@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  DENTIST
+  RECEPTIONIST
+}
+
+enum ClinicType {
+  OWN
+  RENTED
+}
+
+enum BudgetStatus {
+  PENDING
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  DONE
+  CANCELED
+  NO_SHOW
+}
+
+enum ToothRecordStatus {
+  PLANNED
+  DONE
+}
+
+enum RecallStatus {
+  PENDING
+  DONE
+  CANCELED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(DENTIST)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdPatients        Patient[]        @relation("PatientCreatedBy")
+  createdClinicalRecords ClinicalRecord[] @relation("ClinicalRecordCreatedBy")
+  createdBudgets         Budget[]         @relation("BudgetCreatedBy")
+  createdAttendances     Attendance[]     @relation("AttendanceCreatedBy")
+}
+
+model Clinic {
+  id             String     @id @default(cuid())
+  name           String
+  type           ClinicType
+  dailyRentValue Decimal?   @db.Decimal(10, 2)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  appointments Appointment[]
+  attendances  Attendance[]
+}
+
+model Patient {
+  id        String    @id @default(cuid())
+  name      String
+  phone     String
+  birthDate DateTime?
+  address   String?
+
+  createdByUserId String
+  createdBy       User     @relation("PatientCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  anamnesis       Anamnesis?
+  clinicalRecords ClinicalRecord[]
+  toothRecords    ToothRecord[]
+  budgets         Budget[]
+  appointments    Appointment[]
+  attendances     Attendance[]
+  recalls         Recall[]
+}
+
+model Anamnesis {
+  id               String   @id @default(cuid())
+  patientId        String   @unique
+  patient          Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  allergies        String?
+  medications      String?
+  healthConditions String?
+  dentalHistory    String?
+  chiefComplaint   String?
+  updatedAt        DateTime @updatedAt
+}
+
+model ClinicalRecord {
+  id            String   @id @default(cuid())
+  patientId     String
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  date          DateTime
+  procedureNote String
+  observations  String?
+
+  createdByUserId String
+  createdBy       User     @relation("ClinicalRecordCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@index([patientId, date])
+}
+
+model ToothRecord {
+  id          String            @id @default(cuid())
+  patientId   String
+  patient     Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  toothNumber Int
+  procedure   String
+  status      ToothRecordStatus
+  notes       String?
+  updatedAt   DateTime          @updatedAt
+
+  @@index([patientId])
+}
+
+model ProcedureCatalog {
+  id           String  @id @default(cuid())
+  name         String
+  defaultValue Decimal @db.Decimal(10, 2)
+  active       Boolean @default(true)
+
+  budgetItems BudgetItem[]
+  attendances Attendance[]
+}
+
+model Budget {
+  id     String       @id @default(cuid())
+  patientId String
+  patient   Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  status BudgetStatus @default(PENDING)
+
+  createdByUserId String
+  createdBy       User     @relation("BudgetCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items BudgetItem[]
+
+  @@index([patientId])
+}
+
+model BudgetItem {
+  id          String           @id @default(cuid())
+  budgetId    String
+  budget      Budget           @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  procedureId String
+  procedure   ProcedureCatalog @relation(fields: [procedureId], references: [id])
+  toothNumber Int?
+  value       Decimal          @db.Decimal(10, 2)
+  notes       String?
+}
+
+model Appointment {
+  id        String            @id @default(cuid())
+  patientId String
+  patient   Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  clinicId  String
+  clinic    Clinic            @relation(fields: [clinicId], references: [id])
+  startsAt  DateTime
+  status    AppointmentStatus @default(SCHEDULED)
+  notes     String?
+  createdAt DateTime          @default(now())
+
+  attendance Attendance?
+
+  @@index([clinicId, startsAt])
+}
+
+model Attendance {
+  id                String       @id @default(cuid())
+  patientId         String
+  patient           Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointmentId     String?      @unique
+  appointment       Appointment? @relation(fields: [appointmentId], references: [id])
+  clinicId          String
+  clinic            Clinic       @relation(fields: [clinicId], references: [id])
+  procedureId       String
+  procedure         ProcedureCatalog @relation(fields: [procedureId], references: [id])
+  date              DateTime
+  grossValue        Decimal      @db.Decimal(10, 2)
+  repassePercentage Decimal      @db.Decimal(5, 2)
+  materialCost      Decimal      @default(0) @db.Decimal(10, 2)
+
+  createdByUserId String
+  createdBy       User     @relation("AttendanceCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime @default(now())
+
+  materialUsages MaterialUsage[]
+
+  @@index([clinicId, date])
+}
+
+model Material {
+  id           String   @id @default(cuid())
+  name         String
+  unit         String
+  minimumStock Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  batches MaterialBatch[]
+  usages  MaterialUsage[]
+}
+
+model MaterialBatch {
+  id         String    @id @default(cuid())
+  materialId String
+  material   Material  @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  quantity   Decimal   @db.Decimal(10, 2)
+  expiryDate DateTime?
+  receivedAt DateTime  @default(now())
+
+  @@index([materialId])
+}
+
+model MaterialUsage {
+  id           String     @id @default(cuid())
+  attendanceId String
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  materialId   String
+  material     Material   @relation(fields: [materialId], references: [id])
+  quantity     Decimal    @db.Decimal(10, 2)
+}
+
+model Recall {
+  id        String       @id @default(cuid())
+  patientId String
+  patient   Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  dueDate   DateTime
+  reason    String?
+  status    RecallStatus @default(PENDING)
+
+  @@index([patientId])
+}
