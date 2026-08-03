@@ -35,7 +35,11 @@ export class AuthController {
 
   @Post("logout")
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie(REFRESH_COOKIE);
+    // clearCookie precisa dos MESMOS atributos sameSite/secure usados na criação
+    // (ver getRefreshCookieOptions) — um navegador real rejeita silenciosamente um
+    // Set-Cookie de limpeza que não declare SameSite=None+Secure pra um cookie
+    // cross-site, deixando o cookie original intacto (sessão "sobrevive" ao logout).
+    res.clearCookie(REFRESH_COOKIE, this.getRefreshCookieOptions());
     return { success: true };
   }
 
@@ -44,15 +48,21 @@ export class AuthController {
     return user;
   }
 
-  private setRefreshCookie(res: Response, refreshToken: string) {
+  private getRefreshCookieOptions() {
     // Vercel (front) e Render (back) são domínios diferentes: cookie precisa de
     // SameSite=None (+ Secure) pra ser enviado em fetch cross-site com credentials:"include".
     // Em dev local (http://localhost) Secure quebraria o cookie, por isso o fallback abaixo.
     const isProd = process.env.NODE_ENV === "production";
-    res.cookie(REFRESH_COOKIE, refreshToken, {
+    return {
       httpOnly: true,
-      sameSite: isProd ? "none" : "lax",
+      sameSite: (isProd ? "none" : "lax") as "none" | "lax",
       secure: isProd,
+    };
+  }
+
+  private setRefreshCookie(res: Response, refreshToken: string) {
+    res.cookie(REFRESH_COOKIE, refreshToken, {
+      ...this.getRefreshCookieOptions(),
       maxAge: REFRESH_COOKIE_MAX_AGE_MS,
     });
   }
