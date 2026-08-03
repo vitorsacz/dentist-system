@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: dentist-system-api
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: pnpm install --frozen-lockfile && pnpm turbo run build --filter=@dentist-system/api && pnpm --filter @dentist-system/api exec prisma migrate deploy
+    startCommand: node apps/api/dist/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_ADMIN_NAME
+        sync: false
+      - key: SEED_DENTIST_EMAIL
+        sync: false
+      - key: SEED_DENTIST_PASSWORD
+        sync: false
+      - key: SEED_DENTIST_NAME
+        sync: false
