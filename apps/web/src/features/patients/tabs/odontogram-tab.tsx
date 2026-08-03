@@ -131,6 +131,13 @@ export function OdontogramTab({ patientId }: { patientId: string }) {
     },
   });
 
+  const completeMutation = useMutation({
+    mutationFn: (recordId: string) => patientsApi.updateToothRecordStatus(patientId, recordId, "DONE"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["patients", patientId, "tooth-records"] });
+    },
+  });
+
   function selectTooth(tooth: number) {
     setSelectedTooth(tooth);
     setValue("toothNumber", tooth);
@@ -192,9 +199,21 @@ export function OdontogramTab({ patientId }: { patientId: string }) {
                   </span>
                 </div>
                 {record.notes && <p className="mt-1 text-sm text-muted">{record.notes}</p>}
-                <p className="mt-1 text-xs text-muted">
-                  {new Date(record.updatedAt).toLocaleDateString("pt-BR")}
-                </p>
+                <div className="mt-1 flex items-center justify-between">
+                  <p className="text-xs text-muted">
+                    {new Date(record.updatedAt).toLocaleDateString("pt-BR")}
+                  </p>
+                  {record.status === "PLANNED" && (
+                    <button
+                      type="button"
+                      onClick={() => completeMutation.mutate(record.id)}
+                      disabled={completeMutation.isPending}
+                      className="text-xs font-medium text-good disabled:opacity-60"
+                    >
+                      Marcar como realizado
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

@@ -15,3 +15,8 @@ export const upsertToothRecordSchema = z.object({
   notes: z.string().optional(),
 });
 export type UpsertToothRecordInput = z.infer<typeof upsertToothRecordSchema>;
+
+export const updateToothRecordStatusSchema = z.object({
+  status: z.enum(TOOTH_RECORD_STATUSES),
+});
+export type UpdateToothRecordStatusInput = z.infer<typeof updateToothRecordStatusSchema>;

@@ -75,6 +75,8 @@ export const patientsApi = {
     apiClient.get<ToothRecord[]>(`/patients/${patientId}/tooth-records`),
   createToothRecord: (patientId: string, input: UpsertToothRecordInput) =>
     apiClient.post<ToothRecord>(`/patients/${patientId}/tooth-records`, input),
+  updateToothRecordStatus: (patientId: string, id: string, status: string) =>
+    apiClient.patch<ToothRecord>(`/patients/${patientId}/tooth-records/${id}/status`, { status }),
 
   listBudgets: (patientId: string) => apiClient.get<Budget[]>(`/budgets?patientId=${patientId}`),
   createBudget: (input: CreateBudgetInput) => apiClient.post<Budget>("/budgets", input),

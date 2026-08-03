@@ -43,7 +43,9 @@ export {
 
 export {
   upsertToothRecordSchema,
+  updateToothRecordStatusSchema,
   type UpsertToothRecordInput,
+  type UpdateToothRecordStatusInput,
 } from "./odontogram";
 
 export {
