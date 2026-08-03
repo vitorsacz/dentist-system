@@ -19,12 +19,14 @@ export {
   currentUserSchema,
   createUserSchema,
   updateUserSchema,
+  resetPasswordSchema,
   managedUserSchema,
   type LoginInput,
   type AuthTokens,
   type CurrentUser,
   type CreateUserInput,
   type UpdateUserInput,
+  type ResetPasswordInput,
   type ManagedUser,
 } from "./auth";
 

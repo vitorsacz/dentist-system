@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import type { CreateUserInput, UpdateUserInput } from "@dentist-system/shared-types";
+import type { CreateUserInput, UpdateUserInput, ResetPasswordInput } from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -42,6 +42,20 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id },
       data: input,
+      select: USER_SELECT,
+    });
+  }
+
+  async resetPassword(id: string, input: ResetPasswordInput) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException("Usuário não encontrado");
+    }
+
+    const passwordHash = await bcrypt.hash(input.password, 10);
+    return this.prisma.user.update({
+      where: { id },
+      data: { passwordHash },
       select: USER_SELECT,
     });
   }

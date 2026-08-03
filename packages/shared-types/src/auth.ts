@@ -35,6 +35,11 @@ export const updateUserSchema = z.object({
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 
+export const resetPasswordSchema = z.object({
+  password: z.string().min(8, "Senha deve ter ao menos 8 caracteres"),
+});
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
 export const managedUserSchema = z.object({
   id: z.string(),
   email: z.string().email(),
