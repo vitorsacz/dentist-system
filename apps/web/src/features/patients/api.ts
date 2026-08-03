@@ -37,6 +37,7 @@ export interface ToothRecord {
   procedure: string;
   status: string;
   notes: string | null;
+  updatedAt: string;
 }
 
 export interface BudgetItem {
