@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createBudgetSchema, type CreateBudgetInput } from "@dentist-system/shared-types";
-import { patientsApi } from "../api";
+import { patientsApi, type ToothRecord } from "../api";
 import { proceduresApi } from "@/features/procedures/api";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -12,19 +13,60 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETED: "Concluído",
 };
 
+function latestPlannedByTooth(records: ToothRecord[]) {
+  const latestByTooth = new Map<number, ToothRecord>();
+  for (const record of records) {
+    const current = latestByTooth.get(record.toothNumber);
+    if (!current || new Date(record.updatedAt) > new Date(current.updatedAt)) {
+      latestByTooth.set(record.toothNumber, record);
+    }
+  }
+  return [...latestByTooth.values()]
+    .filter((record) => record.status === "PLANNED")
+    .sort((a, b) => a.toothNumber - b.toothNumber);
+}
+
 export function BudgetsTab({ patientId }: { patientId: string }) {
   const queryClient = useQueryClient();
+  const [addedRecordIds, setAddedRecordIds] = useState<Set<string>>(new Set());
   const budgetsQuery = useQuery({
     queryKey: ["patients", patientId, "budgets"],
     queryFn: () => patientsApi.listBudgets(patientId),
   });
   const proceduresQuery = useQuery({ queryKey: ["procedures"], queryFn: proceduresApi.list });
+  const toothRecordsQuery = useQuery({
+    queryKey: ["patients", patientId, "tooth-records"],
+    queryFn: () => patientsApi.listToothRecords(patientId),
+  });
 
   const { register, control, handleSubmit, reset, setValue, formState } = useForm<CreateBudgetInput>({
     resolver: zodResolver(createBudgetSchema),
     defaultValues: { patientId, items: [{ procedureId: "", value: 0 }] },
   });
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
+
+  const plannedSuggestions = latestPlannedByTooth(toothRecordsQuery.data ?? []).filter(
+    (record) => !addedRecordIds.has(record.id),
+  );
+
+  function addSuggestion(record: ToothRecord) {
+    const normalizedRecordProcedure = record.procedure.trim().toLowerCase();
+    const matchedProcedure = proceduresQuery.data?.find((p) => {
+      const normalizedCatalogName = p.name.trim().toLowerCase();
+      return (
+        normalizedCatalogName === normalizedRecordProcedure ||
+        normalizedCatalogName.includes(normalizedRecordProcedure) ||
+        normalizedRecordProcedure.includes(normalizedCatalogName)
+      );
+    });
+    append({
+      procedureId: matchedProcedure?.id ?? "",
+      toothNumber: record.toothNumber,
+      value: matchedProcedure?.defaultValue ?? 0,
+      notes: record.notes ?? record.procedure,
+    });
+    setAddedRecordIds((prev) => new Set(prev).add(record.id));
+  }
 
   const createMutation = useMutation({
     mutationFn: patientsApi.createBudget,
@@ -47,6 +89,26 @@ export function BudgetsTab({ patientId }: { patientId: string }) {
       >
         <h2 className="font-medium text-ink">Novo orçamento</h2>
         <input type="hidden" {...register("patientId")} />
+
+        {plannedSuggestions.length > 0 && (
+          <div className="space-y-2 rounded-md border border-line bg-app p-3">
+            <p className="text-xs text-muted">
+              Sugestões a partir do odontograma (dentes planejados):
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {plannedSuggestions.map((record) => (
+                <button
+                  key={record.id}
+                  type="button"
+                  onClick={() => addSuggestion(record)}
+                  className="rounded-full border border-accent bg-accent-soft px-3 py-1 text-xs font-medium text-accent"
+                >
+                  + Dente {record.toothNumber} — {record.procedure}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {fields.map((field, index) => (
           <div key={field.id} className="grid grid-cols-[2fr_1fr_1fr_auto] items-end gap-2">
