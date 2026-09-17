@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type {
   CreateMaterialBatchInput,
   CreateMaterialInput,
   UpdateMaterialInput,
 } from "@dentist-system/shared-types";
-import { PrismaService } from "../../prisma/prisma.service";
+import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
+import { getTenantContext } from "../../prisma/tenant-context";
 
 const EXPIRY_ALERT_DAYS = 30;
 
@@ -29,7 +30,7 @@ function withAlerts<T extends { minimumStock: unknown; batches: { quantity: unkn
 
 @Injectable()
 export class MaterialsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
 
   async list() {
     const materials = await this.prisma.material.findMany({
@@ -48,7 +49,8 @@ export class MaterialsService {
   }
 
   create(input: CreateMaterialInput) {
-    return this.prisma.material.create({ data: input });
+    const { organizationId } = getTenantContext();
+    return this.prisma.material.create({ data: { ...input, organizationId } });
   }
 
   async update(id: string, input: UpdateMaterialInput) {
@@ -58,6 +60,7 @@ export class MaterialsService {
 
   async addBatch(materialId: string, input: CreateMaterialBatchInput) {
     await this.findOne(materialId);
-    return this.prisma.materialBatch.create({ data: { ...input, materialId } });
+    const { organizationId } = getTenantContext();
+    return this.prisma.materialBatch.create({ data: { ...input, materialId, organizationId } });
   }
 }

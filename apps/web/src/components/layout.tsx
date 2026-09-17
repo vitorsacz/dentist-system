@@ -18,6 +18,7 @@ const NAV_LINKS: NavLinkDef[] = [
   { to: "/procedures", label: "Procedimentos", roles: ["DENTIST"] },
   { to: "/clinics", label: "Consultórios", roles: ["DENTIST"] },
   { to: "/admin/users", label: "Usuários", roles: ["ADMIN"] },
+  { to: "/my-clinic", label: "Minha Clínica", roles: ["ADMIN", "DENTIST", "RECEPTIONIST"] },
 ];
 
 function NavItem({ to, label, end }: { to: string; label: string; end?: boolean }) {

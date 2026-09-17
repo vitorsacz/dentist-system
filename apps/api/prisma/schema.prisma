@@ -49,15 +49,53 @@ model User {
   email        String   @unique
   passwordHash String
   name         String
-  role         Role     @default(DENTIST)
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  memberships            Membership[]
   createdPatients        Patient[]        @relation("PatientCreatedBy")
   createdClinicalRecords ClinicalRecord[] @relation("ClinicalRecordCreatedBy")
   createdBudgets         Budget[]         @relation("BudgetCreatedBy")
   createdAttendances     Attendance[]     @relation("AttendanceCreatedBy")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships     Membership[]
+  clinics         Clinic[]
+  patients        Patient[]
+  anamneses       Anamnesis[]
+  clinicalRecords ClinicalRecord[]
+  toothRecords    ToothRecord[]
+  procedures      ProcedureCatalog[]
+  budgets         Budget[]
+  budgetItems     BudgetItem[]
+  appointments    Appointment[]
+  attendances     Attendance[]
+  materials       Material[]
+  materialBatches MaterialBatch[]
+  materialUsages  MaterialUsage[]
+  recalls         Recall[]
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           Role         @default(DENTIST)
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
 }
 
 model Clinic {
@@ -68,8 +106,13 @@ model Clinic {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   appointments Appointment[]
   attendances  Attendance[]
+
+  @@index([organizationId])
 }
 
 model Patient {
@@ -84,6 +127,9 @@ model Patient {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   anamnesis       Anamnesis?
   clinicalRecords ClinicalRecord[]
   toothRecords    ToothRecord[]
@@ -91,6 +137,8 @@ model Patient {
   appointments    Appointment[]
   attendances     Attendance[]
   recalls         Recall[]
+
+  @@index([organizationId])
 }
 
 model Anamnesis {
@@ -103,6 +151,11 @@ model Anamnesis {
   dentalHistory    String?
   chiefComplaint   String?
   updatedAt        DateTime @updatedAt
+
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 model ClinicalRecord {
@@ -117,7 +170,11 @@ model ClinicalRecord {
   createdBy       User     @relation("ClinicalRecordCreatedBy", fields: [createdByUserId], references: [id])
   createdAt       DateTime @default(now())
 
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   @@index([patientId, date])
+  @@index([organizationId])
 }
 
 model ToothRecord {
@@ -130,7 +187,11 @@ model ToothRecord {
   notes       String?
   updatedAt   DateTime          @updatedAt
 
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   @@index([patientId])
+  @@index([organizationId])
 }
 
 model ProcedureCatalog {
@@ -139,8 +200,13 @@ model ProcedureCatalog {
   defaultValue Decimal @db.Decimal(10, 2)
   active       Boolean @default(true)
 
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   budgetItems BudgetItem[]
   attendances Attendance[]
+
+  @@index([organizationId])
 }
 
 model Budget {
@@ -154,9 +220,13 @@ model Budget {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   items BudgetItem[]
 
   @@index([patientId])
+  @@index([organizationId])
 }
 
 model BudgetItem {
@@ -168,6 +238,11 @@ model BudgetItem {
   toothNumber Int?
   value       Decimal          @db.Decimal(10, 2)
   notes       String?
+
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 model Appointment {
@@ -181,9 +256,13 @@ model Appointment {
   notes     String?
   createdAt DateTime          @default(now())
 
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   attendance Attendance?
 
   @@index([clinicId, startsAt])
+  @@index([organizationId])
 }
 
 model Attendance {
@@ -205,9 +284,13 @@ model Attendance {
   createdBy       User     @relation("AttendanceCreatedBy", fields: [createdByUserId], references: [id])
   createdAt       DateTime @default(now())
 
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   materialUsages MaterialUsage[]
 
   @@index([clinicId, date])
+  @@index([organizationId])
 }
 
 model Material {
@@ -218,8 +301,13 @@ model Material {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   batches MaterialBatch[]
   usages  MaterialUsage[]
+
+  @@index([organizationId])
 }
 
 model MaterialBatch {
@@ -230,7 +318,11 @@ model MaterialBatch {
   expiryDate DateTime?
   receivedAt DateTime  @default(now())
 
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   @@index([materialId])
+  @@index([organizationId])
 }
 
 model MaterialUsage {
@@ -240,6 +332,11 @@ model MaterialUsage {
   materialId   String
   material     Material   @relation(fields: [materialId], references: [id])
   quantity     Decimal    @db.Decimal(10, 2)
+
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 model Recall {
@@ -250,5 +347,9 @@ model Recall {
   reason    String?
   status    RecallStatus @default(PENDING)
 
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   @@index([patientId])
+  @@index([organizationId])
 }

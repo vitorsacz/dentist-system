@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  createUserSchema,
+  createMembershipUserSchema,
   resetPasswordSchema,
-  type CreateUserInput,
+  type CreateMembershipUserInput,
   type ResetPasswordInput,
   type Role,
 } from "@dentist-system/shared-types";
@@ -73,8 +73,8 @@ export function AdminUsersPage() {
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<CreateUserInput>({
-    resolver: zodResolver(createUserSchema),
+  } = useForm<CreateMembershipUserInput>({
+    resolver: zodResolver(createMembershipUserSchema),
     defaultValues: { role: "DENTIST" },
   });
 
@@ -88,8 +88,11 @@ export function AdminUsersPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...input }: { id: string } & Parameters<typeof adminUsersApi.update>[1]) =>
-      adminUsersApi.update(id, input),
+    mutationFn: ({
+      membershipId,
+      ...input
+    }: { membershipId: string } & Parameters<typeof adminUsersApi.update>[1]) =>
+      adminUsersApi.update(membershipId, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
 
@@ -166,9 +169,9 @@ export function AdminUsersPage() {
           </thead>
           <tbody className="divide-y divide-line">
             {usersQuery.data?.map((user) => {
-              const isSelf = user.id === currentUser?.id;
+              const isSelf = user.membershipId === currentUser?.membershipId;
               return (
-                <tr key={user.id}>
+                <tr key={user.membershipId}>
                   <td className="px-4 py-3">{user.name}</td>
                   <td className="px-4 py-3">{user.email}</td>
                   <td className="px-4 py-3">
@@ -176,7 +179,7 @@ export function AdminUsersPage() {
                       value={user.role}
                       disabled={isSelf}
                       onChange={(e) =>
-                        updateMutation.mutate({ id: user.id, role: e.target.value as Role })
+                        updateMutation.mutate({ membershipId: user.membershipId, role: e.target.value as Role })
                       }
                       className="rounded-md border border-line px-2 py-1 text-sm disabled:opacity-50"
                     >
@@ -192,16 +195,18 @@ export function AdminUsersPage() {
                       type="checkbox"
                       checked={user.active}
                       disabled={isSelf}
-                      onChange={(e) => updateMutation.mutate({ id: user.id, active: e.target.checked })}
+                      onChange={(e) =>
+                        updateMutation.mutate({ membershipId: user.membershipId, active: e.target.checked })
+                      }
                     />
                     {isSelf && <span className="ml-2 text-xs text-muted">(você)</span>}
                   </td>
                   <td className="px-4 py-3">
-                    {resetUserId === user.id ? (
-                      <ResetPasswordForm userId={user.id} onDone={() => setResetUserId(null)} />
+                    {resetUserId === user.membershipId ? (
+                      <ResetPasswordForm userId={user.membershipId} onDone={() => setResetUserId(null)} />
                     ) : (
                       <button
-                        onClick={() => setResetUserId(user.id)}
+                        onClick={() => setResetUserId(user.membershipId)}
                         className="text-xs font-medium text-accent"
                       >
                         Redefinir senha

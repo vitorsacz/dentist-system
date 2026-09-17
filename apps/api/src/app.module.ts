@@ -6,8 +6,10 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { RolesGuard } from "./common/guards/roles.guard";
 import { DecimalInterceptor } from "./common/interceptors/decimal.interceptor";
+import { TenantContextInterceptor } from "./common/interceptors/tenant-context.interceptor";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
+import { OrganizationModule } from "./modules/organization/organization.module";
 import { PatientsModule } from "./modules/patients/patients.module";
 import { AnamnesisModule } from "./modules/anamnesis/anamnesis.module";
 import { ClinicalRecordsModule } from "./modules/clinical-records/clinical-records.module";
@@ -31,6 +33,7 @@ import { HealthController } from "./modules/health/health.controller";
     PrismaModule,
     AuthModule,
     UsersModule,
+    OrganizationModule,
     PatientsModule,
     AnamnesisModule,
     ClinicalRecordsModule,
@@ -53,6 +56,10 @@ import { HealthController } from "./modules/health/health.controller";
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TenantContextInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,

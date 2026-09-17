@@ -17,18 +17,28 @@ export {
   loginSchema,
   authTokensSchema,
   currentUserSchema,
-  createUserSchema,
-  updateUserSchema,
   resetPasswordSchema,
-  managedUserSchema,
   type LoginInput,
   type AuthTokens,
   type CurrentUser,
-  type CreateUserInput,
-  type UpdateUserInput,
   type ResetPasswordInput,
-  type ManagedUser,
 } from "./auth";
+
+export {
+  createMembershipUserSchema,
+  updateMembershipSchema,
+  managedMembershipSchema,
+  type CreateMembershipUserInput,
+  type UpdateMembershipInput,
+  type ManagedMembership,
+} from "./membership";
+
+export {
+  clinicMemberSchema,
+  myClinicSchema,
+  type ClinicMember,
+  type MyClinic,
+} from "./organization";
 
 export {
   createPatientSchema,

@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { CreatePatientInput, UpdatePatientInput } from "@dentist-system/shared-types";
-import { PrismaService } from "../../prisma/prisma.service";
+import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
+import { getTenantContext } from "../../prisma/tenant-context";
 
 @Injectable()
 export class PatientsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
 
   list() {
     return this.prisma.patient.findMany({ orderBy: { name: "asc" } });
@@ -19,7 +20,8 @@ export class PatientsService {
   }
 
   create(input: CreatePatientInput, createdByUserId: string) {
-    return this.prisma.patient.create({ data: { ...input, createdByUserId } });
+    const { organizationId } = getTenantContext();
+    return this.prisma.patient.create({ data: { ...input, createdByUserId, organizationId } });
   }
 
   async update(id: string, input: UpdatePatientInput) {

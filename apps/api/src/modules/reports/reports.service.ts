@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import type { FinancialReport, FinancialReportQuery } from "@dentist-system/shared-types";
-import { PrismaService } from "../../prisma/prisma.service";
+import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
 function dayKey(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -8,7 +8,7 @@ function dayKey(date: Date) {
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
 
   async financialReport(query: FinancialReportQuery): Promise<FinancialReport> {
     const attendances = await this.prisma.attendance.findMany({

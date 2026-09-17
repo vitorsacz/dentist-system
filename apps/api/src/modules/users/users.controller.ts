@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import {
-  createUserSchema,
-  updateUserSchema,
+  createMembershipUserSchema,
+  updateMembershipSchema,
   resetPasswordSchema,
-  type CreateUserInput,
-  type UpdateUserInput,
+  type CreateMembershipUserInput,
+  type UpdateMembershipInput,
   type ResetPasswordInput,
 } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
@@ -18,7 +18,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  create(@Body(new ZodValidationPipe(createUserSchema)) body: CreateUserInput) {
+  create(@Body(new ZodValidationPipe(createMembershipUserSchema)) body: CreateMembershipUserInput) {
     return this.usersService.create(body);
   }
 
@@ -29,18 +29,18 @@ export class UsersController {
 
   @Patch(":id")
   update(
-    @Param("id") id: string,
-    @Body(new ZodValidationPipe(updateUserSchema)) body: UpdateUserInput,
+    @Param("id") membershipId: string,
+    @Body(new ZodValidationPipe(updateMembershipSchema)) body: UpdateMembershipInput,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    return this.usersService.update(id, body, currentUser.id);
+    return this.usersService.update(membershipId, body, currentUser.membershipId);
   }
 
   @Patch(":id/password")
   resetPassword(
-    @Param("id") id: string,
+    @Param("id") membershipId: string,
     @Body(new ZodValidationPipe(resetPasswordSchema)) body: ResetPasswordInput,
   ) {
-    return this.usersService.resetPassword(id, body);
+    return this.usersService.resetPassword(membershipId, body);
   }
 }
