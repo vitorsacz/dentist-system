@@ -1,16 +1,16 @@
 import { apiClient } from "@/lib/api-client";
 import type {
-  CreateMembershipUserInput,
-  ManagedMembership,
-  UpdateMembershipInput,
+  CreateTenantUserInput,
+  ManagedTenantUser,
+  UpdateTenantUserInput,
   ResetPasswordInput,
 } from "@dentist-system/shared-types";
 
 export const adminUsersApi = {
-  list: () => apiClient.get<ManagedMembership[]>("/users"),
-  create: (input: CreateMembershipUserInput) => apiClient.post<ManagedMembership>("/users", input),
-  update: (membershipId: string, input: UpdateMembershipInput) =>
-    apiClient.patch<ManagedMembership>(`/users/${membershipId}`, input),
-  resetPassword: (membershipId: string, input: ResetPasswordInput) =>
-    apiClient.patch<ManagedMembership>(`/users/${membershipId}/password`, input),
+  list: () => apiClient.get<ManagedTenantUser[]>("/users"),
+  create: (input: CreateTenantUserInput) => apiClient.post<ManagedTenantUser>("/users", input),
+  update: (userId: string, input: UpdateTenantUserInput) =>
+    apiClient.patch<ManagedTenantUser>(`/users/${userId}`, input),
+  resetPassword: (userId: string, input: ResetPasswordInput) =>
+    apiClient.patch<ManagedTenantUser>(`/users/${userId}/password`, input),
 };

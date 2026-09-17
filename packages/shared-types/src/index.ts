@@ -5,19 +5,29 @@ export {
   APPOINTMENT_STATUSES,
   TOOTH_RECORD_STATUSES,
   RECALL_STATUSES,
+  TENANT_TYPES,
+  ORGANIZATION_STATUSES,
   type Role,
   type ClinicType,
   type BudgetStatus,
   type AppointmentStatus,
   type ToothRecordStatus,
   type RecallStatus,
+  type TenantType,
+  type OrganizationStatus,
 } from "./enums";
 
 export {
+  lookupAccountsSchema,
+  accountOptionSchema,
+  lookupAccountsResultSchema,
   loginSchema,
   authTokensSchema,
   currentUserSchema,
   resetPasswordSchema,
+  type LookupAccountsInput,
+  type AccountOption,
+  type LookupAccountsResult,
   type LoginInput,
   type AuthTokens,
   type CurrentUser,
@@ -25,13 +35,13 @@ export {
 } from "./auth";
 
 export {
-  createMembershipUserSchema,
-  updateMembershipSchema,
-  managedMembershipSchema,
-  type CreateMembershipUserInput,
-  type UpdateMembershipInput,
-  type ManagedMembership,
-} from "./membership";
+  createTenantUserSchema,
+  updateTenantUserSchema,
+  managedTenantUserSchema,
+  type CreateTenantUserInput,
+  type UpdateTenantUserInput,
+  type ManagedTenantUser,
+} from "./tenant-user";
 
 export {
   clinicMemberSchema,
@@ -39,6 +49,15 @@ export {
   type ClinicMember,
   type MyClinic,
 } from "./organization";
+
+export {
+  createOrganizationSchema,
+  platformOrganizationSchema,
+  transferFoundingAdminSchema,
+  type CreateOrganizationInput,
+  type PlatformOrganization,
+  type TransferFoundingAdminInput,
+} from "./platform";
 
 export {
   createPatientSchema,

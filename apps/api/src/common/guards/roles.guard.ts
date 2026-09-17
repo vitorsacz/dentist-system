@@ -19,7 +19,7 @@ export class RolesGuard {
 
     const request = context.switchToHttp().getRequest();
     const user = request.user as AuthenticatedUser | undefined;
-    if (!user || !requiredRoles.includes(user.role)) {
+    if (!user || !user.role || !requiredRoles.includes(user.role)) {
       throw new ForbiddenException("Sem permissão para acessar este recurso");
     }
     return true;

@@ -18,7 +18,7 @@ interface OrgContext {
   organizationId: string;
   dentistToken: string;
   adminToken: string;
-  adminMembershipId: string;
+  adminUserId: string;
 }
 
 async function seedOrgContext(app: INestApplication, label: string): Promise<OrgContext> {
@@ -26,29 +26,38 @@ async function seedOrgContext(app: INestApplication, label: string): Promise<Org
   const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);
 
   const dentistUser = await rawPrisma.user.create({
-    data: { email: `${label}-dentist-${Date.now()}-${Math.random()}@test.com`, passwordHash, name: `${label} Dentista` },
+    data: {
+      organizationId: org.id,
+      email: `${label}-dentist-${Date.now()}-${Math.random()}@test.com`,
+      passwordHash,
+      name: `${label} Dentista`,
+      role: "DENTIST",
+    },
   });
-  await rawPrisma.membership.create({ data: { userId: dentistUser.id, organizationId: org.id, role: "DENTIST" } });
 
   const adminUser = await rawPrisma.user.create({
-    data: { email: `${label}-admin-${Date.now()}-${Math.random()}@test.com`, passwordHash, name: `${label} Admin` },
+    data: {
+      organizationId: org.id,
+      email: `${label}-admin-${Date.now()}-${Math.random()}@test.com`,
+      passwordHash,
+      name: `${label} Admin`,
+      role: "ADMIN",
+    },
   });
-  const adminMembership = await rawPrisma.membership.create({
-    data: { userId: adminUser.id, organizationId: org.id, role: "ADMIN" },
-  });
+  await rawPrisma.organization.update({ where: { id: org.id }, data: { foundingAdminUserId: adminUser.id } });
 
   const dentistLogin = await request(app.getHttpServer())
     .post("/auth/login")
-    .send({ email: dentistUser.email, password: TEST_PASSWORD });
+    .send({ identifier: dentistUser.email, password: TEST_PASSWORD });
   const adminLogin = await request(app.getHttpServer())
     .post("/auth/login")
-    .send({ email: adminUser.email, password: TEST_PASSWORD });
+    .send({ identifier: adminUser.email, password: TEST_PASSWORD });
 
   return {
     organizationId: org.id,
     dentistToken: dentistLogin.body.accessToken,
     adminToken: adminLogin.body.accessToken,
-    adminMembershipId: adminMembership.id,
+    adminUserId: adminUser.id,
   };
 }
 
@@ -65,6 +74,13 @@ describe("Isolamento cross-tenant", () => {
         request(server()).post(path).set("Authorization", `Bearer ${token}`).send(body),
       patch: (path: string, body: Record<string, unknown>) =>
         request(server()).patch(path).set("Authorization", `Bearer ${token}`).send(body),
+    };
+  }
+
+  function noAuth() {
+    const server = () => app.getHttpServer();
+    return {
+      post: (path: string, body: Record<string, unknown>) => request(server()).post(path).send(body),
     };
   }
 
@@ -259,7 +275,7 @@ describe("Isolamento cross-tenant", () => {
     expect(listB.body.some((r: { id: string }) => r.id === recallId)).toBe(false);
   });
 
-  it("Users/Membership: criar em A, list/PATCH por membershipId em B dão vazio/404", async () => {
+  it("Users: criar em A, list/PATCH por userId em B dão vazio/404", async () => {
     const created = await as(orgA.adminToken).post("/users", {
       email: `membro-a-${Date.now()}@test.com`,
       password: TEST_PASSWORD,
@@ -267,14 +283,126 @@ describe("Isolamento cross-tenant", () => {
       role: "DENTIST",
     });
     expect(created.status).toBe(201);
-    const membershipId = created.body.membershipId;
+    const userId = created.body.userId;
 
     const listB = await as(orgB.adminToken).get("/users");
-    expect(listB.body.some((m: { membershipId: string }) => m.membershipId === membershipId)).toBe(false);
+    expect(listB.body.some((u: { userId: string }) => u.userId === userId)).toBe(false);
 
-    expect((await as(orgB.adminToken).patch(`/users/${membershipId}`, { active: false })).status).toBe(404);
+    expect((await as(orgB.adminToken).patch(`/users/${userId}`, { active: false })).status).toBe(404);
     expect(
-      (await as(orgB.adminToken).patch(`/users/${membershipId}/password`, { password: TEST_PASSWORD })).status,
+      (await as(orgB.adminToken).patch(`/users/${userId}/password`, { password: TEST_PASSWORD })).status,
     ).toBe(404);
+  });
+
+  it("Capitania: admin não-fundador não pode editar/desativar outro admin da mesma clínica", async () => {
+    const secondAdminEmail = `segundo-admin-${Date.now()}@test.com`;
+    const created = await as(orgA.adminToken).post("/users", {
+      email: secondAdminEmail,
+      password: TEST_PASSWORD,
+      name: "Segundo Admin",
+      role: "ADMIN",
+    });
+    expect(created.status).toBe(201);
+    const secondAdminUserId = created.body.userId;
+
+    const secondAdminLogin = await noAuth().post("/auth/login", { identifier: secondAdminEmail, password: TEST_PASSWORD });
+    const secondAdminToken = secondAdminLogin.body.accessToken;
+
+    // O admin fundador (orgA.adminUserId) pode editar o segundo admin.
+    expect(
+      (await as(orgA.adminToken).patch(`/users/${secondAdminUserId}`, { active: false })).status,
+    ).toBe(200);
+
+    // Reativa antes do próximo teste.
+    await as(orgA.adminToken).patch(`/users/${secondAdminUserId}`, { active: true });
+
+    // O segundo admin (não-fundador) NÃO pode editar o admin fundador.
+    expect(
+      (await as(secondAdminToken).patch(`/users/${orgA.adminUserId}`, { active: false })).status,
+    ).toBe(403);
+  });
+
+  it("Login multi-tenant: e-mail repetido entre organizations exige organizationId", async () => {
+    const sharedEmail = `compartilhado-${Date.now()}@test.com`;
+    const createdInA = await as(orgA.adminToken).post("/users", {
+      email: sharedEmail,
+      password: TEST_PASSWORD,
+      name: "Pessoa A",
+      role: "DENTIST",
+    });
+    expect(createdInA.status).toBe(201);
+    const createdInB = await as(orgB.adminToken).post("/users", {
+      email: sharedEmail,
+      password: TEST_PASSWORD,
+      name: "Pessoa B",
+      role: "DENTIST",
+    });
+    expect(createdInB.status).toBe(201);
+
+    const lookup = await noAuth().post("/auth/lookup", { identifier: sharedEmail });
+    expect(lookup.status).toBe(201);
+    expect(lookup.body.requiresOrganizationSelection).toBe(true);
+    expect(lookup.body.accounts).toHaveLength(2);
+
+    // Sem organizationId: ambíguo, 401.
+    const loginWithoutOrg = await noAuth().post("/auth/login", { identifier: sharedEmail, password: TEST_PASSWORD });
+    expect(loginWithoutOrg.status).toBe(401);
+
+    // Com organizationId certo: entra normalmente.
+    const loginWithOrg = await noAuth().post("/auth/login", {
+      identifier: sharedEmail,
+      password: TEST_PASSWORD,
+      organizationId: orgA.organizationId,
+    });
+    expect(loginWithOrg.status).toBe(201);
+    expect(loginWithOrg.body.accessToken).toBeTruthy();
+  });
+
+  it("Login por nickname: sempre 1:1, nunca pede escolha de organização", async () => {
+    const nickname = `apelido-${Date.now()}`;
+    await rawPrisma.user.update({
+      where: { id: orgA.adminUserId },
+      data: { nickname },
+    });
+
+    const lookup = await noAuth().post("/auth/lookup", { identifier: nickname });
+    expect(lookup.body.requiresOrganizationSelection).toBe(false);
+
+    const login = await noAuth().post("/auth/login", { identifier: nickname, password: TEST_PASSWORD });
+    expect(login.status).toBe(201);
+    expect(login.body.accessToken).toBeTruthy();
+  });
+
+  it("SuperAdminGuard: bloqueia usuário comum em /platform e libera Super Admin", async () => {
+    expect((await as(orgA.adminToken).get("/platform/organizations")).status).toBe(403);
+    expect((await as(orgA.dentistToken).get("/platform/organizations")).status).toBe(403);
+
+    const superAdminEmail = `super-${Date.now()}@test.com`;
+    const superAdminPasswordHash = await bcrypt.hash(TEST_PASSWORD, 10);
+    await rawPrisma.user.create({
+      data: {
+        email: superAdminEmail,
+        passwordHash: superAdminPasswordHash,
+        name: "Super Admin Teste",
+        isSuperAdmin: true,
+        organizationId: null,
+        role: null,
+      },
+    });
+    const superAdminLogin = await noAuth().post("/auth/login", { identifier: superAdminEmail, password: TEST_PASSWORD });
+    const superAdminToken = superAdminLogin.body.accessToken;
+
+    const list = await as(superAdminToken).get("/platform/organizations");
+    expect(list.status).toBe(200);
+    expect(Array.isArray(list.body)).toBe(true);
+
+    const createOrg = await as(superAdminToken).post("/platform/organizations", {
+      name: `Clínica criada pelo Super Admin ${Date.now()}`,
+      foundingAdminEmail: `founding-${Date.now()}@test.com`,
+      foundingAdminName: "Fundador",
+      foundingAdminPassword: TEST_PASSWORD,
+    });
+    expect(createOrg.status).toBe(201);
+    expect(createOrg.body.foundingAdminUserId).toBeTruthy();
   });
 });

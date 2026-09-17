@@ -1,7 +1,7 @@
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
-import type { LoginInput, Role } from "@dentist-system/shared-types";
+import type { LoginInput, LookupAccountsResult, Role } from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
@@ -11,9 +11,18 @@ const REFRESH_TOKEN_TTL = "30d";
 interface JwtPayload {
   sub: string;
   email: string;
-  organizationId: string;
-  membershipId: string;
-  role: Role;
+  organizationId: string | null;
+  role: Role | null;
+  isSuperAdmin: boolean;
+}
+
+interface AuthenticatedUserRecord {
+  id: string;
+  email: string;
+  organizationId: string | null;
+  role: Role | null;
+  isSuperAdmin: boolean;
+  passwordHash: string;
 }
 
 @Injectable()
@@ -24,30 +33,51 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
+  // Identidade é isolada por tenant — um e-mail pode existir em mais de uma
+  // organização (contas completamente independentes). Essa busca é
+  // deliberadamente global (sem organizationId), porque nesse ponto do fluxo
+  // ainda não sabemos qual organização o usuário quer acessar.
+  async lookupAccounts(identifier: string): Promise<LookupAccountsResult> {
+    const users = await this.prisma.user.findMany({
+      where: { active: true, OR: [{ email: identifier }, { nickname: identifier }] },
+      include: { organization: true },
+    });
+
+    if (users.length <= 1) {
+      return { requiresOrganizationSelection: false, accounts: [] };
+    }
+
+    return {
+      requiresOrganizationSelection: true,
+      accounts: users.map((user) => ({
+        organizationId: user.organizationId ?? "",
+        organizationName: user.organization?.name ?? "",
+      })),
+    };
+  }
+
   async login(input: LoginInput) {
-    const user = await this.prisma.user.findUnique({ where: { email: input.email } });
-    if (!user || !user.active) {
+    const { identifier, password, organizationId } = input;
+
+    const where = organizationId
+      ? { organizationId, active: true, OR: [{ email: identifier }, { nickname: identifier }] }
+      : { active: true, OR: [{ email: identifier }, { nickname: identifier }] };
+
+    const users = await this.prisma.user.findMany({ where });
+    // 0 contas: não existe. Mais de 1: ambíguo, precisa organizationId (o
+    // front deveria ter chamado lookupAccounts antes e nunca chegar aqui sem
+    // ele). Em ambos os casos, mesma mensagem genérica — não revela qual caso é.
+    const [user] = users;
+    if (users.length !== 1 || !user) {
       throw new UnauthorizedException("Credenciais inválidas");
     }
 
-    const isValid = await bcrypt.compare(input.password, user.passwordHash);
+    const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       throw new UnauthorizedException("Credenciais inválidas");
     }
 
-    // Hoje todo usuário real tem exatamente uma membership. Se algum dia
-    // tiver mais de uma (ex.: dentista atendendo em 2 clínicas), a primeira
-    // por createdAt é escolhida deterministicamente — é aqui que um seletor
-    // de organização entraria no futuro, não existe hoje de propósito.
-    const membership = await this.prisma.membership.findFirst({
-      where: { userId: user.id, active: true },
-      orderBy: { createdAt: "asc" },
-    });
-    if (!membership) {
-      throw new UnauthorizedException("Usuário sem acesso a nenhuma organização");
-    }
-
-    return this.issueTokens(user.id, user.email, membership.organizationId, membership.id, membership.role);
+    return this.issueTokens(user);
   }
 
   async refresh(refreshToken: string | undefined) {
@@ -64,22 +94,20 @@ export class AuthService {
         throw new UnauthorizedException("Refresh token inválido");
       }
 
-      // Ancorado na MESMA membership do token anterior (não "primeira de
-      // novo") — a sessão não pula de organização sozinha se o usuário ganhar
-      // uma segunda membership depois de logado.
-      const membership = await this.prisma.membership.findUnique({ where: { id: payload.membershipId } });
-      if (!membership || membership.userId !== user.id || !membership.active) {
-        throw new UnauthorizedException("Refresh token inválido");
-      }
-
-      return this.issueTokens(user.id, user.email, membership.organizationId, membership.id, membership.role);
+      return this.issueTokens(user);
     } catch {
       throw new UnauthorizedException("Refresh token inválido");
     }
   }
 
-  private issueTokens(userId: string, email: string, organizationId: string, membershipId: string, role: Role) {
-    const payload: JwtPayload = { sub: userId, email, organizationId, membershipId, role };
+  private issueTokens(user: AuthenticatedUserRecord) {
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      organizationId: user.organizationId,
+      role: user.role,
+      isSuperAdmin: user.isSuperAdmin,
+    };
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.getOrThrow<string>("JWT_ACCESS_SECRET"),

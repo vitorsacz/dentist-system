@@ -15,3 +15,9 @@ export type ToothRecordStatus = (typeof TOOTH_RECORD_STATUSES)[number];
 
 export const RECALL_STATUSES = ["PENDING", "DONE", "CANCELED"] as const;
 export type RecallStatus = (typeof RECALL_STATUSES)[number];
+
+export const TENANT_TYPES = ["CLINIC"] as const;
+export type TenantType = (typeof TENANT_TYPES)[number];
+
+export const ORGANIZATION_STATUSES = ["ACTIVE", "SUSPENDED", "DELETED"] as const;
+export type OrganizationStatus = (typeof ORGANIZATION_STATUSES)[number];

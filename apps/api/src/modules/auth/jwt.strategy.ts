@@ -8,9 +8,9 @@ import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service"
 interface JwtPayload {
   sub: string;
   email: string;
-  organizationId: string;
-  membershipId: string;
-  role: Role;
+  organizationId: string | null;
+  role: Role | null;
+  isSuperAdmin: boolean;
 }
 
 @Injectable()
@@ -26,19 +26,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, email: true, name: true, active: true },
-    });
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user || !user.active) {
-      throw new UnauthorizedException();
-    }
-
-    // Re-checado a cada request (mesmo padrão do `user.active` acima):
-    // desativar uma membership ou trocar seu papel vale na próxima request,
-    // não só depois do access token expirar (15min).
-    const membership = await this.prisma.membership.findUnique({ where: { id: payload.membershipId } });
-    if (!membership || membership.userId !== user.id || !membership.active) {
       throw new UnauthorizedException();
     }
 
@@ -46,9 +35,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       id: user.id,
       email: user.email,
       name: user.name,
-      organizationId: membership.organizationId,
-      membershipId: membership.id,
-      role: membership.role,
+      organizationId: user.organizationId,
+      role: user.role,
+      isSuperAdmin: user.isSuperAdmin,
     };
   }
 }

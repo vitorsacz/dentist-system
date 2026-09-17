@@ -9,7 +9,7 @@ export class OrganizationService {
   async findMine(organizationId: string): Promise<MyClinic> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
-      include: { memberships: { include: { user: true }, orderBy: { createdAt: "asc" } } },
+      include: { users: { orderBy: { createdAt: "asc" } } },
     });
     if (!organization) {
       throw new NotFoundException("Organização não encontrada");
@@ -18,11 +18,12 @@ export class OrganizationService {
     return {
       id: organization.id,
       name: organization.name,
-      members: organization.memberships.map((membership) => ({
-        membershipId: membership.id,
-        name: membership.user.name,
-        role: membership.role,
-        active: membership.active,
+      // role só é null pra Super Admin, que nunca pertence a uma organização.
+      members: organization.users.map((user) => ({
+        userId: user.id,
+        name: user.name,
+        role: user.role as MyClinic["members"][number]["role"],
+        active: user.active,
       })),
     };
   }

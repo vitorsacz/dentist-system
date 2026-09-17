@@ -5,9 +5,9 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   name: string;
-  role: Role;
-  organizationId: string;
-  membershipId: string;
+  organizationId: string | null;
+  role: Role | null;
+  isSuperAdmin: boolean;
 }
 
 export const CurrentUser = createParamDecorator(

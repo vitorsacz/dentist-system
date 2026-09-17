@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ROLES } from "./enums";
 
 export const clinicMemberSchema = z.object({
-  membershipId: z.string(),
+  userId: z.string(),
   name: z.string(),
   role: z.enum(ROLES),
   active: z.boolean(),

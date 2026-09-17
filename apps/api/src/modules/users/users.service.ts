@@ -1,106 +1,90 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type {
-  CreateMembershipUserInput,
-  UpdateMembershipInput,
-  ResetPasswordInput,
-  ManagedMembership,
-} from "@dentist-system/shared-types";
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import type { CreateTenantUserInput, UpdateTenantUserInput, ResetPasswordInput, ManagedTenantUser } from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
-import { getTenantContext } from "../../prisma/tenant-context";
 
-interface MembershipWithUser {
+interface UserRecord {
   id: string;
-  role: ManagedMembership["role"];
+  email: string;
+  name: string;
+  role: ManagedTenantUser["role"] | null;
   active: boolean;
   createdAt: Date;
-  user: { id: string; email: string; name: string };
 }
 
-function toManagedMembership(membership: MembershipWithUser): ManagedMembership {
+function toManagedTenantUser(user: UserRecord): ManagedTenantUser {
   return {
-    membershipId: membership.id,
-    userId: membership.user.id,
-    email: membership.user.email,
-    name: membership.user.name,
-    role: membership.role,
-    active: membership.active,
-    createdAt: membership.createdAt.toISOString(),
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    // role só é null pra Super Admin, que nunca aparece nesta lista (ela é
+    // sempre filtrada por organizationId) — seguro converter aqui.
+    role: user.role as ManagedTenantUser["role"],
+    active: user.active,
+    createdAt: user.createdAt.toISOString(),
   };
 }
 
-// User/Organization/Membership ficam de fora da extension de tenant (são o
-// próprio mecanismo de resolução, não dado de negócio) — toda query aqui
-// filtra organizationId manualmente via getTenantContext(), sem rede de
-// segurança automática como o resto dos services tem.
+// User fica fora da extension de tenant (é o próprio mecanismo de resolução —
+// login precisa buscar por e-mail sem saber a organização ainda) — toda query
+// aqui filtra organizationId manualmente, sem rede de segurança automática.
 @Injectable()
 export class UsersService {
   constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
 
-  async create(input: CreateMembershipUserInput) {
-    const { organizationId } = getTenantContext();
-
-    let user = await this.prisma.user.findUnique({ where: { email: input.email } });
-    if (!user) {
-      const passwordHash = await bcrypt.hash(input.password, 10);
-      user = await this.prisma.user.create({ data: { email: input.email, passwordHash, name: input.name } });
+  async create(input: CreateTenantUserInput, organizationId: string) {
+    // Checagem de e-mail já existente só dentro do próprio tenant — nunca
+    // revela se aquele e-mail existe em outra organização.
+    const existing = await this.prisma.user.findFirst({ where: { organizationId, email: input.email } });
+    if (existing) {
+      throw new ConflictException("E-mail já cadastrado nesta organização");
     }
 
-    const existingMembership = await this.prisma.membership.findUnique({
-      where: { userId_organizationId: { userId: user.id, organizationId } },
+    const passwordHash = await bcrypt.hash(input.password, 10);
+    const user = await this.prisma.user.create({
+      data: { organizationId, email: input.email, passwordHash, name: input.name, role: input.role },
     });
-    if (existingMembership) {
-      throw new ConflictException("Usuário já tem acesso a esta organização");
-    }
-
-    const membership = await this.prisma.membership.create({
-      data: { userId: user.id, organizationId, role: input.role },
-      include: { user: true },
-    });
-    return toManagedMembership(membership);
+    return toManagedTenantUser(user);
   }
 
-  async list() {
-    const { organizationId } = getTenantContext();
-    const memberships = await this.prisma.membership.findMany({
+  async list(organizationId: string) {
+    const users = await this.prisma.user.findMany({
       where: { organizationId },
-      include: { user: true },
       orderBy: { createdAt: "asc" },
     });
-    return memberships.map(toManagedMembership);
+    return users.map(toManagedTenantUser);
   }
 
-  async update(membershipId: string, input: UpdateMembershipInput, currentMembershipId: string) {
-    const { organizationId } = getTenantContext();
-    const membership = await this.prisma.membership.findFirst({ where: { id: membershipId, organizationId } });
-    if (!membership) {
+  async update(userId: string, input: UpdateTenantUserInput, organizationId: string, currentUserId: string) {
+    const target = await this.prisma.user.findFirst({ where: { id: userId, organizationId } });
+    if (!target) {
       throw new NotFoundException("Usuário não encontrado");
     }
 
-    if (membershipId === currentMembershipId && (input.active === false || (input.role && input.role !== "ADMIN"))) {
+    if (userId === currentUserId && (input.active === false || (input.role && input.role !== "ADMIN"))) {
       throw new BadRequestException("Você não pode desativar ou rebaixar a própria conta de admin");
     }
 
-    const updated = await this.prisma.membership.update({
-      where: { id: membershipId },
-      data: input,
-      include: { user: true },
-    });
-    return toManagedMembership(updated);
+    // Capitania da clínica: só o admin fundador pode editar/desativar outro admin.
+    if (target.role === "ADMIN" && target.id !== currentUserId) {
+      const organization = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+      if (organization?.foundingAdminUserId !== currentUserId) {
+        throw new ForbiddenException("Só o admin fundador pode gerenciar outros admins desta clínica");
+      }
+    }
+
+    const updated = await this.prisma.user.update({ where: { id: userId }, data: input });
+    return toManagedTenantUser(updated);
   }
 
-  async resetPassword(membershipId: string, input: ResetPasswordInput) {
-    const { organizationId } = getTenantContext();
-    const membership = await this.prisma.membership.findFirst({
-      where: { id: membershipId, organizationId },
-      include: { user: true },
-    });
-    if (!membership) {
+  async resetPassword(userId: string, input: ResetPasswordInput, organizationId: string) {
+    const target = await this.prisma.user.findFirst({ where: { id: userId, organizationId } });
+    if (!target) {
       throw new NotFoundException("Usuário não encontrado");
     }
 
     const passwordHash = await bcrypt.hash(input.password, 10);
-    const user = await this.prisma.user.update({ where: { id: membership.userId }, data: { passwordHash } });
-    return toManagedMembership({ ...membership, user });
+    const updated = await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    return toManagedTenantUser(updated);
   }
 }

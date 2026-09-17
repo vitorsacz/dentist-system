@@ -10,6 +10,7 @@ import { TenantContextInterceptor } from "./common/interceptors/tenant-context.i
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
 import { OrganizationModule } from "./modules/organization/organization.module";
+import { PlatformModule } from "./modules/platform/platform.module";
 import { PatientsModule } from "./modules/patients/patients.module";
 import { AnamnesisModule } from "./modules/anamnesis/anamnesis.module";
 import { ClinicalRecordsModule } from "./modules/clinical-records/clinical-records.module";
@@ -34,6 +35,7 @@ import { HealthController } from "./modules/health/health.controller";
     AuthModule,
     UsersModule,
     OrganizationModule,
+    PlatformModule,
     PatientsModule,
     AnamnesisModule,
     ClinicalRecordsModule,
