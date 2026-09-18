@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 body {
-  @apply bg-app text-ink;
+  @apply bg-app text-ink font-sans;
 }
 
 .tabular {

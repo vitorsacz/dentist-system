@@ -1,90 +1,194 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { apiClient } from "@/lib/api-client";
+import Chart from "react-apexcharts";
+import { CalendarCheck, DollarSign, Percent, Users } from "lucide-react";
+import type { AppointmentStatus } from "@dentist-system/shared-types";
 import { useAuth } from "@/lib/auth-context";
+import { Card } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertBanner } from "@/components/ui/alert-banner";
+import { DashboardHeader } from "./dashboard-header";
+import { useMockDashboardOverview } from "./mock-data";
 
-interface AppointmentRow {
-  id: string;
-  startsAt: string;
-  status: string;
-  patient: { name: string };
-  clinic: { name: string };
-}
+const STATUS_LABEL: Record<AppointmentStatus, string> = {
+  SCHEDULED: "Agendado",
+  DONE: "Realizado",
+  CANCELED: "Cancelado",
+  NO_SHOW: "Faltou",
+};
 
-interface RecallRow {
-  id: string;
-  dueDate: string;
-  reason: string | null;
-  patient: { name: string };
-}
+const STATUS_TONE: Record<AppointmentStatus, BadgeTone> = {
+  SCHEDULED: "warning",
+  DONE: "success",
+  CANCELED: "error",
+  NO_SHOW: "neutral",
+};
 
-function todayRange() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-  return { from: start.toISOString(), to: end.toISOString() };
+const BUDGET_STATUS_LABEL: Record<string, string> = {
+  PENDING: "Pendente",
+  APPROVED: "Aprovado",
+  IN_PROGRESS: "Em andamento",
+  COMPLETED: "Concluído",
+};
+
+function formatCurrency(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const { from, to } = todayRange();
-
-  const appointmentsQuery = useQuery({
-    queryKey: ["appointments", "today"],
-    queryFn: () => apiClient.get<AppointmentRow[]>(`/appointments?from=${from}&to=${to}`),
-  });
-
-  const recallsQuery = useQuery({
-    queryKey: ["recalls", "pending"],
-    queryFn: () => apiClient.get<RecallRow[]>("/recalls"),
-  });
+  const { data, isLoading } = useMockDashboardOverview();
+  const showRevenue = user?.role === "DENTIST";
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-ink">Olá, {user?.name}</h1>
-        <p className="text-sm text-muted">Resumo do dia</p>
-      </div>
+    <div className="min-h-screen bg-app">
+      <DashboardHeader />
 
-      <section className="rounded-lg border border-line bg-surface p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-medium text-ink">Consultas de hoje</h2>
-          <Link to="/agenda" className="text-sm text-accent">
-            Ver agenda
-          </Link>
+      <main className="space-y-6 p-8">
+        <div>
+          <p className="text-sm text-muted">Home</p>
+          <h1 className="mt-1 text-2xl font-semibold text-ink">Olá, {user?.name}</h1>
         </div>
-        {appointmentsQuery.isLoading && <p className="text-sm text-muted">Carregando…</p>}
-        {appointmentsQuery.data?.length === 0 && (
-          <p className="text-sm text-muted">Nenhuma consulta agendada para hoje.</p>
-        )}
-        <ul className="divide-y divide-line">
-          {appointmentsQuery.data?.map((appt) => (
-            <li key={appt.id} className="flex items-center justify-between py-2 text-sm">
-              <span>
-                {new Date(appt.startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} —{" "}
-                {appt.patient.name}
-              </span>
-              <span className="text-muted">{appt.clinic.name}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
 
-      <section className="rounded-lg border border-line bg-surface p-6">
-        <h2 className="mb-4 font-medium text-ink">Retornos pendentes</h2>
-        {recallsQuery.data?.length === 0 && <p className="text-sm text-muted">Nenhum retorno pendente.</p>}
-        <ul className="divide-y divide-line">
-          {recallsQuery.data?.map((recall) => (
-            <li key={recall.id} className="flex items-center justify-between py-2 text-sm">
-              <span>{recall.patient.name}</span>
-              <span className="text-muted">
-                {new Date(recall.dueDate).toLocaleDateString("pt-BR")} {recall.reason ? `— ${recall.reason}` : ""}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+        {isLoading && <Skeleton className="h-16 w-full" />}
+        {!isLoading && data?.hasIncompleteProfile && (
+          <AlertBanner>
+            Alguns dados da sua clínica ainda estão incompletos.{" "}
+            <Link to="/my-clinic" className="font-medium underline">
+              Completar cadastro
+            </Link>
+          </AlertBanner>
+        )}
+
+        <div className={`grid gap-4 sm:grid-cols-2 ${showRevenue ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+          {isLoading ? (
+            Array.from({ length: showRevenue ? 4 : 3 }).map((_, i) => <Skeleton key={i} className="h-32" />)
+          ) : (
+            <>
+              <StatCard label="Dentistas ativos" value={data?.activeDentists} icon={<Users className="h-5 w-5" />} />
+              <StatCard
+                label="Pacientes atendidos no mês"
+                value={data?.patientsAttendedThisMonth}
+                icon={<CalendarCheck className="h-5 w-5" />}
+              />
+              {showRevenue && (
+                <StatCard
+                  label="Faturamento do mês"
+                  value={formatCurrency(data?.revenueThisMonth ?? 0)}
+                  icon={<DollarSign className="h-5 w-5" />}
+                />
+              )}
+              <StatCard
+                label="Ocupação da agenda"
+                value={`${data?.agendaOccupancyPercent ?? 0}%`}
+                icon={<Percent className="h-5 w-5" />}
+              />
+            </>
+          )}
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <h2 className="mb-4 font-medium text-ink">Receita por mês</h2>
+            {isLoading || !data ? (
+              <Skeleton className="h-64" />
+            ) : (
+              <Chart
+                type="bar"
+                height={260}
+                options={{
+                  chart: { toolbar: { show: false } },
+                  colors: ["#465FFF"],
+                  plotOptions: { bar: { borderRadius: 4, columnWidth: "45%" } },
+                  dataLabels: { enabled: false },
+                  xaxis: { categories: data.revenueByMonth.map((m) => m.month) },
+                  yaxis: { labels: { formatter: (v: number) => formatCurrency(v) } },
+                  grid: { borderColor: "#E4E7EC" },
+                }}
+                series={[{ name: "Receita", data: data.revenueByMonth.map((m) => m.revenue) }]}
+              />
+            )}
+          </Card>
+
+          <Card>
+            <h2 className="mb-4 font-medium text-ink">Orçamentos por status</h2>
+            {isLoading || !data ? (
+              <Skeleton className="h-64" />
+            ) : (
+              <Chart
+                type="donut"
+                height={260}
+                options={{
+                  labels: data.budgetsByStatus.map((b) => BUDGET_STATUS_LABEL[b.status] ?? b.status),
+                  colors: ["#F79009", "#0BA5EC", "#465FFF", "#12B76A"],
+                  legend: { position: "bottom" },
+                  dataLabels: { enabled: false },
+                }}
+                series={data.budgetsByStatus.map((b) => b.count)}
+              />
+            )}
+          </Card>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <h2 className="mb-4 font-medium text-ink">Meta de faturamento do mês</h2>
+            {isLoading || !data ? (
+              <Skeleton className="h-64" />
+            ) : (
+              <Chart
+                type="radialBar"
+                height={260}
+                options={{
+                  colors: ["#465FFF"],
+                  plotOptions: {
+                    radialBar: {
+                      hollow: { size: "65%" },
+                      dataLabels: {
+                        name: { show: false },
+                        value: { fontSize: "28px", fontWeight: 700, color: "#1D2939", formatter: (v: number) => `${v}%` },
+                      },
+                    },
+                  },
+                }}
+                series={[data.monthlyGoalPercent]}
+              />
+            )}
+          </Card>
+
+          <Card>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-medium text-ink">Hoje</h2>
+              <Link to="/agenda" className="text-sm text-accent">
+                Ver agenda completa
+              </Link>
+            </div>
+            {isLoading || !data ? (
+              <Skeleton className="h-64" />
+            ) : data.todayAppointments.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <p className="text-sm text-muted">Nenhum atendimento hoje.</p>
+                <Link to="/agenda" className="text-sm font-medium text-accent">
+                  Ver agenda completa
+                </Link>
+              </div>
+            ) : (
+              <ul className="divide-y divide-line">
+                {data.todayAppointments.slice(0, 4).map((appt) => (
+                  <li key={appt.id} className="flex items-center justify-between py-2.5 text-sm">
+                    <div>
+                      <span className="font-medium text-ink">{appt.time}</span> — {appt.patientName}
+                      <p className="text-xs text-muted">{appt.clinicName}</p>
+                    </div>
+                    <Badge tone={STATUS_TONE[appt.status]}>{STATUS_LABEL[appt.status]}</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      </main>
     </div>
   );
 }

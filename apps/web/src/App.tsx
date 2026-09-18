@@ -21,9 +21,9 @@ export function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
-          <Route element={<Layout />}>
-            <Route path="/" element={<HomeRoute />} />
+          <Route path="/" element={<HomeRoute />} />
 
+          <Route element={<Layout />}>
             <Route element={<ProtectedRoute roles={["ADMIN", "DENTIST", "RECEPTIONIST"]} />}>
               <Route path="/my-clinic" element={<MyClinicPage />} />
             </Route>

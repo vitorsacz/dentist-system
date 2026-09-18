@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 export type BadgeTone = "success" | "warning" | "error" | "neutral";
 
 const TONE_CLASSES: Record<BadgeTone, string> = {
-  success: "bg-good/10 text-good",
-  warning: "bg-warning-soft text-warning",
-  error: "bg-bad/10 text-bad",
+  success: "bg-success-light text-success-text",
+  warning: "bg-warning-light text-warning-text",
+  error: "bg-error-light text-error-text",
   neutral: "bg-line text-muted",
 };
 
