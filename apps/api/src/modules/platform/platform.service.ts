@@ -1,5 +1,9 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { CreateOrganizationInput, PlatformOrganization } from "@dentist-system/shared-types";
+import type {
+  CreateOrganizationInput,
+  PlatformOrganization,
+  PlatformOrganizationDetail,
+} from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
@@ -53,6 +57,20 @@ export class PlatformService {
   async list(): Promise<PlatformOrganization[]> {
     const organizations = await this.prisma.organization.findMany({ orderBy: { createdAt: "asc" } });
     return organizations.map(toPlatformOrganization);
+  }
+
+  async getOrganizationDetail(id: string): Promise<PlatformOrganizationDetail> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id },
+      include: { foundingAdmin: { select: { name: true, email: true } } },
+    });
+    if (!organization) {
+      throw new NotFoundException("Organização não encontrada");
+    }
+    return {
+      ...toPlatformOrganization(organization),
+      foundingAdmin: organization.foundingAdmin,
+    };
   }
 
   // Transferência de capitania nunca é self-service — só o Super Admin,

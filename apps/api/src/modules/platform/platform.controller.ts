@@ -8,11 +8,20 @@ import {
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { SuperAdminGuard } from "../../common/guards/super-admin.guard";
 import { PlatformService } from "./platform.service";
+import { PlatformStatsService } from "./platform-stats.service";
 
 @Controller("platform")
 @UseGuards(SuperAdminGuard)
 export class PlatformController {
-  constructor(private readonly platformService: PlatformService) {}
+  constructor(
+    private readonly platformService: PlatformService,
+    private readonly platformStatsService: PlatformStatsService,
+  ) {}
+
+  @Get("stats/overview")
+  overview() {
+    return this.platformStatsService.overview();
+  }
 
   @Post("organizations")
   create(@Body(new ZodValidationPipe(createOrganizationSchema)) body: CreateOrganizationInput) {
@@ -22,6 +31,11 @@ export class PlatformController {
   @Get("organizations")
   list() {
     return this.platformService.list();
+  }
+
+  @Get("organizations/:id")
+  getOrganizationDetail(@Param("id") organizationId: string) {
+    return this.platformService.getOrganizationDetail(organizationId);
   }
 
   @Patch("organizations/:id/founding-admin")

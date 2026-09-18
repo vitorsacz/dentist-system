@@ -54,9 +54,21 @@ export {
   createOrganizationSchema,
   platformOrganizationSchema,
   transferFoundingAdminSchema,
+  platformOrganizationDetailSchema,
+  organizationsByStatusSchema,
+  usersByRoleSchema,
+  monthlyCountSchema,
+  platformOrganizationRankingRowSchema,
+  platformOverviewStatsSchema,
   type CreateOrganizationInput,
   type PlatformOrganization,
   type TransferFoundingAdminInput,
+  type PlatformOrganizationDetail,
+  type OrganizationsByStatus,
+  type UsersByRole,
+  type MonthlyCount,
+  type PlatformOrganizationRankingRow,
+  type PlatformOverviewStats,
 } from "./platform";
 
 export {

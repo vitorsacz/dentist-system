@@ -10,6 +10,7 @@ import { ClinicsPage } from "@/features/clinics/clinics-page";
 import { AdminUsersPage } from "@/features/admin/admin-users-page";
 import { MyClinicPage } from "@/features/my-clinic/my-clinic-page";
 import { PlatformPage } from "@/features/platform/platform-page";
+import { OrganizationDetailPage } from "@/features/platform/organization-detail-page";
 import { ProtectedRoute } from "@/routes/protected-route";
 import { HomeRoute } from "@/routes/home-route";
 import { Layout } from "@/components/layout";
@@ -26,6 +27,7 @@ export function App() {
 
             <Route element={<ProtectedRoute superAdminOnly />}>
               <Route path="/platform" element={<PlatformPage />} />
+              <Route path="/platform/organizations/:id" element={<OrganizationDetailPage />} />
             </Route>
 
             <Route element={<ProtectedRoute roles={["ADMIN"]} />}>

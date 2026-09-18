@@ -15,6 +15,17 @@ export default {
         line: "#dee4ef",
         good: "#227a52",
         bad: "#b23b3b",
+        // Adição pontual pro dashboard da Plataforma (design system TailAdmin,
+        // ver Obsidian "feature - design-system-tailadmin-referencia"):
+        // accent≈brand, good≈success, bad≈error já cobrem o resto, só faltava
+        // um tom de aviso e um cinza claro pra fundo de ícone de stat card.
+        warning: {
+          DEFAULT: "#f79009",
+          soft: "#fffaeb",
+        },
+        gray: {
+          100: "#f2f4f7",
+        },
       },
     },
   },
