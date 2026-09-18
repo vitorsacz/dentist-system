@@ -1,6 +1,11 @@
 import { Body, Controller, Get, Post, Req, Res } from "@nestjs/common";
 import type { Request, Response } from "express";
-import { loginSchema, type LoginInput } from "@dentist-system/shared-types";
+import {
+  loginSchema,
+  lookupAccountsSchema,
+  type LoginInput,
+  type LookupAccountsInput,
+} from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Public } from "../../common/decorators/public.decorator";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
@@ -12,6 +17,12 @@ const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Public()
+  @Post("lookup")
+  lookup(@Body(new ZodValidationPipe(lookupAccountsSchema)) body: LookupAccountsInput) {
+    return this.authService.lookupAccounts(body.identifier);
+  }
 
   @Public()
   @Post("login")

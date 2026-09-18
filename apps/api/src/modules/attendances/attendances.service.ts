@@ -1,11 +1,21 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { Inject, BadRequestException, Injectable } from "@nestjs/common";
 import type { CreateAttendanceInput } from "@dentist-system/shared-types";
-import { PrismaService } from "../../prisma/prisma.service";
-import type { Prisma } from "@prisma/client";
+import { PRISMA_SERVICE, type PrismaService, type TenantScopedTransactionClient } from "../../prisma/prisma.service";
+import { getTenantContext } from "../../prisma/tenant-context";
+import { PatientsService } from "../patients/patients.service";
+import { ClinicsService } from "../clinics/clinics.service";
+import { ProceduresService } from "../procedures/procedures.service";
+import { AppointmentsService } from "../appointments/appointments.service";
 
 @Injectable()
 export class AttendancesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PRISMA_SERVICE) private readonly prisma: PrismaService,
+    private readonly patientsService: PatientsService,
+    private readonly clinicsService: ClinicsService,
+    private readonly proceduresService: ProceduresService,
+    private readonly appointmentsService: AppointmentsService,
+  ) {}
 
   listByPatient(patientId: string) {
     return this.prisma.attendance.findMany({
@@ -15,7 +25,19 @@ export class AttendancesService {
     });
   }
 
-  create(input: CreateAttendanceInput, createdByUserId: string) {
+  async create(input: CreateAttendanceInput, createdByUserId: string) {
+    // Mesma razão do appointments/recalls/budgets: a extension não valida FK
+    // cross-tenant em create(), só carimba organizationId na linha nova.
+    // Reaproveita os findOne() de cada service antes de abrir a transação.
+    await this.patientsService.findOne(input.patientId);
+    await this.clinicsService.findOne(input.clinicId);
+    await this.proceduresService.findOne(input.procedureId);
+    if (input.appointmentId) {
+      await this.appointmentsService.findOne(input.appointmentId);
+    }
+
+    const { organizationId } = getTenantContext();
+
     return this.prisma.$transaction(async (tx) => {
       const attendance = await tx.attendance.create({
         data: {
@@ -28,11 +50,12 @@ export class AttendancesService {
           repassePercentage: input.repassePercentage,
           materialCost: input.materialCost,
           createdByUserId,
+          organizationId,
         },
       });
 
       for (const usage of input.materialUsages) {
-        await this.deductStock(tx, attendance.id, usage.materialId, usage.quantity);
+        await this.deductStock(tx, attendance.id, usage.materialId, usage.quantity, organizationId);
       }
 
       if (input.appointmentId) {
@@ -51,10 +74,11 @@ export class AttendancesService {
 
   // Baixa por lote seguindo FEFO (usa primeiro o lote que vence mais cedo).
   private async deductStock(
-    tx: Prisma.TransactionClient,
+    tx: TenantScopedTransactionClient,
     attendanceId: string,
     materialId: string,
     quantity: number,
+    organizationId: string,
   ) {
     const batches = await tx.materialBatch.findMany({
       where: { materialId, quantity: { gt: 0 } },
@@ -80,7 +104,7 @@ export class AttendancesService {
     }
 
     await tx.materialUsage.create({
-      data: { attendanceId, materialId, quantity },
+      data: { attendanceId, materialId, quantity, organizationId },
     });
   }
 }

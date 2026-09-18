@@ -7,6 +7,7 @@ interface NavLinkDef {
   label: string;
   end?: boolean;
   roles?: Role[];
+  superAdminOnly?: boolean;
 }
 
 const NAV_LINKS: NavLinkDef[] = [
@@ -18,6 +19,8 @@ const NAV_LINKS: NavLinkDef[] = [
   { to: "/procedures", label: "Procedimentos", roles: ["DENTIST"] },
   { to: "/clinics", label: "Consultórios", roles: ["DENTIST"] },
   { to: "/admin/users", label: "Usuários", roles: ["ADMIN"] },
+  { to: "/my-clinic", label: "Minha Clínica", roles: ["ADMIN", "DENTIST", "RECEPTIONIST"] },
+  { to: "/platform", label: "Plataforma", superAdminOnly: true },
 ];
 
 function NavItem({ to, label, end }: { to: string; label: string; end?: boolean }) {
@@ -39,7 +42,10 @@ function NavItem({ to, label, end }: { to: string; label: string; end?: boolean 
 export function Layout() {
   const { user, logout } = useAuth();
 
-  const links = NAV_LINKS.filter((link) => !link.roles || (user && link.roles.includes(user.role)));
+  const links = NAV_LINKS.filter((link) => {
+    if (link.superAdminOnly) return Boolean(user?.isSuperAdmin);
+    return !link.roles || (user?.role && link.roles.includes(user.role));
+  });
 
   return (
     <div className="min-h-screen bg-app text-ink">

@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { CreateBudgetInput, UpdateBudgetStatusInput } from "@dentist-system/shared-types";
-import { PrismaService } from "../../prisma/prisma.service";
+import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
+import { getTenantContext } from "../../prisma/tenant-context";
+import { PatientsService } from "../patients/patients.service";
+import { ProceduresService } from "../procedures/procedures.service";
 
 const budgetInclude = {
   items: { include: { procedure: true } },
@@ -13,7 +16,11 @@ function withTotal<T extends { items: { value: unknown }[] }>(budget: T) {
 
 @Injectable()
 export class BudgetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PRISMA_SERVICE) private readonly prisma: PrismaService,
+    private readonly patientsService: PatientsService,
+    private readonly proceduresService: ProceduresService,
+  ) {}
 
   async listByPatient(patientId: string) {
     const budgets = await this.prisma.budget.findMany({
@@ -33,16 +40,28 @@ export class BudgetsService {
   }
 
   async create(input: CreateBudgetInput, createdByUserId: string) {
+    await this.patientsService.findOne(input.patientId);
+    for (const item of input.items) {
+      await this.proceduresService.findOne(item.procedureId);
+    }
+
+    // BudgetItem é nested write (`items: { create: [...] }`) — a extension só
+    // intercepta operações de topo do model alvo (Budget), não dispara pro
+    // model aninhado. Único call site no projeto com esse formato; injeta
+    // organizationId manualmente em cada item.
+    const { organizationId } = getTenantContext();
     const budget = await this.prisma.budget.create({
       data: {
         patientId: input.patientId,
         createdByUserId,
+        organizationId,
         items: {
           create: input.items.map((item) => ({
             procedureId: item.procedureId,
             toothNumber: item.toothNumber,
             value: item.value,
             notes: item.notes,
+            organizationId,
           })),
         },
       },

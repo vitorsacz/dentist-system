@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import {
-  createUserSchema,
-  updateUserSchema,
+  createTenantUserSchema,
+  updateTenantUserSchema,
   resetPasswordSchema,
-  type CreateUserInput,
-  type UpdateUserInput,
+  type CreateTenantUserInput,
+  type UpdateTenantUserInput,
   type ResetPasswordInput,
 } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
@@ -18,29 +18,33 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  create(@Body(new ZodValidationPipe(createUserSchema)) body: CreateUserInput) {
-    return this.usersService.create(body);
+  create(
+    @Body(new ZodValidationPipe(createTenantUserSchema)) body: CreateTenantUserInput,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    return this.usersService.create(body, currentUser.organizationId as string);
   }
 
   @Get()
-  list() {
-    return this.usersService.list();
+  list(@CurrentUser() currentUser: AuthenticatedUser) {
+    return this.usersService.list(currentUser.organizationId as string);
   }
 
   @Patch(":id")
   update(
-    @Param("id") id: string,
-    @Body(new ZodValidationPipe(updateUserSchema)) body: UpdateUserInput,
+    @Param("id") userId: string,
+    @Body(new ZodValidationPipe(updateTenantUserSchema)) body: UpdateTenantUserInput,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    return this.usersService.update(id, body, currentUser.id);
+    return this.usersService.update(userId, body, currentUser.organizationId as string, currentUser.id);
   }
 
   @Patch(":id/password")
   resetPassword(
-    @Param("id") id: string,
+    @Param("id") userId: string,
     @Body(new ZodValidationPipe(resetPasswordSchema)) body: ResetPasswordInput,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    return this.usersService.resetPassword(id, body);
+    return this.usersService.resetPassword(userId, body, currentUser.organizationId as string);
   }
 }

@@ -1,14 +1,21 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type {
   CreateAppointmentInput,
   ListAppointmentsQuery,
   UpdateAppointmentInput,
 } from "@dentist-system/shared-types";
-import { PrismaService } from "../../prisma/prisma.service";
+import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
+import { getTenantContext } from "../../prisma/tenant-context";
+import { PatientsService } from "../patients/patients.service";
+import { ClinicsService } from "../clinics/clinics.service";
 
 @Injectable()
 export class AppointmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PRISMA_SERVICE) private readonly prisma: PrismaService,
+    private readonly patientsService: PatientsService,
+    private readonly clinicsService: ClinicsService,
+  ) {}
 
   list(query: ListAppointmentsQuery) {
     return this.prisma.appointment.findMany({
@@ -32,8 +39,15 @@ export class AppointmentsService {
     return appointment;
   }
 
-  create(input: CreateAppointmentInput) {
-    return this.prisma.appointment.create({ data: input });
+  async create(input: CreateAppointmentInput) {
+    // A extension só carimba organizationId na linha criada — não sabe que
+    // patientId/clinicId são FK pra outro model tenant-scoped. Reaproveita o
+    // findOne() de cada service (tenant-safe de graça via o findUnique com
+    // post-check) pra barrar referência cruzada entre organizações.
+    await this.patientsService.findOne(input.patientId);
+    await this.clinicsService.findOne(input.clinicId);
+    const { organizationId } = getTenantContext();
+    return this.prisma.appointment.create({ data: { ...input, organizationId } });
   }
 
   async update(id: string, input: UpdateAppointmentInput) {

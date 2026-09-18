@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { UpsertToothRecordInput, UpdateToothRecordStatusInput } from "@dentist-system/shared-types";
-import { PrismaService } from "../../prisma/prisma.service";
+import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
+import { getTenantContext } from "../../prisma/tenant-context";
 
 @Injectable()
 export class OdontogramService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
 
   listByPatient(patientId: string) {
     return this.prisma.toothRecord.findMany({
@@ -14,8 +15,9 @@ export class OdontogramService {
   }
 
   create(patientId: string, input: UpsertToothRecordInput) {
+    const { organizationId } = getTenantContext();
     return this.prisma.toothRecord.create({
-      data: { patientId, ...input },
+      data: { patientId, organizationId, ...input },
     });
   }
 
