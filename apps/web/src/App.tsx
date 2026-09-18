@@ -23,7 +23,10 @@ export function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
             <Route path="/" element={<HomeRoute />} />
-            <Route path="/my-clinic" element={<MyClinicPage />} />
+
+            <Route element={<ProtectedRoute roles={["ADMIN", "DENTIST", "RECEPTIONIST"]} />}>
+              <Route path="/my-clinic" element={<MyClinicPage />} />
+            </Route>
 
             <Route element={<ProtectedRoute superAdminOnly />}>
               <Route path="/platform" element={<PlatformPage />} />
