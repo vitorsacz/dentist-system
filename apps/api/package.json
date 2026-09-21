@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "jest --config test/jest-e2e.config.ts --runInBand",
+    "test": "jest --config test/jest-e2e.config.js --runInBand",
     "prisma": "prisma",
     "db:seed": "tsx prisma/seed.ts"
   },
