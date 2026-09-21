@@ -11,7 +11,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { PatientsService } from "./patients.service";
 
 @Controller("patients")
-@Roles("DENTIST", "RECEPTIONIST")
+@Roles("ADMIN", "DENTIST", "RECEPTIONIST")
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
@@ -25,6 +25,7 @@ export class PatientsController {
     return this.patientsService.findOne(id);
   }
 
+  @Roles("DENTIST", "RECEPTIONIST")
   @Post()
   create(
     @Body(new ZodValidationPipe(createPatientSchema)) body: CreatePatientInput,
@@ -33,6 +34,7 @@ export class PatientsController {
     return this.patientsService.create(body, user.id);
   }
 
+  @Roles("DENTIST", "RECEPTIONIST")
   @Patch(":id")
   update(
     @Param("id") id: string,

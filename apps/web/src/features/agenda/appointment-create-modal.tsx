@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { patientsApi } from "@/features/patients/api";
 import { proceduresApi } from "@/features/procedures/api";
 import { LOCATION_COLOR_HEX } from "./location-colors";
+import type { MockDentist } from "./dentist-store";
 import type { MockAppointment, MockLocation } from "./mock-data";
 
 interface AppointmentCreateModalProps {
   locations: MockLocation[];
+  dentists: MockDentist[];
   initialDate: Date;
   initialStart?: Date;
   initialEnd?: Date;
@@ -21,6 +23,7 @@ function toTimeInput(date: Date) {
 
 export function AppointmentCreateModal({
   locations,
+  dentists,
   initialDate,
   initialStart,
   initialEnd,
@@ -38,6 +41,7 @@ export function AppointmentCreateModal({
     editingAppointment ? { name: editingAppointment.patientName, phone: editingAppointment.patientPhone } : null,
   );
   const [locationId, setLocationId] = useState(editingAppointment?.locationId ?? locations[0]?.id ?? "");
+  const [dentistId, setDentistId] = useState(editingAppointment?.dentistUserId ?? dentists[0]?.id ?? "");
   const [procedureName, setProcedureName] = useState(editingAppointment?.procedureName ?? "");
   const [startTime, setStartTime] = useState(
     editingAppointment ? toTimeInput(editingAppointment.start) : initialStart ? toTimeInput(initialStart) : "09:00",
@@ -69,8 +73,9 @@ export function AppointmentCreateModal({
 
     onSave({
       id: editingAppointment?.id ?? `appt-manual-${Date.now()}`,
-      calendarId: editingAppointment?.calendarId ?? `cal-${locationId}-manual`,
+      calendarId: editingAppointment?.calendarId ?? `cal-${locationId}-manual-${dentistId || "self"}`,
       locationId,
+      dentistUserId: dentistId || editingAppointment?.dentistUserId || "",
       patientName: selectedPatient.name,
       patientPhone: selectedPatient.phone,
       procedureName,
@@ -145,6 +150,34 @@ export function AppointmentCreateModal({
               </select>
             </div>
           </div>
+
+          {dentists.length > 0 && (
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ink">Dentista</label>
+              <div className="flex items-center gap-2">
+                {dentistId && (
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                    style={{
+                      backgroundColor:
+                        LOCATION_COLOR_HEX[dentists.find((d) => d.id === dentistId)?.colorToken ?? "brand"].solid,
+                    }}
+                  />
+                )}
+                <select
+                  value={dentistId}
+                  onChange={(e) => setDentistId(e.target.value)}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink"
+                >
+                  {dentists.map((dentist) => (
+                    <option key={dentist.id} value={dentist.id}>
+                      {dentist.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>

@@ -10,7 +10,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { ProceduresService } from "./procedures.service";
 
 @Controller("procedures")
-@Roles("DENTIST", "RECEPTIONIST")
+@Roles("ADMIN", "DENTIST", "RECEPTIONIST")
 export class ProceduresController {
   constructor(private readonly proceduresService: ProceduresService) {}
 

@@ -38,7 +38,7 @@ const NAV_GROUPS: NavGroupDef[] = [
     title: "Menu",
     items: [
       { to: "/", label: "Início", icon: Home, end: true, roles: ["DENTIST", "RECEPTIONIST"] },
-      { to: "/agenda", label: "Agenda", icon: Calendar, roles: ["DENTIST", "RECEPTIONIST"] },
+      { to: "/agenda", label: "Agenda", icon: Calendar, roles: ["ADMIN", "DENTIST", "RECEPTIONIST"] },
       { to: "/patients", label: "Pacientes", icon: Users, roles: ["DENTIST", "RECEPTIONIST"] },
       { to: "/financeiro", label: "Financeiro", icon: Wallet, roles: ["DENTIST"] },
       { to: "/materials", label: "Estoque", icon: Package, roles: ["DENTIST", "RECEPTIONIST"] },

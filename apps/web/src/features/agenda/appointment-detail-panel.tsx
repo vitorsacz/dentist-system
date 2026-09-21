@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import type { AppointmentStatus } from "@dentist-system/shared-types";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { LOCATION_COLOR_HEX } from "./location-colors";
+import type { MockDentist } from "./dentist-store";
 import type { MockAppointment, MockLocation } from "./mock-data";
 
 const STATUS_LABEL: Record<AppointmentStatus, string> = {
@@ -21,6 +22,7 @@ const STATUS_TONE: Record<AppointmentStatus, BadgeTone> = {
 interface AppointmentDetailPanelProps {
   appointment: MockAppointment;
   location: MockLocation | undefined;
+  dentist?: MockDentist;
   onClose: () => void;
   onReschedule: () => void;
   onChangeStatus: (status: AppointmentStatus) => void;
@@ -35,6 +37,7 @@ function formatRange(start: Date, end: Date) {
 export function AppointmentDetailPanel({
   appointment,
   location,
+  dentist,
   onClose,
   onReschedule,
   onChangeStatus,
@@ -74,6 +77,18 @@ export function AppointmentDetailPanel({
               {location?.name ?? "—"}
             </p>
           </div>
+          {dentist && (
+            <div>
+              <p className="text-muted">Dentista</p>
+              <p className="flex items-center gap-2 text-ink">
+                <span
+                  className="h-2.5 w-2.5 rounded-sm"
+                  style={{ backgroundColor: LOCATION_COLOR_HEX[dentist.colorToken].solid }}
+                />
+                {dentist.name}
+              </p>
+            </div>
+          )}
           <div>
             <p className="mb-1 text-muted">Status</p>
             <Badge tone={STATUS_TONE[appointment.status]}>{STATUS_LABEL[appointment.status]}</Badge>
