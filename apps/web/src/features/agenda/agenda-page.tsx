@@ -7,6 +7,7 @@ import type { DateSelectArg, DatesSetArg, EventClickArg, EventContentArg } from 
 import { ChevronDown, Plus } from "lucide-react";
 import type { AppointmentStatus } from "@dentist-system/shared-types";
 import { useAuth } from "@/lib/auth-context";
+import { PageHeader } from "@/components/ui/page-header";
 import { CalendarSidebar } from "./calendar-sidebar";
 import { AppointmentCreateModal } from "./appointment-create-modal";
 import { AppointmentDetailPanel } from "./appointment-detail-panel";
@@ -107,10 +108,7 @@ export function AgendaPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-sm text-muted">Home / Agenda</p>
-        <h1 className="mt-1 text-2xl font-semibold text-ink">Agenda</h1>
-      </div>
+      <PageHeader breadcrumb="Início / Agenda" title="Agenda" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">

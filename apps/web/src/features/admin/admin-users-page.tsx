@@ -11,6 +11,7 @@ import {
 } from "@dentist-system/shared-types";
 import { adminUsersApi } from "./api";
 import { useAuth } from "@/lib/auth-context";
+import { PageHeader } from "@/components/ui/page-header";
 
 const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Admin",
@@ -95,15 +96,18 @@ export function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Usuários</h1>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
-        >
-          {showForm ? "Cancelar" : "Novo usuário"}
-        </button>
-      </div>
+      <PageHeader
+        breadcrumb="Início / Usuários"
+        title="Usuários"
+        action={
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
+          >
+            {showForm ? "Cancelar" : "Novo usuário"}
+          </button>
+        }
+      />
 
       {showForm && (
         <form

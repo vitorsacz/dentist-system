@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createProcedureSchema, type CreateProcedureInput } from "@dentist-system/shared-types";
+import { PageHeader } from "@/components/ui/page-header";
 import { proceduresApi } from "./api";
 
 export function ProceduresPage() {
@@ -36,15 +37,18 @@ export function ProceduresPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Tabela de procedimentos</h1>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
-        >
-          {showForm ? "Cancelar" : "Novo procedimento"}
-        </button>
-      </div>
+      <PageHeader
+        breadcrumb="Início / Procedimentos"
+        title="Tabela de procedimentos"
+        action={
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
+          >
+            {showForm ? "Cancelar" : "Novo procedimento"}
+          </button>
+        }
+      />
 
       {showForm && (
         <form

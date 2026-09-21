@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageHeader } from "@/components/ui/page-header";
 import { AttendanceForm } from "./attendance-form";
 import { FinancialReport } from "./financial-report";
 
@@ -7,7 +8,7 @@ export function FinanceiroPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-ink">Financeiro</h1>
+      <PageHeader breadcrumb="Início / Financeiro" title="Financeiro" />
 
       <div className="flex gap-4 border-b border-line">
         <button
