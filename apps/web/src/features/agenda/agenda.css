@@ -1,0 +1,65 @@
+/* Override visual do FullCalendar pros tokens do design system oficial —
+   borda fina (border-default) em vez de sombra pesada, raio de card/control,
+   tipografia Outfit (já herdada do body). Nenhuma cor nova aqui, só
+   estrutura — cor de evento vem inline via location-colors.ts. */
+
+.agenda-calendar {
+  font-family: inherit;
+}
+
+.agenda-calendar .fc {
+  border-color: #e4e7ec;
+}
+
+.agenda-calendar .fc-theme-standard td,
+.agenda-calendar .fc-theme-standard th,
+.agenda-calendar .fc-theme-standard .fc-scrollgrid {
+  border-color: #e4e7ec;
+}
+
+.agenda-calendar .fc-col-header-cell {
+  background-color: #ffffff;
+  padding: 8px 0;
+}
+
+.agenda-calendar .fc-col-header-cell-cushion {
+  color: #667085;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px;
+}
+
+.agenda-calendar .fc-timegrid-slot-label-cushion,
+.agenda-calendar .fc-timegrid-axis-cushion {
+  color: #667085;
+  font-size: 12px;
+}
+
+.agenda-calendar .fc-daygrid-day-number {
+  color: #1d2939;
+  font-size: 13px;
+  padding: 6px;
+}
+
+.agenda-calendar .fc-day-today {
+  background-color: #ecf3ff;
+}
+
+.agenda-calendar .fc-timegrid-now-indicator-line {
+  border-color: #f04438;
+}
+
+.agenda-calendar .fc-timegrid-now-indicator-arrow {
+  border-color: #f04438;
+  color: #f04438;
+}
+
+.agenda-calendar .fc-event {
+  border-radius: 8px;
+  border-width: 0;
+  box-shadow: none;
+}
+
+.agenda-calendar .fc-daygrid-event {
+  margin-top: 2px;
+}

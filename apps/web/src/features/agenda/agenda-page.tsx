@@ -1,177 +1,255 @@
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  createAppointmentSchema,
-  type AppointmentStatus,
-  type CreateAppointmentInput,
-} from "@dentist-system/shared-types";
-import { appointmentsApi } from "./api";
-import { patientsApi } from "@/features/patients/api";
-import { clinicsApi } from "@/features/clinics/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import interactionPlugin from "@fullcalendar/interaction";
+import type { DateSelectArg, DatesSetArg, EventClickArg, EventContentArg } from "@fullcalendar/core";
+import { ChevronDown, Plus } from "lucide-react";
+import type { AppointmentStatus } from "@dentist-system/shared-types";
+import { useAuth } from "@/lib/auth-context";
+import { CalendarSidebar } from "./calendar-sidebar";
+import { AppointmentCreateModal } from "./appointment-create-modal";
+import { AppointmentDetailPanel } from "./appointment-detail-panel";
+import { useAgendaMockData, type MockAppointment } from "./mock-data";
+import { LOCATION_COLOR_HEX } from "./location-colors";
+import "./agenda.css";
 
-const STATUS_LABELS: Record<string, string> = {
-  SCHEDULED: "Agendado",
-  DONE: "Realizado",
-  CANCELED: "Cancelado",
-  NO_SHOW: "Faltou",
+type ViewKey = "timeGridDay" | "timeGridWeek" | "dayGridMonth";
+const VIEW_LABEL: Record<ViewKey, string> = {
+  timeGridDay: "Dia",
+  timeGridWeek: "Semana",
+  dayGridMonth: "Mês",
 };
 
-function dayBounds(dateStr: string) {
-  const from = new Date(`${dateStr}T00:00:00`);
-  const to = new Date(`${dateStr}T23:59:59`);
-  return { from: from.toISOString(), to: to.toISOString() };
+interface ModalState {
+  editingAppointment: MockAppointment | null;
+  initialDate: Date;
+  initialStart?: Date;
+  initialEnd?: Date;
 }
 
 export function AgendaPage() {
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [showForm, setShowForm] = useState(false);
-  const queryClient = useQueryClient();
-  const { from, to } = dayBounds(selectedDate);
+  const { user } = useAuth();
+  const mock = useAgendaMockData(user);
+  const calendarRef = useRef<FullCalendar>(null);
 
-  const appointmentsQuery = useQuery({
-    queryKey: ["appointments", selectedDate],
-    queryFn: () => appointmentsApi.list(from, to),
-  });
-  const patientsQuery = useQuery({ queryKey: ["patients"], queryFn: patientsApi.list });
-  const clinicsQuery = useQuery({ queryKey: ["clinics"], queryFn: clinicsApi.list });
+  const [appointments, setAppointments] = useState<MockAppointment[]>([]);
+  useEffect(() => {
+    if (!mock.isLoading) setAppointments(mock.appointments);
+  }, [mock.isLoading, mock.appointments]);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<CreateAppointmentInput>({ resolver: zodResolver(createAppointmentSchema) });
+  const [hiddenLocationIds, setHiddenLocationIds] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<ViewKey>("timeGridWeek");
+  const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
+  const [rangeLabel, setRangeLabel] = useState("");
+  const [modalState, setModalState] = useState<ModalState | null>(null);
+  const [detailAppointment, setDetailAppointment] = useState<MockAppointment | null>(null);
 
-  const createMutation = useMutation({
-    mutationFn: appointmentsApi.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      reset();
-      setShowForm(false);
-    },
-  });
+  const locationById = useMemo(() => new Map(mock.locations.map((l) => [l.id, l])), [mock.locations]);
 
-  const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: AppointmentStatus }) =>
-      appointmentsApi.update(id, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
-  });
+  const events = useMemo(
+    () =>
+      appointments
+        .filter((appt) => !hiddenLocationIds.has(appt.locationId))
+        .map((appt) => {
+          const location = locationById.get(appt.locationId);
+          const color = LOCATION_COLOR_HEX[location?.colorToken ?? "brand"];
+          return {
+            id: appt.id,
+            start: appt.start,
+            end: appt.end,
+            backgroundColor: color.light,
+            borderColor: color.solid,
+            extendedProps: { appointment: appt },
+          };
+        }),
+    [appointments, hiddenLocationIds, locationById],
+  );
+
+  function changeView(next: ViewKey) {
+    setView(next);
+    setViewDropdownOpen(false);
+    calendarRef.current?.getApi().changeView(next);
+  }
+
+  function handleSelect(arg: DateSelectArg) {
+    setModalState({ editingAppointment: null, initialDate: arg.start, initialStart: arg.start, initialEnd: arg.end });
+    calendarRef.current?.getApi().unselect();
+  }
+
+  function handleEventClick(arg: EventClickArg) {
+    const appt = arg.event.extendedProps.appointment as MockAppointment;
+    setDetailAppointment(appt);
+  }
+
+  function handleSaveAppointment(appointment: MockAppointment) {
+    setAppointments((prev) => {
+      const exists = prev.some((a) => a.id === appointment.id);
+      return exists ? prev.map((a) => (a.id === appointment.id ? appointment : a)) : [...prev, appointment];
+    });
+    setModalState(null);
+  }
+
+  function handleChangeStatus(status: AppointmentStatus) {
+    if (!detailAppointment) return;
+    setAppointments((prev) => prev.map((a) => (a.id === detailAppointment.id ? { ...a, status } : a)));
+    setDetailAppointment((prev) => (prev ? { ...prev, status } : prev));
+  }
+
+  function toggleLocation(locationId: string) {
+    setHiddenLocationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(locationId)) next.delete(locationId);
+      else next.add(locationId);
+      return next;
+    });
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-ink">Agenda</h1>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="rounded-md border border-line px-3 py-1.5 text-sm"
-          />
-        </div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
-        >
-          {showForm ? "Cancelar" : "Novo agendamento"}
-        </button>
+    <div className="space-y-4">
+      <div>
+        <p className="text-sm text-muted">Home / Agenda</p>
+        <h1 className="mt-1 text-2xl font-semibold text-ink">Agenda</h1>
       </div>
 
-      {showForm && (
-        <form
-          onSubmit={handleSubmit((data) => createMutation.mutate(data))}
-          className="grid max-w-2xl gap-4 rounded-lg border border-line bg-surface p-6 sm:grid-cols-2"
-        >
-          <div>
-            <label className="mb-1 block text-sm text-muted">Paciente</label>
-            <select className="w-full rounded-md border border-line px-3 py-2 text-sm" {...register("patientId")}>
-              <option value="">Selecione</option>
-              {patientsQuery.data?.map((patient) => (
-                <option key={patient.id} value={patient.id}>
-                  {patient.name}
-                </option>
-              ))}
-            </select>
-            {errors.patientId && <p className="mt-1 text-sm text-bad">{errors.patientId.message}</p>}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => calendarRef.current?.getApi().prev()}
+              className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink hover:bg-gray-100"
+            >
+              ‹
+            </button>
+            <button
+              onClick={() => calendarRef.current?.getApi().next()}
+              className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink hover:bg-gray-100"
+            >
+              ›
+            </button>
+            <button
+              onClick={() => calendarRef.current?.getApi().today()}
+              className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink hover:bg-gray-100"
+            >
+              Hoje
+            </button>
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-muted">Consultório</label>
-            <select className="w-full rounded-md border border-line px-3 py-2 text-sm" {...register("clinicId")}>
-              <option value="">Selecione</option>
-              {clinicsQuery.data?.map((clinic) => (
-                <option key={clinic.id} value={clinic.id}>
-                  {clinic.name}
-                </option>
-              ))}
-            </select>
-            {errors.clinicId && <p className="mt-1 text-sm text-bad">{errors.clinicId.message}</p>}
-          </div>
-          <div>
-            <label className="mb-1 block text-sm text-muted">Data e hora</label>
-            <input
-              type="datetime-local"
-              className="w-full rounded-md border border-line px-3 py-2 text-sm"
-              {...register("startsAt")}
-            />
-            {errors.startsAt && <p className="mt-1 text-sm text-bad">{errors.startsAt.message}</p>}
-          </div>
-          <div>
-            <label className="mb-1 block text-sm text-muted">Notas</label>
-            <input className="w-full rounded-md border border-line px-3 py-2 text-sm" {...register("notes")} />
+          <span className="text-sm font-medium text-ink">{rangeLabel}</span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <button
+              onClick={() => setViewDropdownOpen((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm text-ink hover:bg-gray-100"
+            >
+              {VIEW_LABEL[view]}
+              <ChevronDown className="h-4 w-4" />
+            </button>
+            {viewDropdownOpen && (
+              <div className="absolute right-0 z-10 mt-1 w-32 rounded-lg border border-line bg-surface py-1 shadow-lg">
+                {(Object.keys(VIEW_LABEL) as ViewKey[]).map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => changeView(key)}
+                    className="block w-full px-3 py-1.5 text-left text-sm text-ink hover:bg-gray-100"
+                  >
+                    {VIEW_LABEL[key]}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button
-            type="submit"
-            disabled={isSubmitting}
-            className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60 sm:col-span-2"
+            onClick={() => {
+              const start = new Date();
+              start.setMinutes(0, 0, 0);
+              const end = new Date(start.getTime() + 30 * 60_000);
+              setModalState({ editingAppointment: null, initialDate: start, initialStart: start, initialEnd: end });
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white"
           >
-            Agendar
+            <Plus className="h-4 w-4" />
+            Novo agendamento
           </button>
-        </form>
+        </div>
+      </div>
+
+      <div className="flex gap-4">
+        <CalendarSidebar locations={mock.locations} hiddenLocationIds={hiddenLocationIds} onToggle={toggleLocation} />
+
+        <div className="agenda-calendar min-w-0 flex-1 rounded-2xl border border-line bg-surface p-3">
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            initialView={view}
+            headerToolbar={false}
+            height="75vh"
+            nowIndicator
+            selectable
+            selectMirror
+            slotMinTime="07:00:00"
+            slotMaxTime="20:00:00"
+            locale="pt-br"
+            firstDay={1}
+            events={events}
+            select={handleSelect}
+            eventClick={handleEventClick}
+            datesSet={(arg: DatesSetArg) => setRangeLabel(arg.view.title)}
+            eventContent={(arg: EventContentArg) => {
+              const appt = arg.event.extendedProps.appointment as MockAppointment | undefined;
+              // O preview de seleção (selectMirror, enquanto o usuário arrasta
+              // pra criar um agendamento) dispara eventContent sem
+              // extendedProps.appointment — não é um evento de verdade.
+              if (!appt) return null;
+              const location = locationById.get(appt.locationId);
+              const color = LOCATION_COLOR_HEX[location?.colorToken ?? "brand"];
+              return (
+                <div
+                  className="flex h-full items-stretch gap-1.5 overflow-hidden rounded-lg px-1.5 py-1 text-xs"
+                  style={{ backgroundColor: color.light }}
+                >
+                  <span className="w-1 shrink-0 rounded-full" style={{ backgroundColor: color.solid }} />
+                  <div className="min-w-0 truncate text-ink">
+                    <p className="truncate font-medium">{appt.patientName}</p>
+                    <p className="truncate text-[11px] text-muted">{appt.procedureName}</p>
+                  </div>
+                </div>
+              );
+            }}
+          />
+        </div>
+      </div>
+
+      {modalState && (
+        <AppointmentCreateModal
+          locations={mock.locations}
+          initialDate={modalState.initialDate}
+          initialStart={modalState.initialStart}
+          initialEnd={modalState.initialEnd}
+          editingAppointment={modalState.editingAppointment}
+          onClose={() => setModalState(null)}
+          onSave={handleSaveAppointment}
+        />
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-line text-muted">
-            <tr>
-              <th className="px-4 py-3">Horário</th>
-              <th className="px-4 py-3">Paciente</th>
-              <th className="px-4 py-3">Consultório</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {appointmentsQuery.data?.map((appt) => (
-              <tr key={appt.id}>
-                <td className="px-4 py-3">
-                  {new Date(appt.startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                </td>
-                <td className="px-4 py-3">{appt.patient.name}</td>
-                <td className="px-4 py-3">{appt.clinic.name}</td>
-                <td className="px-4 py-3">
-                  <select
-                    value={appt.status}
-                    onChange={(e) =>
-                      statusMutation.mutate({ id: appt.id, status: e.target.value as AppointmentStatus })
-                    }
-                    className="rounded-md border border-line px-2 py-1 text-sm"
-                  >
-                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {appointmentsQuery.data?.length === 0 && (
-          <p className="p-4 text-sm text-muted">Nenhum agendamento neste dia.</p>
-        )}
-      </div>
+      {detailAppointment && (
+        <AppointmentDetailPanel
+          appointment={detailAppointment}
+          location={locationById.get(detailAppointment.locationId)}
+          onClose={() => setDetailAppointment(null)}
+          onReschedule={() => {
+            setModalState({
+              editingAppointment: detailAppointment,
+              initialDate: detailAppointment.start,
+              initialStart: detailAppointment.start,
+              initialEnd: detailAppointment.end,
+            });
+            setDetailAppointment(null);
+          }}
+          onChangeStatus={handleChangeStatus}
+        />
+      )}
     </div>
   );
 }
