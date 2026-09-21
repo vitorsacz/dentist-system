@@ -1,6 +1,5 @@
-import type { Config } from "jest";
-
-const config: Config = {
+/** @type {import('jest').Config} */
+module.exports = {
   rootDir: "..",
   testEnvironment: "node",
   testMatch: ["<rootDir>/test/**/*.e2e-spec.ts"],
@@ -9,5 +8,3 @@ const config: Config = {
   setupFiles: ["<rootDir>/test/env-setup.ts"],
   moduleFileExtensions: ["js", "json", "ts"],
 };
-
-export default config;

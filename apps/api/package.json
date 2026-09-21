@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "jest --config test/jest-e2e.config.ts --runInBand",
+    "test": "jest --config test/jest-e2e.config.js --runInBand",
     "prisma": "prisma",
     "db:seed": "tsx prisma/seed.ts"
   },
@@ -46,6 +46,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^7.2.1",
     "eslint": "^9.17.0",
+    "globals": "^17.12.0",
     "jest": "^30.5.1",
     "prisma": "^5.22.0",
     "supertest": "^7.2.2",

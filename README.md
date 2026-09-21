@@ -29,7 +29,7 @@ dentist-system/
 
 ## Pré-requisitos
 
-- Node.js >= 20
+- Node.js >= 22.13 (pnpm 11 exige essa versão mínima)
 - pnpm (`corepack enable` já resolve a versão fixada em `packageManager`)
 - PostgreSQL rodando localmente (ex.: `brew install postgresql@16` no macOS)
 
