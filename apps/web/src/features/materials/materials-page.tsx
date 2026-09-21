@@ -8,6 +8,7 @@ import {
   type CreateMaterialBatchInput,
   type CreateMaterialInput,
 } from "@dentist-system/shared-types";
+import { PageHeader } from "@/components/ui/page-header";
 import { materialsApi } from "./api";
 
 function BatchForm({ materialId }: { materialId: string }) {
@@ -81,15 +82,18 @@ export function MaterialsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Estoque de materiais</h1>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
-        >
-          {showForm ? "Cancelar" : "Novo material"}
-        </button>
-      </div>
+      <PageHeader
+        breadcrumb="Início / Estoque"
+        title="Estoque de materiais"
+        action={
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
+          >
+            {showForm ? "Cancelar" : "Novo material"}
+          </button>
+        }
+      />
 
       {showForm && (
         <form

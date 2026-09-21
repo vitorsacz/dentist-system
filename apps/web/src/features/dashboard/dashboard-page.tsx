@@ -8,7 +8,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertBanner } from "@/components/ui/alert-banner";
-import { DashboardHeader } from "./dashboard-header";
+import { PageHeader } from "@/components/ui/page-header";
 import { useMockDashboardOverview } from "./mock-data";
 
 const STATUS_LABEL: Record<AppointmentStatus, string> = {
@@ -42,16 +42,10 @@ export function DashboardPage() {
   const showRevenue = user?.role === "DENTIST";
 
   return (
-    <div className="min-h-screen bg-app">
-      <DashboardHeader />
+    <div className="space-y-6">
+      <PageHeader breadcrumb="Início" title={`Olá, ${user?.name ?? ""}`} />
 
-      <main className="space-y-6 p-8">
-        <div>
-          <p className="text-sm text-muted">Home</p>
-          <h1 className="mt-1 text-2xl font-semibold text-ink">Olá, {user?.name}</h1>
-        </div>
-
-        {isLoading && <Skeleton className="h-16 w-full" />}
+      {isLoading && <Skeleton className="h-16 w-full" />}
         {!isLoading && data?.hasIncompleteProfile && (
           <AlertBanner>
             Alguns dados da sua clínica ainda estão incompletos.{" "}
@@ -188,7 +182,6 @@ export function DashboardPage() {
             )}
           </Card>
         </div>
-      </main>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createClinicSchema, type CreateClinicInput } from "@dentist-system/shared-types";
+import { PageHeader } from "@/components/ui/page-header";
 import { clinicsApi } from "./api";
 
 export function ClinicsPage() {
@@ -30,15 +31,18 @@ export function ClinicsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Consultórios</h1>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
-        >
-          {showForm ? "Cancelar" : "Novo consultório"}
-        </button>
-      </div>
+      <PageHeader
+        breadcrumb="Início / Consultórios"
+        title="Consultórios"
+        action={
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
+          >
+            {showForm ? "Cancelar" : "Novo consultório"}
+          </button>
+        }
+      />
 
       {showForm && (
         <form

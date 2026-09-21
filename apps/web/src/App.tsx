@@ -13,7 +13,7 @@ import { PlatformPage } from "@/features/platform/platform-page";
 import { OrganizationDetailPage } from "@/features/platform/organization-detail-page";
 import { ProtectedRoute } from "@/routes/protected-route";
 import { HomeRoute } from "@/routes/home-route";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/app-shell";
 
 export function App() {
   return (
@@ -21,9 +21,9 @@ export function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<HomeRoute />} />
+          <Route element={<AppShell />}>
+            <Route path="/" element={<HomeRoute />} />
 
-          <Route element={<Layout />}>
             <Route element={<ProtectedRoute roles={["ADMIN", "DENTIST", "RECEPTIONIST"]} />}>
               <Route path="/my-clinic" element={<MyClinicPage />} />
             </Route>

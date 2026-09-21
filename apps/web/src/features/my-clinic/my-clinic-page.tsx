@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Role } from "@dentist-system/shared-types";
+import { PageHeader } from "@/components/ui/page-header";
 import { myClinicApi } from "./api";
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -13,9 +14,7 @@ export function MyClinicPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-ink">
-        {myClinicQuery.data?.name ?? "Minha Clínica"}
-      </h1>
+      <PageHeader breadcrumb="Início / Minha Clínica" title={myClinicQuery.data?.name ?? "Minha Clínica"} />
 
       <div className="overflow-x-auto rounded-lg border border-line bg-surface">
         <table className="w-full text-left text-sm">

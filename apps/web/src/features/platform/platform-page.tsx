@@ -6,6 +6,7 @@ import type { OrganizationStatus } from "@dentist-system/shared-types";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 import { platformApi } from "./api";
 import { CreateOrganizationForm } from "./create-organization-form";
 
@@ -36,18 +37,18 @@ export function PlatformPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-muted">Início / Plataforma</p>
-        <div className="mt-1 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-ink">Visão Geral da Plataforma</h1>
+      <PageHeader
+        breadcrumb="Início / Plataforma"
+        title="Visão Geral da Plataforma"
+        action={
           <button
             onClick={() => setShowForm((v) => !v)}
             className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
           >
             {showForm ? "Cancelar" : "Nova clínica"}
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {showForm && <CreateOrganizationForm onDone={() => setShowForm(false)} />}
 
