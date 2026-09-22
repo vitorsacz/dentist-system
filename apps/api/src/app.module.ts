@@ -15,6 +15,7 @@ import { PatientsModule } from "./modules/patients/patients.module";
 import { AnamnesisModule } from "./modules/anamnesis/anamnesis.module";
 import { ClinicalRecordsModule } from "./modules/clinical-records/clinical-records.module";
 import { ClinicsModule } from "./modules/clinics/clinics.module";
+import { ClinicFinancialTermsModule } from "./modules/clinic-financial-terms/clinic-financial-terms.module";
 import { ProceduresModule } from "./modules/procedures/procedures.module";
 import { BudgetsModule } from "./modules/budgets/budgets.module";
 import { AppointmentsModule } from "./modules/appointments/appointments.module";
@@ -40,6 +41,7 @@ import { HealthController } from "./modules/health/health.controller";
     AnamnesisModule,
     ClinicalRecordsModule,
     ClinicsModule,
+    ClinicFinancialTermsModule,
     ProceduresModule,
     BudgetsModule,
     AppointmentsModule,

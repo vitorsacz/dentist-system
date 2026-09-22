@@ -19,5 +19,11 @@ export type RecallStatus = (typeof RECALL_STATUSES)[number];
 export const TENANT_TYPES = ["CLINIC", "FREELANCER"] as const;
 export type TenantType = (typeof TENANT_TYPES)[number];
 
+export const LOCATION_RELATIONSHIP_TYPES = ["RENTED_FIXED", "COMMISSION", "PER_SERVICE"] as const;
+export type LocationRelationshipType = (typeof LOCATION_RELATIONSHIP_TYPES)[number];
+
+export const RENT_PERIODICITIES = ["DAILY", "WEEKLY", "MONTHLY"] as const;
+export type RentPeriodicity = (typeof RENT_PERIODICITIES)[number];
+
 export const ORGANIZATION_STATUSES = ["ACTIVE", "SUSPENDED", "DELETED"] as const;
 export type OrganizationStatus = (typeof ORGANIZATION_STATUSES)[number];

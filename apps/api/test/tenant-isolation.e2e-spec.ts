@@ -21,8 +21,12 @@ interface OrgContext {
   adminUserId: string;
 }
 
-async function seedOrgContext(app: INestApplication, label: string): Promise<OrgContext> {
-  const org = await rawPrisma.organization.create({ data: { name: `${label} (teste isolamento)` } });
+async function seedOrgContext(
+  app: INestApplication,
+  label: string,
+  type: "CLINIC" | "FREELANCER" = "CLINIC",
+): Promise<OrgContext> {
+  const org = await rawPrisma.organization.create({ data: { name: `${label} (teste isolamento)`, type } });
   const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);
 
   const dentistUser = await rawPrisma.user.create({
@@ -65,6 +69,7 @@ describe("Isolamento cross-tenant", () => {
   let app: INestApplication;
   let orgA: OrgContext;
   let orgB: OrgContext;
+  let freelancerOrg: OrgContext;
 
   function as(token: string) {
     const server = () => app.getHttpServer();
@@ -74,6 +79,8 @@ describe("Isolamento cross-tenant", () => {
         request(server()).post(path).set("Authorization", `Bearer ${token}`).send(body),
       patch: (path: string, body: Record<string, unknown>) =>
         request(server()).patch(path).set("Authorization", `Bearer ${token}`).send(body),
+      put: (path: string, body: Record<string, unknown>) =>
+        request(server()).put(path).set("Authorization", `Bearer ${token}`).send(body),
     };
   }
 
@@ -116,6 +123,7 @@ describe("Isolamento cross-tenant", () => {
 
     orgA = await seedOrgContext(app, "OrgA");
     orgB = await seedOrgContext(app, "OrgB");
+    freelancerOrg = await seedOrgContext(app, "Freelancer", "FREELANCER");
   }, 30000);
 
   afterAll(async () => {
@@ -138,6 +146,65 @@ describe("Isolamento cross-tenant", () => {
   it("Clinic: dentista de tenant tipo CLINIC não consegue criar consultório novo (só Freelancer pode)", async () => {
     const res = await as(orgA.dentistToken).post("/clinics", { name: "Consultório Novo", type: "OWN" });
     expect(res.status).toBe(403);
+  });
+
+  it("ClinicFinancialTerms: freelancer define, lê e troca o tipo de relação (campos do tipo anterior somem)", async () => {
+    const create = await as(freelancerOrg.dentistToken).post("/clinics", {
+      name: "Consultório Freelancer",
+      type: "OWN",
+    });
+    expect(create.status).toBe(201);
+    const clinicId = create.body.id as string;
+
+    const rented = await as(freelancerOrg.dentistToken).put(`/clinics/${clinicId}/financial-terms`, {
+      relationshipType: "RENTED_FIXED",
+      rentValue: 300,
+      rentPeriodicity: "MONTHLY",
+    });
+    expect(rented.status).toBe(200);
+    expect(rented.body.rentValue).toBe(300);
+    expect(rented.body.rentPeriodicity).toBe("MONTHLY");
+
+    const found = await as(freelancerOrg.dentistToken).get(`/clinics/${clinicId}/financial-terms`);
+    expect(found.body.relationshipType).toBe("RENTED_FIXED");
+
+    const commission = await as(freelancerOrg.dentistToken).put(`/clinics/${clinicId}/financial-terms`, {
+      relationshipType: "COMMISSION",
+      commissionPercentage: 30,
+    });
+    expect(commission.status).toBe(200);
+    expect(commission.body.relationshipType).toBe("COMMISSION");
+    expect(commission.body.commissionPercentage).toBe(30);
+    // Campos do RENTED_FIXED anterior precisam ter sido zerados, não só
+    // ignorados.
+    expect(commission.body.rentValue).toBeNull();
+    expect(commission.body.rentPeriodicity).toBeNull();
+  });
+
+  it("ClinicFinancialTerms: dentista de tenant CLINIC recebe 403, mesmo no próprio consultório", async () => {
+    const clinicId = await createClinic(orgA.organizationId, "Consultório da Clínica A");
+    const res = await as(orgA.dentistToken).put(`/clinics/${clinicId}/financial-terms`, {
+      relationshipType: "RENTED_FIXED",
+      rentValue: 100,
+      rentPeriodicity: "DAILY",
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("ClinicFinancialTerms: freelancer de outro tenant não consegue definir termos no consultório de outro freelancer (404)", async () => {
+    const otherFreelancer = await seedOrgContext(app, "Freelancer B", "FREELANCER");
+    const create = await as(freelancerOrg.dentistToken).post("/clinics", {
+      name: "Consultório Isolamento",
+      type: "OWN",
+    });
+    expect(create.status).toBe(201);
+    const clinicId = create.body.id as string;
+
+    const res = await as(otherFreelancer.dentistToken).put(`/clinics/${clinicId}/financial-terms`, {
+      relationshipType: "PER_SERVICE",
+      defaultServiceRate: 50,
+    });
+    expect(res.status).toBe(404);
   });
 
   it("Patient: create em A, GET/PATCH por id em B dão 404; list de B não vaza", async () => {

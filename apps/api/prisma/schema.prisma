@@ -19,6 +19,23 @@ enum ClinicType {
   RENTED
 }
 
+// Relação financeira do dentista Freelancer com um consultório específico —
+// conceito paralelo a ClinicType/dailyRentValue (aquele é pro Clinic de
+// tenant Clínica pagando aluguel internamente). Ver vault:
+// dentist-system/"Relação Financeira do Freelancer por Consultório — Plano
+// Técnico".
+enum LocationRelationshipType {
+  RENTED_FIXED
+  COMMISSION
+  PER_SERVICE
+}
+
+enum RentPeriodicity {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
 enum BudgetStatus {
   PENDING
   APPROVED
@@ -88,21 +105,22 @@ model Organization {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
-  users           User[]             @relation("OrganizationUsers")
-  clinics         Clinic[]
-  patients        Patient[]
-  anamneses       Anamnesis[]
-  clinicalRecords ClinicalRecord[]
-  toothRecords    ToothRecord[]
-  procedures      ProcedureCatalog[]
-  budgets         Budget[]
-  budgetItems     BudgetItem[]
-  appointments    Appointment[]
-  attendances     Attendance[]
-  materials       Material[]
-  materialBatches MaterialBatch[]
-  materialUsages  MaterialUsage[]
-  recalls         Recall[]
+  users                User[]                 @relation("OrganizationUsers")
+  clinics              Clinic[]
+  clinicFinancialTerms ClinicFinancialTerms[]
+  patients             Patient[]
+  anamneses            Anamnesis[]
+  clinicalRecords      ClinicalRecord[]
+  toothRecords         ToothRecord[]
+  procedures           ProcedureCatalog[]
+  budgets              Budget[]
+  budgetItems          BudgetItem[]
+  appointments         Appointment[]
+  attendances          Attendance[]
+  materials            Material[]
+  materialBatches      MaterialBatch[]
+  materialUsages       MaterialUsage[]
+  recalls              Recall[]
 }
 
 model Clinic {
@@ -116,8 +134,43 @@ model Clinic {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  appointments Appointment[]
-  attendances  Attendance[]
+  appointments   Appointment[]
+  attendances    Attendance[]
+  financialTerms ClinicFinancialTerms?
+
+  @@index([organizationId])
+}
+
+// Relação financeira do freelancer com este consultório (só existe pra
+// tenant tipo FREELANCER — regra de negócio aplicada no serviço, não é um
+// campo aqui; ver ClinicFinancialTermsService). Opcional: um Clinic pode
+// não ter linha aqui ainda (cadastro do consultório não bloqueia por isso).
+model ClinicFinancialTerms {
+  id       String @id @default(cuid())
+  clinicId String @unique
+  clinic   Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  relationshipType LocationRelationshipType
+
+  // RENTED_FIXED
+  rentValue       Decimal?         @db.Decimal(10, 2)
+  rentPeriodicity RentPeriodicity?
+
+  // COMMISSION
+  commissionPercentage Decimal? @db.Decimal(5, 2)
+
+  // PER_SERVICE (valor fixo por atendimento — rate por procedimento é
+  // extensão futura, não implementada neste v1)
+  defaultServiceRate Decimal? @db.Decimal(10, 2)
+
+  // Referência livre ao proprietário/comissionado — texto, não entidade.
+  ownerLabel String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
 }
