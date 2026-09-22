@@ -46,6 +46,7 @@ enum RecallStatus {
 
 enum TenantType {
   CLINIC
+  FREELANCER
 }
 
 enum OrganizationStatus {

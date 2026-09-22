@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "TenantType" ADD VALUE 'FREELANCER';
