@@ -8,6 +8,7 @@ import { getTenantContext } from "./tenant-context";
 // (ver users.service.ts).
 export const TENANT_SCOPED_MODELS = [
   "Clinic",
+  "ClinicFinancialTerms",
   "Patient",
   "Anamnesis",
   "ClinicalRecord",

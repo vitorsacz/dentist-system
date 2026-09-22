@@ -7,6 +7,8 @@ export {
   RECALL_STATUSES,
   TENANT_TYPES,
   ORGANIZATION_STATUSES,
+  LOCATION_RELATIONSHIP_TYPES,
+  RENT_PERIODICITIES,
   type Role,
   type ClinicType,
   type BudgetStatus,
@@ -15,6 +17,8 @@ export {
   type RecallStatus,
   type TenantType,
   type OrganizationStatus,
+  type LocationRelationshipType,
+  type RentPeriodicity,
 } from "./enums";
 
 export {
@@ -95,6 +99,13 @@ export {
   type CreateClinicInput,
   type UpdateClinicInput,
 } from "./clinic";
+
+export {
+  upsertClinicFinancialTermsSchema,
+  clinicFinancialTermsSchema,
+  type UpsertClinicFinancialTermsInput,
+  type ClinicFinancialTerms,
+} from "./clinic-financial-terms";
 
 export {
   createProcedureSchema,
