@@ -18,6 +18,7 @@ export class OrganizationService {
     return {
       id: organization.id,
       name: organization.name,
+      type: organization.type as MyClinic["type"],
       // role só é null pra Super Admin, que nunca pertence a uma organização.
       members: organization.users.map((user) => ({
         userId: user.id,

@@ -90,10 +90,13 @@ describe("Isolamento cross-tenant", () => {
     return res.body.id as string;
   }
 
-  async function createClinic(token: string, name = "Consultório Teste") {
-    const res = await as(token).post("/clinics", { name, type: "OWN" });
-    expect(res.status).toBe(201);
-    return res.body.id as string;
+  // Vai direto no Prisma (não via POST /clinics) porque consultório de tenant
+  // tipo CLINIC (default dos testes) não é mais self-service — ver
+  // ClinicsService.create(). Isso é fixture de teste, não está testando a
+  // regra de criação em si.
+  async function createClinic(organizationId: string, name = "Consultório Teste") {
+    const clinic = await rawPrisma.clinic.create({ data: { organizationId, name, type: "OWN" } });
+    return clinic.id;
   }
 
   async function createProcedure(token: string, name = "Procedimento Teste") {
@@ -123,13 +126,18 @@ describe("Isolamento cross-tenant", () => {
   });
 
   it("Clinic: create em A, GET/PATCH por id em B dão 404; list de B não vaza", async () => {
-    const clinicId = await createClinic(orgA.dentistToken, "Clínica A");
+    const clinicId = await createClinic(orgA.organizationId, "Clínica A");
 
     expect((await as(orgB.dentistToken).get(`/clinics/${clinicId}`)).status).toBe(404);
     expect((await as(orgB.dentistToken).patch(`/clinics/${clinicId}`, { name: "Hackeado" })).status).toBe(404);
 
     const listB = await as(orgB.dentistToken).get("/clinics");
     expect(listB.body.some((c: { id: string }) => c.id === clinicId)).toBe(false);
+  });
+
+  it("Clinic: dentista de tenant tipo CLINIC não consegue criar consultório novo (só Freelancer pode)", async () => {
+    const res = await as(orgA.dentistToken).post("/clinics", { name: "Consultório Novo", type: "OWN" });
+    expect(res.status).toBe(403);
   });
 
   it("Patient: create em A, GET/PATCH por id em B dão 404; list de B não vaza", async () => {
@@ -153,7 +161,7 @@ describe("Isolamento cross-tenant", () => {
 
   it("Appointment: create em A, GET/PATCH por id em B dão 404; e criar em B referenciando patient/clinic de A dá 404", async () => {
     const patientIdA = await createPatient(orgA.dentistToken, "Paciente Agenda A");
-    const clinicIdA = await createClinic(orgA.dentistToken, "Clínica Agenda A");
+    const clinicIdA = await createClinic(orgA.organizationId, "Clínica Agenda A");
 
     const created = await as(orgA.dentistToken).post("/appointments", {
       patientId: patientIdA,
@@ -206,7 +214,7 @@ describe("Isolamento cross-tenant", () => {
 
   it("Attendance: criar em B referenciando patient/clinic/procedure de A dá 404 (FK cross-tenant + propagação em transação)", async () => {
     const patientIdA = await createPatient(orgA.dentistToken, "Paciente Atendimento A");
-    const clinicIdA = await createClinic(orgA.dentistToken, "Clínica Atendimento A");
+    const clinicIdA = await createClinic(orgA.organizationId, "Clínica Atendimento A");
     const procedureIdA = await createProcedure(orgA.dentistToken, "Procedimento Atendimento A");
 
     const okAsA = await as(orgA.dentistToken).post("/attendances", {

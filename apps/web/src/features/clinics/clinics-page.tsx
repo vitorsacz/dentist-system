@@ -4,12 +4,18 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createClinicSchema, type CreateClinicInput } from "@dentist-system/shared-types";
 import { PageHeader } from "@/components/ui/page-header";
+import { myClinicApi } from "@/features/my-clinic/api";
 import { clinicsApi } from "./api";
 
 export function ClinicsPage() {
   const [showForm, setShowForm] = useState(false);
   const queryClient = useQueryClient();
   const clinicsQuery = useQuery({ queryKey: ["clinics"], queryFn: clinicsApi.list });
+  const myClinicQuery = useQuery({ queryKey: ["my-clinic"], queryFn: myClinicApi.get });
+  // Consultório de uma clínica é fixo — só tenant tipo Freelancer pode
+  // adicionar novos. Enquanto o tipo da organização não carrega, assume
+  // restrito (não pisca o botão pra depois sumir).
+  const canCreateClinic = myClinicQuery.data ? myClinicQuery.data.type !== "CLINIC" : false;
 
   const {
     register,
@@ -35,16 +41,18 @@ export function ClinicsPage() {
         breadcrumb="Início / Consultórios"
         title="Consultórios"
         action={
-          <button
-            onClick={() => setShowForm((v) => !v)}
-            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
-          >
-            {showForm ? "Cancelar" : "Novo consultório"}
-          </button>
+          canCreateClinic ? (
+            <button
+              onClick={() => setShowForm((v) => !v)}
+              className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white"
+            >
+              {showForm ? "Cancelar" : "Novo consultório"}
+            </button>
+          ) : undefined
         }
       />
 
-      {showForm && (
+      {showForm && canCreateClinic && (
         <form
           onSubmit={handleSubmit((data) => createMutation.mutate(data))}
           className="grid max-w-xl gap-4 rounded-lg border border-line bg-surface p-6 sm:grid-cols-2"
