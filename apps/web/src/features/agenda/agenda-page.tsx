@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -8,13 +9,14 @@ import { ChevronDown, Plus } from "lucide-react";
 import type { AppointmentStatus } from "@dentist-system/shared-types";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/ui/page-header";
+import { clinicsApi } from "@/features/clinics/api";
+import { adminUsersApi } from "@/features/admin/api";
 import { CalendarSidebar } from "./calendar-sidebar";
 import { DentistSidebar } from "./dentist-sidebar";
 import { AppointmentCreateModal } from "./appointment-create-modal";
 import { AppointmentDetailPanel } from "./appointment-detail-panel";
-import { useAgendaMockData, type MockAppointment } from "./mock-data";
-import { LOCATION_COLOR_HEX } from "./location-colors";
-import { addDentist, updateDentistColor } from "./dentist-store";
+import { useAgendaData, type MockAppointment } from "./mock-data";
+import { LOCATION_COLOR_HEX, toApiColorToken, type LocationColorToken } from "./location-colors";
 import "./agenda.css";
 
 type ViewKey = "timeGridDay" | "timeGridWeek" | "dayGridMonth";
@@ -33,7 +35,8 @@ interface ModalState {
 
 export function AgendaPage() {
   const { user } = useAuth();
-  const mock = useAgendaMockData(user);
+  const mock = useAgendaData(user);
+  const queryClient = useQueryClient();
   const calendarRef = useRef<FullCalendar>(null);
 
   const [appointments, setAppointments] = useState<MockAppointment[]>([]);
@@ -49,11 +52,11 @@ export function AgendaPage() {
   const [modalState, setModalState] = useState<ModalState | null>(null);
   const [detailAppointment, setDetailAppointment] = useState<MockAppointment | null>(null);
 
-  // Admin/recepcionista enxergam e agrupam por dentista (multi-dentista);
-  // dentista logado continua vendo a agenda por consultório, sem alterar
-  // o comportamento que já existia (modo freelancer). mock.dentists já
-  // vem vazio para role DENTIST — ver useAgendaMockData.
-  const viewByDentist = mock.dentists.length > 0;
+  // Eixo decidido centralizadamente no hook (organization.type + papel) —
+  // ver useAgendaData/resolveCalendarAxis. "dentist" = clínica, admin/
+  // recepcionista; "location" = freelancer; "none" = dentista de clínica,
+  // sem sidebar, só a própria agenda (já decidido).
+  const viewByDentist = mock.axis === "dentist";
 
   const locationById = useMemo(() => new Map(mock.locations.map((l) => [l.id, l])), [mock.locations]);
   const dentistById = useMemo(() => new Map(mock.dentists.map((d) => [d.id, d])), [mock.dentists]);
@@ -127,14 +130,33 @@ export function AgendaPage() {
     });
   }
 
-  function handleAddDentist(input: { name: string; croUf: string; email: string }) {
-    addDentist(input);
-    mock.refreshDentists();
+  const changeDentistColorMutation = useMutation({
+    mutationFn: ({ userId, colorToken }: { userId: string; colorToken: LocationColorToken }) =>
+      adminUsersApi.update(userId, { colorToken: toApiColorToken(colorToken) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["organization", "dentists"] }),
+  });
+
+  function handleChangeDentistColor(dentistId: string, colorToken: LocationColorToken) {
+    changeDentistColorMutation.mutate({ userId: dentistId, colorToken });
   }
 
-  function handleChangeDentistColor(dentistId: string, colorToken: Parameters<typeof updateDentistColor>[1]) {
-    updateDentistColor(dentistId, colorToken);
-    mock.refreshDentists();
+  const addLocationMutation = useMutation({
+    mutationFn: (input: { name: string }) => clinicsApi.create({ name: input.name, type: "OWN" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["clinics"] }),
+  });
+
+  function handleAddLocation(input: { name: string }) {
+    addLocationMutation.mutate(input);
+  }
+
+  const changeLocationColorMutation = useMutation({
+    mutationFn: ({ clinicId, colorToken }: { clinicId: string; colorToken: LocationColorToken }) =>
+      clinicsApi.update(clinicId, { colorToken: toApiColorToken(colorToken) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["clinics"] }),
+  });
+
+  function handleChangeLocationColor(locationId: string, colorToken: LocationColorToken) {
+    changeLocationColorMutation.mutate({ clinicId: locationId, colorToken });
   }
 
   return (
@@ -205,17 +227,24 @@ export function AgendaPage() {
       </div>
 
       <div className="flex gap-4">
-        {viewByDentist ? (
+        {mock.axis === "dentist" && (
           <DentistSidebar
             dentists={mock.dentists}
             hiddenDentistIds={hiddenDentistIds}
             onToggle={toggleDentist}
-            onAddDentist={handleAddDentist}
             onChangeColor={handleChangeDentistColor}
           />
-        ) : (
-          <CalendarSidebar locations={mock.locations} hiddenLocationIds={hiddenLocationIds} onToggle={toggleLocation} />
         )}
+        {mock.axis === "location" && (
+          <CalendarSidebar
+            locations={mock.locations}
+            hiddenLocationIds={hiddenLocationIds}
+            onToggle={toggleLocation}
+            onAddLocation={handleAddLocation}
+            onChangeColor={handleChangeLocationColor}
+          />
+        )}
+        {/* axis === "none": dentista de clínica, sem sidebar — só a própria agenda */}
 
         <div className="agenda-calendar min-w-0 flex-1 rounded-2xl border border-line bg-surface p-3">
           <FullCalendar

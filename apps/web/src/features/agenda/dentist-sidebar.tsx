@@ -1,37 +1,19 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
 import { LOCATION_COLOR_HEX, LOCATION_COLOR_TOKENS, type LocationColorToken } from "./location-colors";
-import type { MockDentist } from "./dentist-store";
+import type { MockDentist } from "./mock-data";
 
 interface DentistSidebarProps {
   dentists: MockDentist[];
   hiddenDentistIds: Set<string>;
   onToggle: (dentistId: string) => void;
-  onAddDentist: (input: { name: string; croUf: string; email: string }) => void;
   onChangeColor: (dentistId: string, colorToken: LocationColorToken) => void;
 }
 
-export function DentistSidebar({
-  dentists,
-  hiddenDentistIds,
-  onToggle,
-  onAddDentist,
-  onChangeColor,
-}: DentistSidebarProps) {
+// Cadastro de dentista não vive mais aqui — é um fluxo mais pesado (convite,
+// CRO) que já tem tela própria em Usuários; esta sidebar só lê o roster
+// real (GET organization/dentists) e deixa editar a cor de identidade.
+export function DentistSidebar({ dentists, hiddenDentistIds, onToggle, onChangeColor }: DentistSidebarProps) {
   const [colorPickerFor, setColorPickerFor] = useState<string | null>(null);
-  const [addFormOpen, setAddFormOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [croUf, setCroUf] = useState("");
-  const [email, setEmail] = useState("");
-
-  function handleAddSubmit() {
-    if (!name.trim() || !croUf.trim()) return;
-    onAddDentist({ name: name.trim(), croUf: croUf.trim(), email: email.trim() });
-    setName("");
-    setCroUf("");
-    setEmail("");
-    setAddFormOpen(false);
-  }
 
   return (
     <aside className="w-64 shrink-0 rounded-2xl border border-line bg-surface p-4">
@@ -61,10 +43,7 @@ export function DentistSidebar({
                     style={{ backgroundColor: color.solid }}
                     aria-label={`Trocar cor de ${dentist.name}`}
                   />
-                  <span className="min-w-0 truncate">
-                    <span className="block truncate">{dentist.name}</span>
-                    <span className="block truncate text-xs text-muted">{dentist.croUf}</span>
-                  </span>
+                  <span className="min-w-0 truncate">{dentist.name}</span>
                 </label>
               </div>
               {colorPickerFor === dentist.id && (
@@ -90,57 +69,7 @@ export function DentistSidebar({
         {dentists.length === 0 && <p className="text-sm text-muted">Nenhum dentista cadastrado.</p>}
       </ul>
 
-      {addFormOpen ? (
-        <div className="mt-4 space-y-2 rounded-lg border border-line p-3">
-          <input
-            type="text"
-            placeholder="Nome"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md border border-line px-2 py-1.5 text-sm"
-          />
-          <input
-            type="text"
-            placeholder="CRO + UF (ex: CRO-SP 12345)"
-            value={croUf}
-            onChange={(e) => setCroUf(e.target.value)}
-            className="w-full rounded-md border border-line px-2 py-1.5 text-sm"
-          />
-          <input
-            type="email"
-            placeholder="E-mail (opcional)"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-md border border-line px-2 py-1.5 text-sm"
-          />
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => setAddFormOpen(false)}
-              className="rounded-md px-2 py-1 text-xs text-muted"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleAddSubmit}
-              disabled={!name.trim() || !croUf.trim()}
-              className="rounded-md bg-accent px-2 py-1 text-xs font-medium text-white disabled:opacity-60"
-            >
-              Salvar
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAddFormOpen(true)}
-          className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line px-3 py-1.5 text-xs font-medium text-muted hover:bg-gray-100"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Novo dentista
-        </button>
-      )}
+      <p className="mt-4 text-xs text-muted">Pra cadastrar um novo dentista, use a tela de Usuários.</p>
     </aside>
   );
 }

@@ -1,11 +1,12 @@
 import { apiClient } from "@/lib/api-client";
-import type { CreateClinicInput, UpdateClinicInput } from "@dentist-system/shared-types";
+import type { CreateClinicInput, PaletteColorToken, UpdateClinicInput } from "@dentist-system/shared-types";
 
 export interface Clinic {
   id: string;
   name: string;
   type: "OWN" | "RENTED";
   dailyRentValue: number | null;
+  colorToken: PaletteColorToken | null;
 }
 
 export const clinicsApi = {
