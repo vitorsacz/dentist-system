@@ -9,10 +9,12 @@ import type { AppointmentStatus } from "@dentist-system/shared-types";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/ui/page-header";
 import { CalendarSidebar } from "./calendar-sidebar";
+import { DentistSidebar } from "./dentist-sidebar";
 import { AppointmentCreateModal } from "./appointment-create-modal";
 import { AppointmentDetailPanel } from "./appointment-detail-panel";
 import { useAgendaMockData, type MockAppointment } from "./mock-data";
 import { LOCATION_COLOR_HEX } from "./location-colors";
+import { addDentist, updateDentistColor } from "./dentist-store";
 import "./agenda.css";
 
 type ViewKey = "timeGridDay" | "timeGridWeek" | "dayGridMonth";
@@ -40,21 +42,31 @@ export function AgendaPage() {
   }, [mock.isLoading, mock.appointments]);
 
   const [hiddenLocationIds, setHiddenLocationIds] = useState<Set<string>>(new Set());
+  const [hiddenDentistIds, setHiddenDentistIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<ViewKey>("timeGridWeek");
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const [rangeLabel, setRangeLabel] = useState("");
   const [modalState, setModalState] = useState<ModalState | null>(null);
   const [detailAppointment, setDetailAppointment] = useState<MockAppointment | null>(null);
 
+  // Admin/recepcionista enxergam e agrupam por dentista (multi-dentista);
+  // dentista logado continua vendo a agenda por consultório, sem alterar
+  // o comportamento que já existia (modo freelancer). mock.dentists já
+  // vem vazio para role DENTIST — ver useAgendaMockData.
+  const viewByDentist = mock.dentists.length > 0;
+
   const locationById = useMemo(() => new Map(mock.locations.map((l) => [l.id, l])), [mock.locations]);
+  const dentistById = useMemo(() => new Map(mock.dentists.map((d) => [d.id, d])), [mock.dentists]);
 
   const events = useMemo(
     () =>
       appointments
         .filter((appt) => !hiddenLocationIds.has(appt.locationId))
+        .filter((appt) => !viewByDentist || !hiddenDentistIds.has(appt.dentistUserId))
         .map((appt) => {
-          const location = locationById.get(appt.locationId);
-          const color = LOCATION_COLOR_HEX[location?.colorToken ?? "brand"];
+          const color = viewByDentist
+            ? LOCATION_COLOR_HEX[dentistById.get(appt.dentistUserId)?.colorToken ?? "brand"]
+            : LOCATION_COLOR_HEX[locationById.get(appt.locationId)?.colorToken ?? "brand"];
           return {
             id: appt.id,
             start: appt.start,
@@ -64,7 +76,7 @@ export function AgendaPage() {
             extendedProps: { appointment: appt },
           };
         }),
-    [appointments, hiddenLocationIds, locationById],
+    [appointments, hiddenLocationIds, hiddenDentistIds, viewByDentist, locationById, dentistById],
   );
 
   function changeView(next: ViewKey) {
@@ -104,6 +116,25 @@ export function AgendaPage() {
       else next.add(locationId);
       return next;
     });
+  }
+
+  function toggleDentist(dentistId: string) {
+    setHiddenDentistIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(dentistId)) next.delete(dentistId);
+      else next.add(dentistId);
+      return next;
+    });
+  }
+
+  function handleAddDentist(input: { name: string; croUf: string; email: string }) {
+    addDentist(input);
+    mock.refreshDentists();
+  }
+
+  function handleChangeDentistColor(dentistId: string, colorToken: Parameters<typeof updateDentistColor>[1]) {
+    updateDentistColor(dentistId, colorToken);
+    mock.refreshDentists();
   }
 
   return (
@@ -174,7 +205,17 @@ export function AgendaPage() {
       </div>
 
       <div className="flex gap-4">
-        <CalendarSidebar locations={mock.locations} hiddenLocationIds={hiddenLocationIds} onToggle={toggleLocation} />
+        {viewByDentist ? (
+          <DentistSidebar
+            dentists={mock.dentists}
+            hiddenDentistIds={hiddenDentistIds}
+            onToggle={toggleDentist}
+            onAddDentist={handleAddDentist}
+            onChangeColor={handleChangeDentistColor}
+          />
+        ) : (
+          <CalendarSidebar locations={mock.locations} hiddenLocationIds={hiddenLocationIds} onToggle={toggleLocation} />
+        )}
 
         <div className="agenda-calendar min-w-0 flex-1 rounded-2xl border border-line bg-surface p-3">
           <FullCalendar
@@ -186,6 +227,7 @@ export function AgendaPage() {
             nowIndicator
             selectable
             selectMirror
+            slotEventOverlap={!viewByDentist}
             slotMinTime="07:00:00"
             slotMaxTime="20:00:00"
             locale="pt-br"
@@ -200,8 +242,9 @@ export function AgendaPage() {
               // pra criar um agendamento) dispara eventContent sem
               // extendedProps.appointment — não é um evento de verdade.
               if (!appt) return null;
-              const location = locationById.get(appt.locationId);
-              const color = LOCATION_COLOR_HEX[location?.colorToken ?? "brand"];
+              const color = viewByDentist
+                ? LOCATION_COLOR_HEX[dentistById.get(appt.dentistUserId)?.colorToken ?? "brand"]
+                : LOCATION_COLOR_HEX[locationById.get(appt.locationId)?.colorToken ?? "brand"];
               return (
                 <div
                   className="flex h-full items-stretch gap-1.5 overflow-hidden rounded-lg px-1.5 py-1 text-xs"
@@ -222,6 +265,7 @@ export function AgendaPage() {
       {modalState && (
         <AppointmentCreateModal
           locations={mock.locations}
+          dentists={mock.dentists}
           initialDate={modalState.initialDate}
           initialStart={modalState.initialStart}
           initialEnd={modalState.initialEnd}
@@ -235,6 +279,7 @@ export function AgendaPage() {
         <AppointmentDetailPanel
           appointment={detailAppointment}
           location={locationById.get(detailAppointment.locationId)}
+          dentist={dentistById.get(detailAppointment.dentistUserId)}
           onClose={() => setDetailAppointment(null)}
           onReschedule={() => {
             setModalState({

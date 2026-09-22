@@ -37,10 +37,13 @@ export function App() {
               <Route path="/admin/users" element={<AdminUsersPage />} />
             </Route>
 
+            <Route element={<ProtectedRoute roles={["ADMIN", "DENTIST", "RECEPTIONIST"]} />}>
+              <Route path="/agenda" element={<AgendaPage />} />
+            </Route>
+
             <Route element={<ProtectedRoute roles={["DENTIST", "RECEPTIONIST"]} />}>
               <Route path="/patients" element={<PatientsPage />} />
               <Route path="/patients/:patientId" element={<PatientDetailPage />} />
-              <Route path="/agenda" element={<AgendaPage />} />
               <Route path="/materials" element={<MaterialsPage />} />
               <Route element={<ProtectedRoute roles={["DENTIST"]} />}>
                 <Route path="/financeiro" element={<FinanceiroPage />} />
