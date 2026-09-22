@@ -3,8 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { patientsApi } from "@/features/patients/api";
 import { proceduresApi } from "@/features/procedures/api";
 import { LOCATION_COLOR_HEX } from "./location-colors";
-import type { MockDentist } from "./dentist-store";
-import type { MockAppointment, MockLocation } from "./mock-data";
+import type { MockAppointment, MockDentist, MockLocation } from "./mock-data";
 
 interface AppointmentCreateModalProps {
   locations: MockLocation[];

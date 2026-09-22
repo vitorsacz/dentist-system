@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { MyClinic } from "@dentist-system/shared-types";
+import type { MyClinic, OrganizationDentist } from "@dentist-system/shared-types";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
@@ -27,5 +27,23 @@ export class OrganizationService {
         active: user.active,
       })),
     };
+  }
+
+  // Roster pra sidebar de dentistas da Agenda — deliberadamente um método
+  // (e rota) separado de findMine(): aquele é permissivo pra qualquer papel
+  // autenticado (inclusive DENTIST, correto pra "Minha Clínica"); este é
+  // ADMIN/RECEPTIONIST only, ver OrganizationController. Só dentista ativo
+  // — inativo some do roster (histórico de agendamentos passados, quando
+  // existir de verdade, continua vinculado a ele mesmo assim).
+  async findDentists(organizationId: string): Promise<OrganizationDentist[]> {
+    const dentists = await this.prisma.user.findMany({
+      where: { organizationId, role: "DENTIST", active: true },
+      orderBy: { name: "asc" },
+    });
+    return dentists.map((user) => ({
+      userId: user.id,
+      name: user.name,
+      colorToken: user.colorToken as OrganizationDentist["colorToken"],
+    }));
   }
 }

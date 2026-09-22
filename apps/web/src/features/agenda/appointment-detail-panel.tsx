@@ -2,8 +2,7 @@ import { X } from "lucide-react";
 import type { AppointmentStatus } from "@dentist-system/shared-types";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { LOCATION_COLOR_HEX } from "./location-colors";
-import type { MockDentist } from "./dentist-store";
-import type { MockAppointment, MockLocation } from "./mock-data";
+import type { MockAppointment, MockDentist, MockLocation } from "./mock-data";
 
 const STATUS_LABEL: Record<AppointmentStatus, string> = {
   SCHEDULED: "Agendado",

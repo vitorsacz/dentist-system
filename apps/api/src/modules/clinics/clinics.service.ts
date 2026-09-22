@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { CreateClinicInput, UpdateClinicInput } from "@dentist-system/shared-types";
+import { PALETTE_COLOR_TOKENS, type CreateClinicInput, type UpdateClinicInput } from "@dentist-system/shared-types";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 import { getTenantContext } from "../../prisma/tenant-context";
 
@@ -30,7 +30,15 @@ export class ClinicsService {
         "Consultórios de uma clínica são fixos — não podem ser criados por aqui.",
       );
     }
-    return this.prisma.clinic.create({ data: { ...input, organizationId } });
+    // Cor opcional — se não vier, cicla a paleta pelo nº de consultórios que
+    // o tenant já tem (mesma lógica que antes vivia no front).
+    let colorToken = input.colorToken;
+    if (!colorToken) {
+      const existingCount = await this.prisma.clinic.count({ where: { organizationId } });
+      colorToken = PALETTE_COLOR_TOKENS[existingCount % PALETTE_COLOR_TOKENS.length];
+    }
+
+    return this.prisma.clinic.create({ data: { ...input, colorToken, organizationId } });
   }
 
   async update(id: string, input: UpdateClinicInput) {

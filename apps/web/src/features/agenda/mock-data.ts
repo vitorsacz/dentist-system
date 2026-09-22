@@ -1,11 +1,17 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { AppointmentStatus, CurrentUser } from "@dentist-system/shared-types";
+import type { AppointmentStatus, CurrentUser, Role, TenantType } from "@dentist-system/shared-types";
 import { clinicsApi, type Clinic } from "@/features/clinics/api";
-import { locationColorForIndex, type LocationColorToken } from "./location-colors";
-import { loadDentists, type MockDentist } from "./dentist-store";
+import { myClinicApi } from "@/features/my-clinic/api";
+import { fromApiColorToken, locationColorForIndex, type LocationColorToken } from "./location-colors";
 
 export interface MockLocation {
+  id: string;
+  name: string;
+  colorToken: LocationColorToken;
+}
+
+export interface MockDentist {
   id: string;
   name: string;
   colorToken: LocationColorToken;
@@ -29,6 +35,21 @@ export interface MockAppointment {
   start: Date;
   end: Date;
   status: AppointmentStatus;
+}
+
+// Qual eixo a sidebar de calendários mostra — decisão centralizada aqui
+// (única fonte de verdade, ver vault "Conectar Agenda a Dados Reais de
+// Consultório e Dentistas — Plano Técnico"), nunca espalhada em
+// componente. Freelancer sempre agrupa por consultório (mesmo sendo
+// sempre DENTIST, o tipo do tenant decide primeiro); clínica agrupa por
+// dentista pro admin/recepcionista, e não mostra sidebar nenhuma pro
+// dentista (já decidido — ele só vê a própria agenda).
+export type CalendarAxis = "location" | "dentist" | "none";
+
+export function resolveCalendarAxis(organizationType: TenantType, role: Role | null): CalendarAxis {
+  if (organizationType === "FREELANCER") return "location";
+  if (role === "DENTIST") return "none";
+  return "dentist";
 }
 
 const FAKE_PATIENTS = [
@@ -58,40 +79,38 @@ function startOfWeek(date: Date) {
   return d;
 }
 
+// Calendários continuam mockados nesta rodada (só o roster — consultório e
+// dentista — virou real, ver hook abaixo). Pra "dentist" (clínica, admin/
+// recepcionista): todo par (consultório real, dentista real). Pra
+// "location" (freelancer) e "none" (dentista de clínica, só a própria
+// agenda): um calendário por consultório, sempre do usuário logado.
 function buildCalendars(
+  axis: CalendarAxis,
   locations: MockLocation[],
-  currentUser: Pick<CurrentUser, "id" | "name" | "role"> | null,
-  dentistRoster: MockDentist[],
-) {
-  const calendars: MockCalendar[] = [];
-  locations.forEach((location, index) => {
-    if (currentUser?.role === "DENTIST" && index === 0) {
-      // Calendário "de verdade" do dentista logado — RBAC mock: só ele
-      // enxerga este calendário quando role === DENTIST (ver useAgendaMockData).
-      calendars.push({
-        id: `cal-${location.id}-self`,
-        locationId: location.id,
-        dentistUserId: currentUser.id,
-        dentistName: currentUser.name,
+  dentists: MockDentist[],
+  currentUser: Pick<CurrentUser, "id" | "name"> | null,
+): MockCalendar[] {
+  if (axis === "dentist") {
+    const calendars: MockCalendar[] = [];
+    locations.forEach((location) => {
+      dentists.forEach((dentist) => {
+        calendars.push({
+          id: `cal-${location.id}-${dentist.id}`,
+          locationId: location.id,
+          dentistUserId: dentist.id,
+          dentistName: dentist.name,
+        });
       });
-    } else {
-      const dentist = dentistRoster[index % dentistRoster.length];
-      calendars.push({
-        id: `cal-${location.id}-1`,
-        locationId: location.id,
-        dentistUserId: dentist?.id ?? `mock-dentist-${index}`,
-        dentistName: dentist?.name ?? "Dentista",
-      });
-    }
-    const extraDentist = dentistRoster[(index + 1) % dentistRoster.length];
-    calendars.push({
-      id: `cal-${location.id}-2`,
-      locationId: location.id,
-      dentistUserId: extraDentist?.id ?? `mock-dentist-extra-${index}`,
-      dentistName: extraDentist?.name ?? "Dentista",
     });
-  });
-  return calendars;
+    return calendars;
+  }
+
+  return locations.map((location) => ({
+    id: `cal-${location.id}-self`,
+    locationId: location.id,
+    dentistUserId: currentUser?.id ?? "self",
+    dentistName: currentUser?.name ?? "",
+  }));
 }
 
 function buildAppointments(calendars: MockCalendar[]): MockAppointment[] {
@@ -170,52 +189,54 @@ function buildAppointments(calendars: MockCalendar[]): MockAppointment[] {
   return appointments;
 }
 
-export function useAgendaMockData(currentUser: CurrentUser | null) {
+export function useAgendaData(currentUser: CurrentUser | null) {
+  const orgQuery = useQuery({ queryKey: ["my-clinic"], queryFn: myClinicApi.get });
   const clinicsQuery = useQuery({ queryKey: ["clinics"], queryFn: clinicsApi.list });
-  const [dentistRosterVersion, setDentistRosterVersion] = useState(0);
 
-  function refreshDentists() {
-    setDentistRosterVersion((v) => v + 1);
-  }
+  // Enquanto o tipo do tenant não carregou, assume o eixo mais restrito
+  // ("none") em vez de arriscar mostrar a sidebar errada por um instante.
+  const axis: CalendarAxis = orgQuery.data
+    ? resolveCalendarAxis(orgQuery.data.type, currentUser?.role ?? null)
+    : "none";
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- dentistRosterVersion é só um gatilho pra reler o localStorage
-  const fullDentistRoster = useMemo(() => loadDentists(), [dentistRosterVersion]);
+  const dentistsQuery = useQuery({
+    queryKey: ["organization", "dentists"],
+    queryFn: myClinicApi.dentists,
+    enabled: axis === "dentist",
+  });
 
-  // RBAC mockado no cliente — só uma maquete do comportamento esperado.
-  // Dentista logado nunca recebe o roster (a sidebar por dentista não deve
-  // nem ter dados pra mostrar); admin/recepcionista veem todo o roster da
-  // clínica. Quando existir backend de verdade, esse filtro precisa
-  // acontecer no servidor (ver Obsidian "Implementação da Agenda
-  // Multi-Consultório — Plano Técnico"), nunca só aqui.
-  const dentists = currentUser?.role === "DENTIST" ? [] : fullDentistRoster;
-
-  const { locations, calendars } = useMemo(() => {
+  const locations: MockLocation[] = useMemo(() => {
     const clinics: Clinic[] = clinicsQuery.data ?? [];
-    const allLocations = clinics.map((clinic, index) => ({
+    return clinics.map((clinic, index) => ({
       id: clinic.id,
       name: clinic.name,
-      colorToken: locationColorForIndex(index),
+      colorToken: fromApiColorToken(clinic.colorToken) ?? locationColorForIndex(index),
     }));
-    const allCalendars = buildCalendars(allLocations, currentUser, fullDentistRoster);
+  }, [clinicsQuery.data]);
 
-    const visibleCalendars =
-      currentUser?.role === "DENTIST"
-        ? allCalendars.filter((cal) => cal.dentistUserId === currentUser.id)
-        : allCalendars;
-    const visibleLocationIds = new Set(visibleCalendars.map((cal) => cal.locationId));
-    const visibleLocations = allLocations.filter((loc) => visibleLocationIds.has(loc.id));
+  const dentists: MockDentist[] = useMemo(() => {
+    if (axis !== "dentist") return [];
+    const roster = dentistsQuery.data ?? [];
+    return roster.map((dentist, index) => ({
+      id: dentist.userId,
+      name: dentist.name,
+      colorToken: fromApiColorToken(dentist.colorToken) ?? locationColorForIndex(index),
+    }));
+  }, [axis, dentistsQuery.data]);
 
-    return { locations: visibleLocations, calendars: visibleCalendars };
-  }, [clinicsQuery.data, currentUser, fullDentistRoster]);
+  const calendars = useMemo(
+    () => buildCalendars(axis, locations, dentists, currentUser),
+    [axis, locations, dentists, currentUser],
+  );
 
   const appointments = useMemo(() => buildAppointments(calendars), [calendars]);
 
   return {
+    axis,
     locations,
-    calendars,
     dentists,
+    calendars,
     appointments,
-    isLoading: clinicsQuery.isLoading,
-    refreshDentists,
+    isLoading: orgQuery.isLoading || clinicsQuery.isLoading || (axis === "dentist" && dentistsQuery.isLoading),
   };
 }

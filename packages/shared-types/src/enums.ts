@@ -19,6 +19,9 @@ export type RecallStatus = (typeof RECALL_STATUSES)[number];
 export const TENANT_TYPES = ["CLINIC", "FREELANCER"] as const;
 export type TenantType = (typeof TENANT_TYPES)[number];
 
+export const PALETTE_COLOR_TOKENS = ["BRAND", "SUCCESS", "WARNING", "ERROR", "INFO"] as const;
+export type PaletteColorToken = (typeof PALETTE_COLOR_TOKENS)[number];
+
 export const LOCATION_RELATIONSHIP_TYPES = ["RENTED_FIXED", "COMMISSION", "PER_SERVICE"] as const;
 export type LocationRelationshipType = (typeof LOCATION_RELATIONSHIP_TYPES)[number];
 

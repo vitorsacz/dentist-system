@@ -1,5 +1,11 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { CreateTenantUserInput, UpdateTenantUserInput, ResetPasswordInput, ManagedTenantUser } from "@dentist-system/shared-types";
+import {
+  PALETTE_COLOR_TOKENS,
+  type CreateTenantUserInput,
+  type UpdateTenantUserInput,
+  type ResetPasswordInput,
+  type ManagedTenantUser,
+} from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
@@ -9,6 +15,7 @@ interface UserRecord {
   name: string;
   role: ManagedTenantUser["role"] | null;
   active: boolean;
+  colorToken: ManagedTenantUser["colorToken"];
   createdAt: Date;
 }
 
@@ -21,6 +28,7 @@ function toManagedTenantUser(user: UserRecord): ManagedTenantUser {
     // sempre filtrada por organizationId) — seguro converter aqui.
     role: user.role as ManagedTenantUser["role"],
     active: user.active,
+    colorToken: user.colorToken,
     createdAt: user.createdAt.toISOString(),
   };
 }
@@ -40,9 +48,25 @@ export class UsersService {
       throw new ConflictException("E-mail já cadastrado nesta organização");
     }
 
+    // Cor opcional, relevante só pra DENTIST (identidade na sidebar da
+    // Agenda) — se não vier, cicla a paleta pelo nº de dentistas que o
+    // tenant já tem (mesma lógica que antes vivia no front/localStorage).
+    let colorToken = input.colorToken;
+    if (!colorToken && input.role === "DENTIST") {
+      const existingDentists = await this.prisma.user.count({ where: { organizationId, role: "DENTIST" } });
+      colorToken = PALETTE_COLOR_TOKENS[existingDentists % PALETTE_COLOR_TOKENS.length];
+    }
+
     const passwordHash = await bcrypt.hash(input.password, 10);
     const user = await this.prisma.user.create({
-      data: { organizationId, email: input.email, passwordHash, name: input.name, role: input.role },
+      data: {
+        organizationId,
+        email: input.email,
+        passwordHash,
+        name: input.name,
+        role: input.role,
+        colorToken,
+      },
     });
     return toManagedTenantUser(user);
   }

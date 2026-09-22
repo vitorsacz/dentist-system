@@ -17,6 +17,7 @@ const TEST_PASSWORD = "SenhaForte12345";
 interface OrgContext {
   organizationId: string;
   dentistToken: string;
+  dentistUserId: string;
   adminToken: string;
   adminUserId: string;
 }
@@ -60,6 +61,7 @@ async function seedOrgContext(
   return {
     organizationId: org.id,
     dentistToken: dentistLogin.body.accessToken,
+    dentistUserId: dentistUser.id,
     adminToken: adminLogin.body.accessToken,
     adminUserId: adminUser.id,
   };
@@ -205,6 +207,52 @@ describe("Isolamento cross-tenant", () => {
       defaultServiceRate: 50,
     });
     expect(res.status).toBe(404);
+  });
+
+  it("GET organization/dentists: admin vê o roster da própria org, dentista recebe 403 (RBAC real, não só filtro de UI)", async () => {
+    const asAdmin = await as(orgA.adminToken).get("/organization/dentists");
+    expect(asAdmin.status).toBe(200);
+    expect(asAdmin.body.some((d: { userId: string }) => d.userId === orgA.dentistUserId)).toBe(true);
+
+    const asDentist = await as(orgA.dentistToken).get("/organization/dentists");
+    expect(asDentist.status).toBe(403);
+  });
+
+  it("GET organization/dentists: isolamento cross-tenant — admin de B não vê dentista de A", async () => {
+    const asAdminB = await as(orgB.adminToken).get("/organization/dentists");
+    expect(asAdminB.status).toBe(200);
+    expect(asAdminB.body.some((d: { userId: string }) => d.userId === orgA.dentistUserId)).toBe(false);
+  });
+
+  it("GET organization/dentists: dentista inativo some do roster", async () => {
+    const org = await seedOrgContext(app, "InativoTest");
+    const dentistUser = await rawPrisma.user.findFirstOrThrow({
+      where: { organizationId: org.organizationId, role: "DENTIST" },
+    });
+
+    const beforeDeactivation = await as(org.adminToken).get("/organization/dentists");
+    expect(beforeDeactivation.body.some((d: { userId: string }) => d.userId === dentistUser.id)).toBe(true);
+
+    await rawPrisma.user.update({ where: { id: dentistUser.id }, data: { active: false } });
+
+    const afterDeactivation = await as(org.adminToken).get("/organization/dentists");
+    expect(afterDeactivation.body.some((d: { userId: string }) => d.userId === dentistUser.id)).toBe(false);
+  });
+
+  it("POST /clinics e POST /users: colorToken omitido cicla a paleta por índice; informado é respeitado", async () => {
+    const org = await seedOrgContext(app, "CorPaleta", "FREELANCER");
+
+    const clinic1 = await as(org.dentistToken).post("/clinics", { name: "Consultório 1", type: "OWN" });
+    const clinic2 = await as(org.dentistToken).post("/clinics", { name: "Consultório 2", type: "OWN" });
+    expect(clinic1.body.colorToken).toBe("BRAND");
+    expect(clinic2.body.colorToken).toBe("SUCCESS");
+
+    const clinicChosen = await as(org.dentistToken).post("/clinics", {
+      name: "Consultório Escolhido",
+      type: "OWN",
+      colorToken: "ERROR",
+    });
+    expect(clinicChosen.body.colorToken).toBe("ERROR");
   });
 
   it("Patient: create em A, GET/PATCH por id em B dão 404; list de B não vaza", async () => {

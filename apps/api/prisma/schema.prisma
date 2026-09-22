@@ -19,6 +19,19 @@ enum ClinicType {
   RENTED
 }
 
+// Cor de identidade — consultório (freelancer) ou dentista (clínica) na
+// sidebar da Agenda. Nunca é usada como cor de status de agendamento (essas
+// duas continuam em elementos visuais separados de propósito — ver vault:
+// dentist-system/"Conectar Agenda a Dados Reais de Consultório e
+// Dentistas — Plano Técnico").
+enum PaletteColorToken {
+  BRAND
+  SUCCESS
+  WARNING
+  ERROR
+  INFO
+}
+
 // Relação financeira do dentista Freelancer com um consultório específico —
 // conceito paralelo a ClinicType/dailyRentValue (aquele é pro Clinic de
 // tenant Clínica pagando aluguel internamente). Ver vault:
@@ -73,18 +86,19 @@ enum OrganizationStatus {
 }
 
 model User {
-  id             String        @id @default(cuid())
+  id             String             @id @default(cuid())
   organizationId String?
-  organization   Organization? @relation("OrganizationUsers", fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization?      @relation("OrganizationUsers", fields: [organizationId], references: [id], onDelete: Cascade)
   email          String
-  nickname       String?       @unique
+  nickname       String?            @unique
   passwordHash   String
   name           String
   role           Role?
-  isSuperAdmin   Boolean       @default(false)
-  active         Boolean       @default(true)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  colorToken     PaletteColorToken?
+  isSuperAdmin   Boolean            @default(false)
+  active         Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   foundingOfOrganization Organization?    @relation("OrganizationFoundingAdmin")
   createdPatients        Patient[]        @relation("PatientCreatedBy")
@@ -124,12 +138,13 @@ model Organization {
 }
 
 model Clinic {
-  id             String     @id @default(cuid())
+  id             String             @id @default(cuid())
   name           String
   type           ClinicType
-  dailyRentValue Decimal?   @db.Decimal(10, 2)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  dailyRentValue Decimal?           @db.Decimal(10, 2)
+  colorToken     PaletteColorToken?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
