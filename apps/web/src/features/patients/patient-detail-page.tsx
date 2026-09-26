@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
+import { can } from "@/lib/access";
 import { useAuth } from "@/lib/auth-context";
 import { AnamnesisTab } from "./tabs/anamnesis-tab";
 import { ClinicalRecordsTab } from "./tabs/clinical-records-tab";
@@ -13,8 +14,9 @@ type TabKey = "anamnesis" | "clinical-records" | "odontogram" | "budgets";
 export function PatientDetailPage() {
   const { patientId = "" } = useParams();
   const { user } = useAuth();
-  const isDentist = user?.role === "DENTIST";
-  const [tab, setTab] = useState<TabKey>(isDentist ? "anamnesis" : "budgets");
+  // Abas de dado clínico (anamnese, prontuário, odontograma).
+  const canSeeClinical = can(user, "clinical.read");
+  const [tab, setTab] = useState<TabKey>(canSeeClinical ? "anamnesis" : "budgets");
 
   const patientQuery = useQuery({
     queryKey: ["patients", patientId],
@@ -22,7 +24,7 @@ export function PatientDetailPage() {
   });
 
   const tabs: { key: TabKey; label: string }[] = [
-    ...(isDentist
+    ...(canSeeClinical
       ? ([
           { key: "anamnesis", label: "Anamnese" },
           { key: "clinical-records", label: "Prontuário" },
@@ -53,9 +55,9 @@ export function PatientDetailPage() {
         ))}
       </div>
 
-      {tab === "anamnesis" && isDentist && <AnamnesisTab patientId={patientId} />}
-      {tab === "clinical-records" && isDentist && <ClinicalRecordsTab patientId={patientId} />}
-      {tab === "odontogram" && isDentist && <OdontogramTab patientId={patientId} />}
+      {tab === "anamnesis" && canSeeClinical && <AnamnesisTab patientId={patientId} />}
+      {tab === "clinical-records" && canSeeClinical && <ClinicalRecordsTab patientId={patientId} />}
+      {tab === "odontogram" && canSeeClinical && <OdontogramTab patientId={patientId} />}
       {tab === "budgets" && <BudgetsTab patientId={patientId} />}
     </div>
   );

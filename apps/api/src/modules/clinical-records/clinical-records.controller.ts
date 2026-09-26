@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post } from "@nestjs/common";
 import {
+  ACCESS,
   createClinicalRecordSchema,
   type CreateClinicalRecordInput,
 } from "@dentist-system/shared-types";
@@ -9,15 +10,16 @@ import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/cur
 import { ClinicalRecordsService } from "./clinical-records.service";
 
 @Controller("patients/:patientId/clinical-records")
-@Roles("DENTIST")
 export class ClinicalRecordsController {
   constructor(private readonly clinicalRecordsService: ClinicalRecordsService) {}
 
+  @Roles(...ACCESS["clinical.read"])
   @Get()
   listByPatient(@Param("patientId") patientId: string) {
     return this.clinicalRecordsService.listByPatient(patientId);
   }
 
+  @Roles(...ACCESS["clinical.write"])
   @Post()
   create(
     @Param("patientId") patientId: string,

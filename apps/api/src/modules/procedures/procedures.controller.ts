@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import {
+  ACCESS,
   createProcedureSchema,
   updateProcedureSchema,
   type CreateProcedureInput,
@@ -10,7 +11,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { ProceduresService } from "./procedures.service";
 
 @Controller("procedures")
-@Roles("ADMIN", "DENTIST", "RECEPTIONIST")
+@Roles(...ACCESS["procedures.read"])
 export class ProceduresController {
   constructor(private readonly proceduresService: ProceduresService) {}
 
@@ -19,13 +20,13 @@ export class ProceduresController {
     return this.proceduresService.list();
   }
 
-  @Roles("DENTIST")
+  @Roles(...ACCESS["procedures.write"])
   @Post()
   create(@Body(new ZodValidationPipe(createProcedureSchema)) body: CreateProcedureInput) {
     return this.proceduresService.create(body);
   }
 
-  @Roles("DENTIST")
+  @Roles(...ACCESS["procedures.write"])
   @Patch(":id")
   update(
     @Param("id") id: string,

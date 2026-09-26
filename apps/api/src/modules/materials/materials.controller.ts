@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import {
+  ACCESS,
   createMaterialBatchSchema,
   createMaterialSchema,
   updateMaterialSchema,
@@ -12,7 +13,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { MaterialsService } from "./materials.service";
 
 @Controller("materials")
-@Roles("DENTIST", "RECEPTIONIST")
+@Roles(...ACCESS["materials.manage"])
 export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) {}
 

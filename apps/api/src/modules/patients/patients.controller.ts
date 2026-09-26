@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import {
+  ACCESS,
   createPatientSchema,
   updatePatientSchema,
   type CreatePatientInput,
@@ -11,7 +12,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { PatientsService } from "./patients.service";
 
 @Controller("patients")
-@Roles("ADMIN", "DENTIST", "RECEPTIONIST")
+@Roles(...ACCESS["patients.read"])
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
@@ -25,7 +26,7 @@ export class PatientsController {
     return this.patientsService.findOne(id);
   }
 
-  @Roles("DENTIST", "RECEPTIONIST")
+  @Roles(...ACCESS["patients.write"])
   @Post()
   create(
     @Body(new ZodValidationPipe(createPatientSchema)) body: CreatePatientInput,
@@ -34,7 +35,7 @@ export class PatientsController {
     return this.patientsService.create(body, user.id);
   }
 
-  @Roles("DENTIST", "RECEPTIONIST")
+  @Roles(...ACCESS["patients.write"])
   @Patch(":id")
   update(
     @Param("id") id: string,

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import {
+  ACCESS,
   createAppointmentSchema,
   listAppointmentsQuerySchema,
   updateAppointmentSchema,
@@ -12,7 +13,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { AppointmentsService } from "./appointments.service";
 
 @Controller("appointments")
-@Roles("DENTIST", "RECEPTIONIST")
+@Roles(...ACCESS["appointments.manage"])
 export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
