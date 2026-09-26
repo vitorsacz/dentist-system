@@ -6,11 +6,16 @@ import {
   type TransferFoundingAdminInput,
 } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
+import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.decorator";
 import { SuperAdminGuard } from "../../common/guards/super-admin.guard";
 import { PlatformService } from "./platform.service";
 import { PlatformStatsService } from "./platform-stats.service";
 
+// Super Admin não tem `role` de tenant, então não cabe em @Roles: o
+// RolesGuard global só exige autenticação (@AllowAuthenticated) e quem
+// restringe de fato ao Super Admin é o SuperAdminGuard.
 @Controller("platform")
+@AllowAuthenticated()
 @UseGuards(SuperAdminGuard)
 export class PlatformController {
   constructor(

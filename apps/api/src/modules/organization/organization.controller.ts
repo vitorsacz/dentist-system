@@ -1,4 +1,5 @@
 import { BadRequestException, Controller, Get } from "@nestjs/common";
+import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.decorator";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { OrganizationService } from "./organization.service";
@@ -7,6 +8,8 @@ import { OrganizationService } from "./organization.service";
 export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) {}
 
+  // Qualquer papel da organização vê "Minha Clínica" (nome + membros).
+  @AllowAuthenticated()
   @Get()
   getMine(@CurrentUser() user: AuthenticatedUser) {
     if (!user.organizationId) {
@@ -15,8 +18,8 @@ export class OrganizationController {
     return this.organizationService.findMine(user.organizationId);
   }
 
-  // Sobrepõe a ausência de @Roles da classe (permissiva) — este endpoint é
-  // deliberadamente mais restrito, ver OrganizationService.findDentists().
+  // Deliberadamente mais restrito que getMine() — ver
+  // OrganizationService.findDentists().
   @Roles("ADMIN", "RECEPTIONIST")
   @Get("dentists")
   getDentists(@CurrentUser() user: AuthenticatedUser) {

@@ -154,7 +154,10 @@ Não existe cadastro público — o primeiro usuário/organização nascem do se
 partir daí só o `ADMIN` da organização cria novos usuários pelo painel
 (`/admin/users`). RBAC é reforçado no backend por um `RolesGuard` global, não
 só escondido na UI — recepcionista, por exemplo, nunca tem acesso a anamnese,
-prontuário, odontograma ou dados financeiros.
+prontuário, odontograma ou dados financeiros. O guard **nega por padrão**:
+toda rota precisa declarar `@Roles(...)`, `@AllowAuthenticated()` (qualquer
+usuário logado) ou `@Public()`, no handler ou na classe — sem isso responde 403,
+e o teste `test/route-policy-coverage.e2e-spec.ts` quebra no CI.
 
 Teste de isolamento cross-tenant: `pnpm --filter @dentist-system/api test`
 (usa um banco Postgres separado, `dentist_system_test` local ou

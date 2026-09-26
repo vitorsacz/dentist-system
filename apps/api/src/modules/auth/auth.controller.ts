@@ -8,6 +8,7 @@ import {
 } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Public } from "../../common/decorators/public.decorator";
+import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.decorator";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { AuthService } from "./auth.service";
 
@@ -44,6 +45,7 @@ export class AuthController {
     return { accessToken };
   }
 
+  @AllowAuthenticated()
   @Post("logout")
   logout(@Res({ passthrough: true }) res: Response) {
     // clearCookie precisa dos MESMOS atributos sameSite/secure usados na criação
@@ -54,6 +56,7 @@ export class AuthController {
     return { success: true };
   }
 
+  @AllowAuthenticated()
   @Get("me")
   me(@CurrentUser() user: AuthenticatedUser) {
     return user;
