@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { AppointmentStatus, CurrentUser, Role, TenantType } from "@dentist-system/shared-types";
+import type { AppointmentStatus, CurrentUser, TenantType } from "@dentist-system/shared-types";
+import { can } from "@/lib/access";
 import { clinicsApi, type Clinic } from "@/features/clinics/api";
 import { myClinicApi } from "@/features/my-clinic/api";
 import { fromApiColorToken, locationColorForIndex, type LocationColorToken } from "./location-colors";
@@ -46,10 +47,12 @@ export interface MockAppointment {
 // dentista (já decidido — ele só vê a própria agenda).
 export type CalendarAxis = "location" | "dentist" | "none";
 
-export function resolveCalendarAxis(organizationType: TenantType, role: Role | null): CalendarAxis {
+// O tipo de organização decide primeiro (regra de negócio, fora da matriz
+// de acesso); dentro da clínica, o eixo "dentista" é pra quem pode listar os
+// dentistas (capacidade organization.dentists).
+export function resolveCalendarAxis(organizationType: TenantType, canListDentists: boolean): CalendarAxis {
   if (organizationType === "FREELANCER") return "location";
-  if (role === "DENTIST") return "none";
-  return "dentist";
+  return canListDentists ? "dentist" : "none";
 }
 
 const FAKE_PATIENTS = [
@@ -196,7 +199,7 @@ export function useAgendaData(currentUser: CurrentUser | null) {
   // Enquanto o tipo do tenant não carregou, assume o eixo mais restrito
   // ("none") em vez de arriscar mostrar a sidebar errada por um instante.
   const axis: CalendarAxis = orgQuery.data
-    ? resolveCalendarAxis(orgQuery.data.type, currentUser?.role ?? null)
+    ? resolveCalendarAxis(orgQuery.data.type, can(currentUser, "organization.dentists"))
     : "none";
 
   const dentistsQuery = useQuery({

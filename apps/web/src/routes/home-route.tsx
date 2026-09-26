@@ -1,4 +1,5 @@
 import { Navigate } from "react-router-dom";
+import { can } from "@/lib/access";
 import { useAuth } from "@/lib/auth-context";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 
@@ -9,7 +10,9 @@ export function HomeRoute() {
     return <Navigate to="/platform" replace />;
   }
 
-  if (user?.role === "ADMIN") {
+  // Quem não tem a tela inicial (hoje: ADMIN) cai direto na gestão de
+  // usuários.
+  if (!can(user, "dashboard.view") && can(user, "users.manage")) {
     return <Navigate to="/admin/users" replace />;
   }
 

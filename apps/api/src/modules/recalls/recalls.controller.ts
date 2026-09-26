@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import {
+  ACCESS,
   createRecallSchema,
   updateRecallStatusSchema,
   type CreateRecallInput,
@@ -10,7 +11,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { RecallsService } from "./recalls.service";
 
 @Controller("recalls")
-@Roles("DENTIST", "RECEPTIONIST")
+@Roles(...ACCESS["recalls.manage"])
 export class RecallsController {
   constructor(private readonly recallsService: RecallsService) {}
 

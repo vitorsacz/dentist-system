@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Put } from "@nestjs/common";
 import {
+  ACCESS,
   upsertClinicFinancialTermsSchema,
   type UpsertClinicFinancialTermsInput,
 } from "@dentist-system/shared-types";
@@ -10,7 +11,7 @@ import { ClinicFinancialTermsService } from "./clinic-financial-terms.service";
 // Mesmo escopo de acesso de attendances/reports/financial (dado financeiro
 // sensível) — ADMIN e RECEPTIONIST ficam de fora.
 @Controller("clinics/:clinicId/financial-terms")
-@Roles("DENTIST")
+@Roles(...ACCESS["clinicFinancialTerms.manage"])
 export class ClinicFinancialTermsController {
   constructor(private readonly clinicFinancialTermsService: ClinicFinancialTermsService) {}
 

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import Chart from "react-apexcharts";
 import { CalendarCheck, DollarSign, Percent, Users } from "lucide-react";
 import type { AppointmentStatus } from "@dentist-system/shared-types";
+import { can } from "@/lib/access";
 import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -39,7 +40,7 @@ function formatCurrency(value: number) {
 export function DashboardPage() {
   const { user } = useAuth();
   const { data, isLoading } = useMockDashboardOverview();
-  const showRevenue = user?.role === "DENTIST";
+  const showRevenue = can(user, "reports.financial");
 
   return (
     <div className="space-y-6">

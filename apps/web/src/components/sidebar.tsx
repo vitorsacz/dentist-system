@@ -15,7 +15,8 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import type { Role } from "@dentist-system/shared-types";
+import type { Capability } from "@dentist-system/shared-types";
+import { can, userRoles } from "@/lib/access";
 import { useAuth } from "@/lib/auth-context";
 import { initials } from "@/lib/initials";
 
@@ -24,7 +25,7 @@ interface NavItemDef {
   label: string;
   icon: LucideIcon;
   end?: boolean;
-  roles?: Role[];
+  capability?: Capability;
   superAdminOnly?: boolean;
 }
 
@@ -37,20 +38,20 @@ const NAV_GROUPS: NavGroupDef[] = [
   {
     title: "Menu",
     items: [
-      { to: "/", label: "Início", icon: Home, end: true, roles: ["DENTIST", "RECEPTIONIST"] },
-      { to: "/agenda", label: "Agenda", icon: Calendar, roles: ["ADMIN", "DENTIST", "RECEPTIONIST"] },
-      { to: "/patients", label: "Pacientes", icon: Users, roles: ["DENTIST", "RECEPTIONIST"] },
-      { to: "/financeiro", label: "Financeiro", icon: Wallet, roles: ["DENTIST"] },
-      { to: "/materials", label: "Estoque", icon: Package, roles: ["DENTIST", "RECEPTIONIST"] },
-      { to: "/procedures", label: "Procedimentos", icon: Stethoscope, roles: ["DENTIST"] },
+      { to: "/", label: "Início", icon: Home, end: true, capability: "dashboard.view" },
+      { to: "/agenda", label: "Agenda", icon: Calendar, capability: "agenda.view" },
+      { to: "/patients", label: "Pacientes", icon: Users, capability: "patients.write" },
+      { to: "/financeiro", label: "Financeiro", icon: Wallet, capability: "reports.financial" },
+      { to: "/materials", label: "Estoque", icon: Package, capability: "materials.manage" },
+      { to: "/procedures", label: "Procedimentos", icon: Stethoscope, capability: "procedures.write" },
     ],
   },
   {
     title: "Clínica",
     items: [
-      { to: "/clinics", label: "Consultórios", icon: Building2, roles: ["DENTIST"] },
-      { to: "/my-clinic", label: "Minha Clínica", icon: Landmark, roles: ["ADMIN", "DENTIST", "RECEPTIONIST"] },
-      { to: "/admin/users", label: "Usuários", icon: UserCog, roles: ["ADMIN"] },
+      { to: "/clinics", label: "Consultórios", icon: Building2, capability: "clinics.write" },
+      { to: "/my-clinic", label: "Minha Clínica", icon: Landmark, capability: "organization.read" },
+      { to: "/admin/users", label: "Usuários", icon: UserCog, capability: "users.manage" },
     ],
   },
   {
@@ -77,11 +78,15 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
     ...group,
     items: group.items.filter((item) => {
       if (item.superAdminOnly) return Boolean(user?.isSuperAdmin);
-      return !item.roles || (user?.role && item.roles.includes(user.role));
+      return !item.capability || can(user, item.capability);
     }),
   })).filter((group) => group.items.length > 0);
 
-  const roleLabel = user?.isSuperAdmin ? "Super Admin" : user?.role ? ROLE_LABEL[user.role] : "";
+  const roleLabel = user?.isSuperAdmin
+    ? "Super Admin"
+    : userRoles(user)
+        .map((role) => ROLE_LABEL[role])
+        .join(" · ");
 
   return (
     <aside

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import {
+  ACCESS,
   createTenantUserSchema,
   updateTenantUserSchema,
   resetPasswordSchema,
@@ -13,7 +14,7 @@ import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/cur
 import { UsersService } from "./users.service";
 
 @Controller("users")
-@Roles("ADMIN")
+@Roles(...ACCESS["users.manage"])
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

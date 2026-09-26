@@ -24,7 +24,7 @@ export function App() {
           <Route element={<AppShell />}>
             <Route path="/" element={<HomeRoute />} />
 
-            <Route element={<ProtectedRoute roles={["ADMIN", "DENTIST", "RECEPTIONIST"]} />}>
+            <Route element={<ProtectedRoute capability="organization.read" />}>
               <Route path="/my-clinic" element={<MyClinicPage />} />
             </Route>
 
@@ -33,23 +33,33 @@ export function App() {
               <Route path="/platform/organizations/:id" element={<OrganizationDetailPage />} />
             </Route>
 
-            <Route element={<ProtectedRoute roles={["ADMIN"]} />}>
+            <Route element={<ProtectedRoute capability="users.manage" />}>
               <Route path="/admin/users" element={<AdminUsersPage />} />
             </Route>
 
-            <Route element={<ProtectedRoute roles={["ADMIN", "DENTIST", "RECEPTIONIST"]} />}>
+            <Route element={<ProtectedRoute capability="agenda.view" />}>
               <Route path="/agenda" element={<AgendaPage />} />
             </Route>
 
-            <Route element={<ProtectedRoute roles={["DENTIST", "RECEPTIONIST"]} />}>
+            <Route element={<ProtectedRoute capability="patients.write" />}>
               <Route path="/patients" element={<PatientsPage />} />
               <Route path="/patients/:patientId" element={<PatientDetailPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute capability="materials.manage" />}>
               <Route path="/materials" element={<MaterialsPage />} />
-              <Route element={<ProtectedRoute roles={["DENTIST"]} />}>
-                <Route path="/financeiro" element={<FinanceiroPage />} />
-                <Route path="/procedures" element={<ProceduresPage />} />
-                <Route path="/clinics" element={<ClinicsPage />} />
-              </Route>
+            </Route>
+
+            <Route element={<ProtectedRoute capability="reports.financial" />}>
+              <Route path="/financeiro" element={<FinanceiroPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute capability="procedures.write" />}>
+              <Route path="/procedures" element={<ProceduresPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute capability="clinics.write" />}>
+              <Route path="/clinics" element={<ClinicsPage />} />
             </Route>
           </Route>
         </Route>

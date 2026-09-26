@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import {
+  ACCESS,
   createBudgetSchema,
   updateBudgetStatusSchema,
   type CreateBudgetInput,
@@ -11,20 +12,22 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { BudgetsService } from "./budgets.service";
 
 @Controller("budgets")
-@Roles("DENTIST", "RECEPTIONIST")
 export class BudgetsController {
   constructor(private readonly budgetsService: BudgetsService) {}
 
+  @Roles(...ACCESS["budgets.read"])
   @Get()
   listByPatient(@Query("patientId") patientId: string) {
     return this.budgetsService.listByPatient(patientId);
   }
 
+  @Roles(...ACCESS["budgets.read"])
   @Get(":id")
   findOne(@Param("id") id: string) {
     return this.budgetsService.findOne(id);
   }
 
+  @Roles(...ACCESS["budgets.write"])
   @Post()
   create(
     @Body(new ZodValidationPipe(createBudgetSchema)) body: CreateBudgetInput,
@@ -33,6 +36,7 @@ export class BudgetsController {
     return this.budgetsService.create(body, user.id);
   }
 
+  @Roles(...ACCESS["budgets.status"])
   @Patch(":id/status")
   updateStatus(
     @Param("id") id: string,

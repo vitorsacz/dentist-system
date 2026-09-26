@@ -1,8 +1,9 @@
 import { Navigate, Outlet } from "react-router-dom";
-import type { Role } from "@dentist-system/shared-types";
+import type { Capability } from "@dentist-system/shared-types";
+import { can } from "@/lib/access";
 import { useAuth } from "@/lib/auth-context";
 
-export function ProtectedRoute({ roles, superAdminOnly }: { roles?: Role[]; superAdminOnly?: boolean }) {
+export function ProtectedRoute({ capability, superAdminOnly }: { capability?: Capability; superAdminOnly?: boolean }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -17,7 +18,7 @@ export function ProtectedRoute({ roles, superAdminOnly }: { roles?: Role[]; supe
     return <Navigate to="/" replace />;
   }
 
-  if (roles && (!user.role || !roles.includes(user.role))) {
+  if (capability && !can(user, capability)) {
     return <Navigate to="/" replace />;
   }
 

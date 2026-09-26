@@ -167,3 +167,5 @@ export {
   type FinancialReportClinicRow,
   type FinancialReport,
 } from "./report";
+
+export { ACCESS, rolesHaveAccess, type Capability } from "./access";
