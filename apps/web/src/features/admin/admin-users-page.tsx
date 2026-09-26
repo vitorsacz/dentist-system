@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,6 +64,82 @@ function RolesCell({
   );
 }
 
+interface PendingAdminChange {
+  user: ManagedTenantUser;
+  roles: Role[];
+  grant: boolean;
+}
+
+// Dar ou tirar ADMIN muda o que a pessoa pode fazer na clínica inteira, então
+// pede confirmação antes de salvar. O texto descreve o que o ADMIN pode HOJE
+// pela matriz ACCESS (users.manage, organization.dentists); atualizar quando a
+// Fase 2 der ao admin consultórios, catálogo e financeiro.
+function ConfirmAdminChangeDialog({
+  change,
+  onConfirm,
+  onCancel,
+}: {
+  change: PendingAdminChange;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    cancelRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+
+  const { user, grant } = change;
+  const title = grant ? "Dar acesso de administrador?" : "Remover acesso de administrador?";
+  const description = grant
+    ? `${user.name} poderá gerenciar os usuários desta clínica: criar contas, ativar e desativar, redefinir senhas e mudar papéis. Também passa a ver a agenda de todos os dentistas.`
+    : `${user.name} deixará de gerenciar os usuários desta clínica e de ver a agenda de todos os dentistas. Os outros papéis continuam como estão.`;
+
+  // Portal no <body>: dentro da página o modal herdaria o espaçamento do
+  // container (space-y-* põe margin-top nos filhos) e ficaria deslocado.
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-admin-title"
+        aria-describedby="confirm-admin-description"
+        className="w-full max-w-md rounded-2xl border border-line bg-surface p-6"
+      >
+        <h2 id="confirm-admin-title" className="mb-2 text-xl font-semibold text-ink">
+          {title}
+        </h2>
+        <p id="confirm-admin-description" className="text-sm text-muted">
+          {description}
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            ref={cancelRef}
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${grant ? "bg-accent" : "bg-bad"}`}
+          >
+            {grant ? "Dar acesso de administrador" : "Remover acesso"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function ResetPasswordForm({ userId, onDone }: { userId: string; onDone: () => void }) {
   const queryClient = useQueryClient();
   const {
@@ -110,6 +187,7 @@ export function AdminUsersPage() {
   const { user: currentUser } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const [pendingAdminChange, setPendingAdminChange] = useState<PendingAdminChange | null>(null);
   const queryClient = useQueryClient();
   const usersQuery = useQuery({ queryKey: ["admin", "users"], queryFn: adminUsersApi.list });
 
@@ -137,6 +215,19 @@ export function AdminUsersPage() {
       adminUsersApi.update(userId, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
+  // Mudança de papéis vinda da tabela. Se o ADMIN entrou ou saiu (na linha de
+  // outra pessoa), segura e pede confirmação; o checkbox continua mostrando o
+  // estado salvo até confirmar. Os demais papéis salvam na hora.
+  const handleRolesChange = (user: ManagedTenantUser, roles: Role[]) => {
+    const hadAdmin = user.roles.includes("ADMIN");
+    const hasAdmin = roles.includes("ADMIN");
+    if (hadAdmin !== hasAdmin && user.userId !== currentUser?.id) {
+      setPendingAdminChange({ user, roles, grant: hasAdmin });
+      return;
+    }
+    updateMutation.mutate({ userId: user.userId, roles });
+  };
+
   const updateError =
     updateMutation.error instanceof ApiError ? updateMutation.error.message : updateMutation.error ? "Erro ao salvar" : null;
 
@@ -230,7 +321,7 @@ export function AdminUsersPage() {
                       user={user}
                       isSelf={isSelf}
                       disabled={updateMutation.isPending}
-                      onChange={(roles) => updateMutation.mutate({ userId: user.userId, roles })}
+                      onChange={(roles) => handleRolesChange(user, roles)}
                     />
                   </td>
                   <td className="px-4 py-3">
@@ -260,6 +351,17 @@ export function AdminUsersPage() {
           </tbody>
         </table>
       </div>
+
+      {pendingAdminChange && (
+        <ConfirmAdminChangeDialog
+          change={pendingAdminChange}
+          onCancel={() => setPendingAdminChange(null)}
+          onConfirm={() => {
+            updateMutation.mutate({ userId: pendingAdminChange.user.userId, roles: pendingAdminChange.roles });
+            setPendingAdminChange(null);
+          }}
+        />
+      )}
     </div>
   );
 }
