@@ -1,12 +1,25 @@
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
-import type { LoginInput, LookupAccountsResult, Role } from "@dentist-system/shared-types";
+import type { AccountOption, LoginInput, Role } from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
 const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL = "30d";
+const BCRYPT_ROUNDS = 10;
+
+// Hash de uma senha que ninguém tem, comparado quando o identifier não bate
+// com nenhuma conta — assim "e-mail inexistente" gasta o mesmo bcrypt.compare
+// que "senha errada" e o tempo de resposta não revela se o e-mail existe.
+// Mesmo custo (rounds) dos hashes reais.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync("conta-inexistente-comparacao-de-tempo", BCRYPT_ROUNDS);
+
+const INVALID_CREDENTIALS = "Credenciais inválidas";
+
+export type LoginOutcome =
+  | { kind: "tokens"; accessToken: string; refreshToken: string }
+  | { kind: "organization-selection"; accounts: AccountOption[] };
 
 interface JwtPayload {
   sub: string;
@@ -33,51 +46,57 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
-  // Identidade é isolada por tenant — um e-mail pode existir em mais de uma
-  // organização (contas completamente independentes). Essa busca é
-  // deliberadamente global (sem organizationId), porque nesse ponto do fluxo
-  // ainda não sabemos qual organização o usuário quer acessar.
-  async lookupAccounts(identifier: string): Promise<LookupAccountsResult> {
-    const users = await this.prisma.user.findMany({
-      where: { active: true, OR: [{ email: identifier }, { nickname: identifier }] },
-      include: { organization: true },
-    });
-
-    if (users.length <= 1) {
-      return { requiresOrganizationSelection: false, accounts: [] };
-    }
-
-    return {
-      requiresOrganizationSelection: true,
-      accounts: users.map((user) => ({
-        organizationId: user.organizationId ?? "",
-        organizationName: user.organization?.name ?? "",
-      })),
-    };
-  }
-
-  async login(input: LoginInput) {
+  // Identidade é isolada por organização — o mesmo e-mail pode ter conta em
+  // várias, cada uma com a própria senha. A senha é validada ANTES de revelar
+  // qualquer organização: só quem acerta a senha vê onde ela confere. Nenhuma
+  // resposta diferencia "e-mail inexistente" de "senha errada".
+  async login(input: LoginInput): Promise<LoginOutcome> {
     const { identifier, password, organizationId } = input;
 
-    const where = organizationId
-      ? { organizationId, active: true, OR: [{ email: identifier }, { nickname: identifier }] }
-      : { active: true, OR: [{ email: identifier }, { nickname: identifier }] };
+    // Busca global (sem tenant no contexto): User fica fora da extension de
+    // isolamento justamente pra isso — ver tenant.extension.ts.
+    const candidates = await this.prisma.user.findMany({
+      where: {
+        active: true,
+        OR: [{ email: identifier }, { nickname: identifier }],
+        ...(organizationId ? { organizationId } : {}),
+      },
+      include: { organization: { select: { name: true } } },
+    });
 
-    const users = await this.prisma.user.findMany({ where });
-    // 0 contas: não existe. Mais de 1: ambíguo, precisa organizationId (o
-    // front deveria ter chamado lookupAccounts antes e nunca chegar aqui sem
-    // ele). Em ambos os casos, mesma mensagem genérica — não revela qual caso é.
-    const [user] = users;
-    if (users.length !== 1 || !user) {
-      throw new UnauthorizedException("Credenciais inválidas");
+    if (candidates.length === 0) {
+      await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+      throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
 
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      throw new UnauthorizedException("Credenciais inválidas");
+    const validAccounts: typeof candidates = [];
+    for (const candidate of candidates) {
+      if (await bcrypt.compare(password, candidate.passwordHash)) {
+        validAccounts.push(candidate);
+      }
     }
 
-    return this.issueTokens(user);
+    const [onlyAccount] = validAccounts;
+    if (!onlyAccount) {
+      throw new UnauthorizedException(INVALID_CREDENTIALS);
+    }
+    if (validAccounts.length === 1) {
+      return { kind: "tokens", ...this.issueTokens(onlyAccount) };
+    }
+
+    // Senha confere em mais de uma conta: o usuário escolhe a organização e
+    // reenvia com organizationId (senha validada de novo). Conta sem
+    // organização (Super Admin) não entra na lista — não há organizationId
+    // pra reenviar; Super Admin com e-mail e senha repetidos entra pelo
+    // nickname, que é único globalmente.
+    return {
+      kind: "organization-selection",
+      accounts: validAccounts.flatMap((account) =>
+        account.organizationId && account.organization
+          ? [{ organizationId: account.organizationId, organizationName: account.organization.name }]
+          : [],
+      ),
+    };
   }
 
   async refresh(refreshToken: string | undefined) {

@@ -78,6 +78,22 @@ describe("Cobertura de política de acesso (RBAC nega por padrão)", () => {
     }
   });
 
+  // Rota pública não passa por nenhuma checagem de login: cada uma aqui é
+  // superfície de ataque aberta a qualquer um. Adicionar uma nova exige
+  // atualizar esta lista de propósito — e garantir que ela não revela se um
+  // e-mail existe ou em quais organizações está (ver auth-login.e2e-spec.ts).
+  it("as rotas públicas são exatamente as esperadas", () => {
+    const publicRoutes = routes
+      .filter((route) => resolveRoutePolicy(reflector, route.handler, route.controllerClass)?.kind === "public")
+      .map((route) => route.label)
+      .sort();
+    expect(publicRoutes).toEqual([
+      "AuthController.login (POST /auth/login)",
+      "AuthController.refresh (POST /auth/refresh)",
+      "HealthController.check (GET /health)",
+    ]);
+  });
+
   it("nenhum nível (handler ou classe) declara mais de uma política ao mesmo tempo", () => {
     const ambiguous: string[] = [];
     for (const route of routes) {
