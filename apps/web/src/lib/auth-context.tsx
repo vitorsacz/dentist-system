@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { CurrentUser } from "@dentist-system/shared-types";
-import { apiClient, setAccessToken } from "./api-client";
+import { apiClient, refreshAccessToken, setAccessToken } from "./api-client";
 
 interface AuthContextValue {
   user: CurrentUser | null;
@@ -28,13 +28,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Tenta restaurar a sessão via refresh cookie httpOnly ao carregar o app.
-    apiClient
-      .post<{ accessToken: string }>("/auth/refresh")
-      .then((data) => {
-        setAccessToken(data.accessToken);
-        return loadUser();
-      })
-      .catch(() => setIsLoading(false));
+    // Passa pelo refresh único do api-client (nunca POST /auth/refresh direto):
+    // o StrictMode monta este efeito duas vezes e duas rotações paralelas com o
+    // mesmo token seriam tratadas como reuso pelo servidor.
+    refreshAccessToken().then((refreshed) => (refreshed ? loadUser() : setIsLoading(false)));
   }, [loadUser]);
 
   const login = useCallback(

@@ -8,6 +8,7 @@ import {
 } from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
+import { RefreshSessionsService } from "../sessions/refresh-sessions.service";
 
 interface UserRecord {
   id: string;
@@ -38,7 +39,10 @@ function toManagedTenantUser(user: UserRecord): ManagedTenantUser {
 // aqui filtra organizationId manualmente, sem rede de segurança automática.
 @Injectable()
 export class UsersService {
-  constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PRISMA_SERVICE) private readonly prisma: PrismaService,
+    private readonly refreshSessions: RefreshSessionsService,
+  ) {}
 
   async create(input: CreateTenantUserInput, organizationId: string) {
     // Checagem de e-mail já existente só dentro do próprio tenant — nunca
@@ -98,6 +102,11 @@ export class UsersService {
     }
 
     const updated = await this.prisma.user.update({ where: { id: userId }, data: input });
+    // Desativar derruba as sessões em todos os navegadores: sem isso o
+    // refresh seguiria funcionando até o token expirar.
+    if (input.active === false) {
+      await this.refreshSessions.revokeAllForUser(userId);
+    }
     return toManagedTenantUser(updated);
   }
 

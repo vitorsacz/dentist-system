@@ -105,8 +105,33 @@ model User {
   createdClinicalRecords ClinicalRecord[] @relation("ClinicalRecordCreatedBy")
   createdBudgets         Budget[]         @relation("BudgetCreatedBy")
   createdAttendances     Attendance[]     @relation("AttendanceCreatedBy")
+  refreshSessions        RefreshSession[]
 
   @@unique([organizationId, email])
+}
+
+// Sessão de refresh (login em um navegador/dispositivo). O refresh token é um
+// valor aleatório opaco no cookie httpOnly; aqui fica só o hash SHA-256. Cada
+// POST /auth/refresh revoga a sessão atual e cria a próxima na mesma família
+// (familyId = um login); reusar uma sessão já revogada revoga a família
+// inteira (sinal de token roubado). Sem organizationId de propósito: a sessão
+// pertence ao usuário (que já está numa organização só) e é consultada antes
+// de existir contexto de tenant — ver refresh-sessions.service.ts.
+model RefreshSession {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  familyId     String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  userAgent    String?
+  ip           String?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
 }
 
 model Organization {
