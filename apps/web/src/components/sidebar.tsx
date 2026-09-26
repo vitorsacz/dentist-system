@@ -61,7 +61,7 @@ const NAV_GROUPS: NavGroupDef[] = [
 ];
 
 const ROLE_LABEL: Record<string, string> = {
-  ADMIN: "Tenant admin",
+  ADMIN: "Admin",
   DENTIST: "Dentista",
   RECEPTIONIST: "Recepcionista",
 };

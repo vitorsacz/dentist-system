@@ -157,9 +157,9 @@ describe("RolesGuard", () => {
     } as unknown as ExecutionContext;
   }
 
-  const dentist = { role: "DENTIST", isSuperAdmin: false };
-  const admin = { role: "ADMIN", isSuperAdmin: false };
-  const superAdmin = { role: null, isSuperAdmin: true };
+  const dentist = { roles: ["DENTIST"], isSuperAdmin: false };
+  const admin = { roles: ["ADMIN"], isSuperAdmin: false };
+  const superAdmin = { roles: [], isSuperAdmin: true };
 
   it("nega rota sem política, mesmo pra usuário autenticado", () => {
     const ctx = contextFor(UndecoratedController, UndecoratedController.prototype.open, dentist);

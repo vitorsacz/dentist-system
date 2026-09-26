@@ -36,7 +36,7 @@ describe("Sessões de refresh revogáveis", () => {
   async function createUser(role: "ADMIN" | "DENTIST" = "DENTIST") {
     const email = `sessao-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.com`;
     const user = await rawPrisma.user.create({
-      data: { organizationId, email, passwordHash: await bcrypt.hash(PASSWORD, 10), name: email, role },
+      data: { organizationId, email, passwordHash: await bcrypt.hash(PASSWORD, 10), name: email, roles: [role] },
     });
     return { id: user.id, email };
   }

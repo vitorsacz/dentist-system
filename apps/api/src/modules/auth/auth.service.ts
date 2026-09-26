@@ -25,7 +25,7 @@ interface JwtPayload {
   sub: string;
   email: string;
   organizationId: string | null;
-  role: Role | null;
+  roles: Role[];
   isSuperAdmin: boolean;
 }
 
@@ -33,7 +33,7 @@ interface AuthenticatedUserRecord {
   id: string;
   email: string;
   organizationId: string | null;
-  role: Role | null;
+  roles: Role[];
   isSuperAdmin: boolean;
   passwordHash: string;
 }
@@ -135,7 +135,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       organizationId: user.organizationId,
-      role: user.role,
+      roles: user.roles,
       isSuperAdmin: user.isSuperAdmin,
     };
     return this.jwtService.sign(payload, {

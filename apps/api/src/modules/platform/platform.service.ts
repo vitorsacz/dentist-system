@@ -42,7 +42,7 @@ export class PlatformService {
           email: input.foundingAdminEmail,
           passwordHash,
           name: input.foundingAdminName,
-          role: "ADMIN",
+          roles: ["ADMIN"],
         },
       });
       return tx.organization.update({
@@ -76,7 +76,9 @@ export class PlatformService {
   // Transferência de capitania nunca é self-service — só o Super Admin,
   // via este endpoint (não existe rota equivalente pro Tenant Admin).
   async transferFoundingAdmin(organizationId: string, userId: string): Promise<PlatformOrganization> {
-    const user = await this.prisma.user.findFirst({ where: { id: userId, organizationId, role: "ADMIN" } });
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId, roles: { has: "ADMIN" } },
+    });
     if (!user) {
       throw new NotFoundException("Usuário admin não encontrado nesta organização");
     }

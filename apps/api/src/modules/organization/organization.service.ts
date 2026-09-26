@@ -19,11 +19,10 @@ export class OrganizationService {
       id: organization.id,
       name: organization.name,
       type: organization.type as MyClinic["type"],
-      // role só é null pra Super Admin, que nunca pertence a uma organização.
       members: organization.users.map((user) => ({
         userId: user.id,
         name: user.name,
-        role: user.role as MyClinic["members"][number]["role"],
+        roles: user.roles,
         active: user.active,
       })),
     };
@@ -37,7 +36,7 @@ export class OrganizationService {
   // existir de verdade, continua vinculado a ele mesmo assim).
   async findDentists(organizationId: string): Promise<OrganizationDentist[]> {
     const dentists = await this.prisma.user.findMany({
-      where: { organizationId, role: "DENTIST", active: true },
+      where: { organizationId, roles: { has: "DENTIST" }, active: true },
       orderBy: { name: "asc" },
     });
     return dentists.map((user) => ({

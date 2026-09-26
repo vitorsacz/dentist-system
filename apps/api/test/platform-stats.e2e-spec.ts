@@ -24,7 +24,7 @@ async function seedFixtures(label: string) {
       email: `${label}-admin-${Date.now()}-${Math.random()}@test.com`,
       passwordHash,
       name: `${label} Admin`,
-      role: "ADMIN",
+      roles: ["ADMIN"],
     },
   });
   await rawPrisma.user.create({
@@ -33,7 +33,7 @@ async function seedFixtures(label: string) {
       email: `${label}-dentist-${Date.now()}-${Math.random()}@test.com`,
       passwordHash,
       name: `${label} Dentista`,
-      role: "DENTIST",
+      roles: ["DENTIST"],
       active: true,
     },
   });
@@ -111,7 +111,7 @@ describe("Platform stats (Super Admin)", () => {
         name: "Super Admin Stats",
         isSuperAdmin: true,
         organizationId: null,
-        role: null,
+        roles: [],
       },
     });
     const superAdminLogin = await request(app.getHttpServer())

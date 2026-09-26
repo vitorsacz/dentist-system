@@ -9,7 +9,7 @@ interface JwtPayload {
   sub: string;
   email: string;
   organizationId: string | null;
-  role: Role | null;
+  roles: Role[];
   isSuperAdmin: boolean;
 }
 
@@ -25,6 +25,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
+  // Relê o usuário do banco a cada request: papéis, ativo e organização valem
+  // sempre o estado atual, não o que estava no token (um access token antigo,
+  // de antes do R1, com `role` no payload, continua funcionando).
   async validate(payload: JwtPayload) {
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user || !user.active) {
@@ -36,7 +39,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       name: user.name,
       organizationId: user.organizationId,
-      role: user.role,
+      roles: user.roles,
       isSuperAdmin: user.isSuperAdmin,
     };
   }

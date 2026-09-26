@@ -56,7 +56,8 @@ export class RolesGuard {
 
     const request = context.switchToHttp().getRequest();
     const user = request.user as AuthenticatedUser | undefined;
-    if (!user || !user.role || !policy.roles.includes(user.role)) {
+    // Usuário com vários papéis passa se QUALQUER um deles estiver na lista.
+    if (!user || !user.roles.some((role) => policy.roles.includes(role))) {
       throw new ForbiddenException("Sem permissão para acessar este recurso");
     }
     return true;

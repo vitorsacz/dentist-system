@@ -1,5 +1,6 @@
 export {
   ROLES,
+  tenantRolesSchema,
   CLINIC_TYPES,
   BUDGET_STATUSES,
   APPOINTMENT_STATUSES,

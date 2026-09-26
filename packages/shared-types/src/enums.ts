@@ -1,5 +1,14 @@
+import { z } from "zod";
+
 export const ROLES = ["ADMIN", "DENTIST", "RECEPTIONIST"] as const;
 export type Role = (typeof ROLES)[number];
+
+// Lista de papéis de um usuário de organização (R1: pode ter mais de um,
+// ex.: ADMIN + DENTIST). Pelo menos um, sem repetição.
+export const tenantRolesSchema = z
+  .array(z.enum(ROLES))
+  .min(1, "Escolha pelo menos um papel")
+  .refine((roles) => new Set(roles).size === roles.length, "Papel repetido");
 
 export const CLINIC_TYPES = ["OWN", "RENTED"] as const;
 export type ClinicType = (typeof CLINIC_TYPES)[number];

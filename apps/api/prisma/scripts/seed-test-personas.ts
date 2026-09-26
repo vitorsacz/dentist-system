@@ -14,7 +14,7 @@ async function findOrCreateUser(organizationId: string, email: string, name: str
   const existing = await prisma.user.findFirst({ where: { organizationId, email } });
   if (existing) return existing;
   const passwordHash = await bcrypt.hash(PASSWORD, 10);
-  return prisma.user.create({ data: { organizationId, email, passwordHash, name, role } });
+  return prisma.user.create({ data: { organizationId, email, passwordHash, name, roles: [role] } });
 }
 
 async function main() {
