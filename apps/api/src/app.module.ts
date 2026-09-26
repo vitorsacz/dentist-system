@@ -1,9 +1,16 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { validateEnv } from "./config/env.validation";
 import { PrismaModule } from "./prisma/prisma.module";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
+import {
+  GLOBAL_RATE_LIMIT,
+  RATE_LIMIT_MESSAGE,
+  RATE_LIMIT_WINDOW_MS,
+  isRateLimitDisabled,
+} from "./common/rate-limit/rate-limit.config";
 import { RolesGuard } from "./common/guards/roles.guard";
 import { DecimalInterceptor } from "./common/interceptors/decimal.interceptor";
 import { TenantContextInterceptor } from "./common/interceptors/tenant-context.interceptor";
@@ -32,6 +39,11 @@ import { HealthController } from "./modules/health/health.controller";
       isGlobal: true,
       validate: validateEnv,
     }),
+    ThrottlerModule.forRoot({
+      throttlers: [{ name: "default", ttl: RATE_LIMIT_WINDOW_MS, limit: GLOBAL_RATE_LIMIT }],
+      errorMessage: RATE_LIMIT_MESSAGE,
+      skipIf: () => isRateLimitDisabled(),
+    }),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -53,6 +65,12 @@ import { HealthController } from "./modules/health/health.controller";
   ],
   controllers: [HealthController],
   providers: [
+    // Primeiro guard: conta a requisição antes de qualquer checagem de login,
+    // então tentativa com credencial errada também consome o limite.
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

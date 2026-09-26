@@ -1,10 +1,10 @@
-import cookieParser from "cookie-parser";
 import request from "supertest";
 import { Test } from "@nestjs/testing";
-import type { INestApplication } from "@nestjs/common";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import * as bcrypt from "bcrypt";
 import { PrismaClient } from "@prisma/client";
 import { AppModule } from "../src/app.module";
+import { configureApp } from "../src/app.setup";
 import { TEST_DATABASE_URL } from "./test-db";
 
 // Critério de aceite da fundação de multi-tenancy (ver plano técnico): 2
@@ -23,7 +23,7 @@ interface OrgContext {
 }
 
 async function seedOrgContext(
-  app: INestApplication,
+  app: NestExpressApplication,
   label: string,
   type: "CLINIC" | "FREELANCER" = "CLINIC",
 ): Promise<OrgContext> {
@@ -68,7 +68,7 @@ async function seedOrgContext(
 }
 
 describe("Isolamento cross-tenant", () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   let orgA: OrgContext;
   let orgB: OrgContext;
   let freelancerOrg: OrgContext;
@@ -116,8 +116,8 @@ describe("Isolamento cross-tenant", () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    app.use(cookieParser());
+    app = moduleRef.createNestApplication<NestExpressApplication>();
+    configureApp(app);
     await app.init();
 
     await rawPrisma.organization.deleteMany({});

@@ -1,6 +1,12 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from "@nestjs/common";
 import type { Request, Response } from "express";
+import { Throttle } from "@nestjs/throttler";
 import { loginSchema, type LoginInput, type LoginResult } from "@dentist-system/shared-types";
+import {
+  LOGIN_RATE_LIMIT,
+  RATE_LIMIT_WINDOW_MS,
+  REFRESH_RATE_LIMIT,
+} from "../../common/rate-limit/rate-limit.config";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Public } from "../../common/decorators/public.decorator";
 import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.decorator";
@@ -19,6 +25,7 @@ export class AuthController {
   // POST auth/lookup foi removido): a lista de organizações só aparece depois
   // da senha conferir, e só com as organizações em que ela conferiu.
   @Public()
+  @Throttle({ default: { limit: LOGIN_RATE_LIMIT, ttl: RATE_LIMIT_WINDOW_MS } })
   @Post("login")
   @HttpCode(HttpStatus.OK)
   async login(
@@ -34,6 +41,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: REFRESH_RATE_LIMIT, ttl: RATE_LIMIT_WINDOW_MS } })
   @Post("refresh")
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies?.[REFRESH_COOKIE];

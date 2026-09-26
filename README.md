@@ -186,6 +186,30 @@ Teste de isolamento cross-tenant: `pnpm --filter @dentist-system/api test`
 `TEST_DATABASE_URL` em CI) — seeda 2 organizations e confirma que acesso
 cruzado por ID em todo endpoint responde 404, nunca vazamento.
 
+### Rate limit e headers de segurança
+
+`@nestjs/throttler` como primeiro guard global, contando por IP do cliente
+(valores em `apps/api/src/common/rate-limit/rate-limit.config.ts`):
+
+- `POST /auth/login`: 5 por minuto — contra força bruta de senha.
+- `POST /auth/refresh`: 30 por minuto — mais folgado porque o front chama
+  refresh a cada carregamento de página e a equipe de uma clínica costuma sair
+  pelo mesmo IP.
+- Demais rotas: 100 por minuto. `GET /health` não é limitado (health check do
+  Render).
+- Estourou: `429` com a mensagem "Muitas tentativas. Aguarde um minuto e tente
+  novamente." (a tela de login mostra essa mensagem).
+
+A API roda atrás do proxy do Render, então `trust proxy` é configurado com o
+número de saltos `TRUST_PROXY_HOPS` (padrão `1`) — sem isso todos os clientes
+teriam o IP do proxy e dividiriam o mesmo limite. A contagem é em memória, por
+instância.
+
+`helmet` adiciona os headers de segurança, com CSP `default-src 'none'` (API
+só JSON). Tudo isso fica em `apps/api/src/app.setup.ts`, usado pelo `main.ts` e
+pelos testes e2e. Na suíte o rate limit fica desligado (`RATE_LIMIT_DISABLED`
+em `test/env-setup.ts`), exceto em `test/rate-limit.e2e-spec.ts`.
+
 ### Separação de role de banco (produção)
 
 `apps/api/prisma/scripts/create-app-role.sql` cria uma role Postgres
