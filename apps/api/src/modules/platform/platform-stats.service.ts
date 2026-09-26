@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { PlatformOverviewStats } from "@dentist-system/shared-types";
+import { ROLES, type PlatformOverviewStats } from "@dentist-system/shared-types";
 import { PRISMA_UNSCOPED_SERVICE, type PrismaBaseService } from "../../prisma/prisma.service";
 
 function monthKey(date: Date) {
@@ -28,20 +28,22 @@ export class PlatformStatsService {
 
     const [
       organizationsByStatusRaw,
-      usersByRoleRaw,
+      activeUsersByRole,
+      activeUsersWithAnyRole,
       totalDentistsRegistered,
       totalDentistsActive,
       recentOrganizations,
       attendancesByOrg,
     ] = await Promise.all([
       this.prisma.organization.groupBy({ by: ["status"], _count: true }),
-      this.prisma.user.groupBy({
-        by: ["role"],
-        where: { active: true, role: { not: null } },
-        _count: true,
-      }),
-      this.prisma.user.count({ where: { role: "DENTIST" } }),
-      this.prisma.user.count({ where: { role: "DENTIST", active: true } }),
+      // Um usuário com mais de um papel (ex.: ADMIN + DENTIST) conta em CADA
+      // papel que tem — por isso a soma por papel pode passar do total.
+      Promise.all(ROLES.map((role) => this.prisma.user.count({ where: { active: true, roles: { has: role } } }))),
+      // Total = pessoas (usuários ativos com pelo menos um papel), não soma
+      // dos papéis. Super Admin (sem papel) fica de fora, como antes.
+      this.prisma.user.count({ where: { active: true, roles: { isEmpty: false } } }),
+      this.prisma.user.count({ where: { roles: { has: "DENTIST" } } }),
+      this.prisma.user.count({ where: { roles: { has: "DENTIST" }, active: true } }),
       this.prisma.organization.findMany({
         where: { createdAt: { gte: sixMonthsAgo } },
         select: { createdAt: true },
@@ -59,12 +61,10 @@ export class PlatformStatsService {
       organizationsByStatus.total += row._count;
     }
 
-    const usersByRole = { ADMIN: 0, DENTIST: 0, RECEPTIONIST: 0, total: 0 };
-    for (const row of usersByRoleRaw) {
-      if (!row.role) continue;
-      usersByRole[row.role] = row._count;
-      usersByRole.total += row._count;
-    }
+    const usersByRole = { ADMIN: 0, DENTIST: 0, RECEPTIONIST: 0, total: activeUsersWithAnyRole };
+    ROLES.forEach((role, index) => {
+      usersByRole[role] = activeUsersByRole[index] ?? 0;
+    });
 
     const monthBuckets = new Map(lastNMonthKeys(6, now).map((key) => [key, 0]));
     for (const org of recentOrganizations) {

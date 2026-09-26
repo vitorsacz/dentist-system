@@ -37,7 +37,7 @@ describe("Login sem vazamento de organizações", () => {
         nickname,
         passwordHash: await bcrypt.hash(password, 10),
         name: `Pessoa ${email}`,
-        role: "DENTIST",
+        roles: ["DENTIST"],
       },
     });
   }

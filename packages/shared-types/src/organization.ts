@@ -4,7 +4,7 @@ import { ROLES, TENANT_TYPES, PALETTE_COLOR_TOKENS } from "./enums";
 export const clinicMemberSchema = z.object({
   userId: z.string(),
   name: z.string(),
-  role: z.enum(ROLES),
+  roles: z.array(z.enum(ROLES)),
   active: z.boolean(),
 });
 export type ClinicMember = z.infer<typeof clinicMemberSchema>;

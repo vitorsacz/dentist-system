@@ -3,12 +3,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  ROLES,
   createTenantUserSchema,
   resetPasswordSchema,
   type CreateTenantUserInput,
+  type ManagedTenantUser,
   type ResetPasswordInput,
   type Role,
 } from "@dentist-system/shared-types";
+import { ApiError } from "@/lib/api-client";
 import { adminUsersApi } from "./api";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/ui/page-header";
@@ -18,6 +21,47 @@ const ROLE_LABELS: Record<Role, string> = {
   DENTIST: "Dentista",
   RECEPTIONIST: "Recepcionista",
 };
+
+// Papéis de um usuário da tabela: um checkbox por papel, cada mudança salva na
+// hora. Nunca deixa desmarcar o último papel. Na própria linha, ADMIN fica
+// travado (a API também barra remover o próprio ADMIN).
+function RolesCell({
+  user,
+  isSelf,
+  disabled,
+  onChange,
+}: {
+  user: ManagedTenantUser;
+  isSelf: boolean;
+  disabled: boolean;
+  onChange: (roles: Role[]) => void;
+}) {
+  const toggle = (role: Role, checked: boolean) => {
+    const next = checked ? [...user.roles, role] : user.roles.filter((r) => r !== role);
+    onChange(ROLES.filter((r) => next.includes(r)));
+  };
+
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-1">
+      {ROLES.map((role) => {
+        const checked = user.roles.includes(role);
+        const isLastRole = checked && user.roles.length === 1;
+        const lockedOwnAdmin = isSelf && role === "ADMIN";
+        return (
+          <label key={role} className="inline-flex items-center gap-1 text-sm">
+            <input
+              type="checkbox"
+              checked={checked}
+              disabled={disabled || isLastRole || lockedOwnAdmin}
+              onChange={(e) => toggle(role, e.target.checked)}
+            />
+            {ROLE_LABELS[role]}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
 
 function ResetPasswordForm({ userId, onDone }: { userId: string; onDone: () => void }) {
   const queryClient = useQueryClient();
@@ -76,14 +120,14 @@ export function AdminUsersPage() {
     formState: { errors, isSubmitting },
   } = useForm<CreateTenantUserInput>({
     resolver: zodResolver(createTenantUserSchema),
-    defaultValues: { role: "DENTIST" },
+    defaultValues: { roles: ["DENTIST"] },
   });
 
   const createMutation = useMutation({
     mutationFn: adminUsersApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-      reset({ role: "DENTIST", name: "", email: "", password: "" });
+      reset({ roles: ["DENTIST"], name: "", email: "", password: "" });
       setShowForm(false);
     },
   });
@@ -93,6 +137,8 @@ export function AdminUsersPage() {
       adminUsersApi.update(userId, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
+  const updateError =
+    updateMutation.error instanceof ApiError ? updateMutation.error.message : updateMutation.error ? "Erro ao salvar" : null;
 
   return (
     <div className="space-y-6">
@@ -137,16 +183,18 @@ export function AdminUsersPage() {
             />
             {errors.password && <p className="mt-1 text-sm text-bad">{errors.password.message}</p>}
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-muted">Papel</label>
-            <select className="w-full rounded-md border border-line px-3 py-2 text-sm" {...register("role")}>
-              {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
+          <fieldset>
+            <legend className="mb-1 block text-sm text-muted">Papéis</legend>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 py-2">
+              {ROLES.map((role) => (
+                <label key={role} className="inline-flex items-center gap-1 text-sm">
+                  <input type="checkbox" value={role} {...register("roles")} />
+                  {ROLE_LABELS[role]}
+                </label>
               ))}
-            </select>
-          </div>
+            </div>
+            {errors.roles && <p className="mt-1 text-sm text-bad">{errors.roles.message}</p>}
+          </fieldset>
           <button
             type="submit"
             disabled={isSubmitting}
@@ -157,13 +205,15 @@ export function AdminUsersPage() {
         </form>
       )}
 
+      {updateError && <p className="text-sm text-bad">{updateError}</p>}
+
       <div className="overflow-x-auto rounded-lg border border-line bg-surface">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-line text-muted">
             <tr>
               <th className="px-4 py-3">Nome</th>
               <th className="px-4 py-3">E-mail</th>
-              <th className="px-4 py-3">Papel</th>
+              <th className="px-4 py-3">Papéis</th>
               <th className="px-4 py-3">Ativo</th>
               <th className="px-4 py-3">Ações</th>
             </tr>
@@ -176,18 +226,12 @@ export function AdminUsersPage() {
                   <td className="px-4 py-3">{user.name}</td>
                   <td className="px-4 py-3">{user.email}</td>
                   <td className="px-4 py-3">
-                    <select
-                      value={user.role}
-                      disabled={isSelf}
-                      onChange={(e) => updateMutation.mutate({ userId: user.userId, role: e.target.value as Role })}
-                      className="rounded-md border border-line px-2 py-1 text-sm disabled:opacity-50"
-                    >
-                      {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                    <RolesCell
+                      user={user}
+                      isSelf={isSelf}
+                      disabled={updateMutation.isPending}
+                      onChange={(roles) => updateMutation.mutate({ userId: user.userId, roles })}
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <input

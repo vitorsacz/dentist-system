@@ -93,7 +93,13 @@ model User {
   nickname       String?            @unique
   passwordHash   String
   name           String
+  // OBSOLETO (R1): substituído por `roles`. Mantido só até a migration que
+  // remove a coluna (PR de "contrair"), pra API antiga não quebrar durante o
+  // deploy. Nenhum código lê ou escreve este campo.
   role           Role?
+  // Papéis do usuário na organização (pode ter mais de um, ex.: ADMIN +
+  // DENTIST). Vazio só pro Super Admin, que não pertence a organização.
+  roles          Role[]             @default([])
   colorToken     PaletteColorToken?
   isSuperAdmin   Boolean            @default(false)
   active         Boolean            @default(true)

@@ -14,7 +14,7 @@ interface UserRecord {
   id: string;
   email: string;
   name: string;
-  role: ManagedTenantUser["role"] | null;
+  roles: ManagedTenantUser["roles"];
   active: boolean;
   colorToken: ManagedTenantUser["colorToken"];
   createdAt: Date;
@@ -25,9 +25,7 @@ function toManagedTenantUser(user: UserRecord): ManagedTenantUser {
     userId: user.id,
     email: user.email,
     name: user.name,
-    // role só é null pra Super Admin, que nunca aparece nesta lista (ela é
-    // sempre filtrada por organizationId) — seguro converter aqui.
-    role: user.role as ManagedTenantUser["role"],
+    roles: user.roles,
     active: user.active,
     colorToken: user.colorToken,
     createdAt: user.createdAt.toISOString(),
@@ -52,13 +50,11 @@ export class UsersService {
       throw new ConflictException("E-mail já cadastrado nesta organização");
     }
 
-    // Cor opcional, relevante só pra DENTIST (identidade na sidebar da
-    // Agenda) — se não vier, cicla a paleta pelo nº de dentistas que o
-    // tenant já tem (mesma lógica que antes vivia no front/localStorage).
+    // Todo dentista tem cor (identidade na sidebar da Agenda). Se não vier,
+    // cicla a paleta pelo nº de dentistas que o tenant já tem.
     let colorToken = input.colorToken;
-    if (!colorToken && input.role === "DENTIST") {
-      const existingDentists = await this.prisma.user.count({ where: { organizationId, role: "DENTIST" } });
-      colorToken = PALETTE_COLOR_TOKENS[existingDentists % PALETTE_COLOR_TOKENS.length];
+    if (!colorToken && input.roles.includes("DENTIST")) {
+      colorToken = await this.nextDentistColor(organizationId);
     }
 
     const passwordHash = await bcrypt.hash(input.password, 10);
@@ -68,7 +64,7 @@ export class UsersService {
         email: input.email,
         passwordHash,
         name: input.name,
-        role: input.role,
+        roles: input.roles,
         colorToken,
       },
     });
@@ -89,25 +85,56 @@ export class UsersService {
       throw new NotFoundException("Usuário não encontrado");
     }
 
-    if (userId === currentUserId && (input.active === false || (input.role && input.role !== "ADMIN"))) {
+    const nextRoles = input.roles ?? target.roles;
+    const nextActive = input.active ?? target.active;
+
+    // 1) A organização nunca fica sem admin ativo. Checado primeiro: é o que
+    //    barra o único admin tentando se rebaixar ou se desativar.
+    const losesActiveAdmin =
+      target.active && target.roles.includes("ADMIN") && (!nextActive || !nextRoles.includes("ADMIN"));
+    if (losesActiveAdmin) {
+      const otherActiveAdmins = await this.prisma.user.count({
+        where: { organizationId, active: true, roles: { has: "ADMIN" }, id: { not: userId } },
+      });
+      if (otherActiveAdmins === 0) {
+        throw new BadRequestException("A organização precisa de pelo menos um admin ativo");
+      }
+    }
+
+    // 2) O admin não se desativa nem remove o próprio papel de ADMIN (evita se
+    //    trancar fora do sistema).
+    if (userId === currentUserId && (input.active === false || (input.roles && !input.roles.includes("ADMIN")))) {
       throw new BadRequestException("Você não pode desativar ou rebaixar a própria conta de admin");
     }
 
-    // Capitania da clínica: só o admin fundador pode editar/desativar outro admin.
-    if (target.role === "ADMIN" && target.id !== currentUserId) {
+    // 3) Capitania da clínica: só o admin fundador pode editar/desativar outro admin.
+    if (target.roles.includes("ADMIN") && target.id !== currentUserId) {
       const organization = await this.prisma.organization.findUnique({ where: { id: organizationId } });
       if (organization?.foundingAdminUserId !== currentUserId) {
         throw new ForbiddenException("Só o admin fundador pode gerenciar outros admins desta clínica");
       }
     }
 
-    const updated = await this.prisma.user.update({ where: { id: userId }, data: input });
+    // Ganhou DENTIST e ainda não tem cor: atribui a próxima da paleta.
+    const colorToken =
+      input.colorToken ??
+      (nextRoles.includes("DENTIST") && !target.colorToken ? await this.nextDentistColor(organizationId) : undefined);
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { ...input, ...(colorToken ? { colorToken } : {}) },
+    });
     // Desativar derruba as sessões em todos os navegadores: sem isso o
     // refresh seguiria funcionando até o token expirar.
     if (input.active === false) {
       await this.refreshSessions.revokeAllForUser(userId);
     }
     return toManagedTenantUser(updated);
+  }
+
+  private async nextDentistColor(organizationId: string) {
+    const existingDentists = await this.prisma.user.count({ where: { organizationId, roles: { has: "DENTIST" } } });
+    return PALETTE_COLOR_TOKENS[existingDentists % PALETTE_COLOR_TOKENS.length];
   }
 
   async resetPassword(userId: string, input: ResetPasswordInput, organizationId: string) {

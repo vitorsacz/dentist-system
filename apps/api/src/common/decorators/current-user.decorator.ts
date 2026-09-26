@@ -6,7 +6,8 @@ export interface AuthenticatedUser {
   email: string;
   name: string;
   organizationId: string | null;
-  role: Role | null;
+  // Papéis na organização (pode ter mais de um). Vazio só pro Super Admin.
+  roles: Role[];
   isSuperAdmin: boolean;
 }
 

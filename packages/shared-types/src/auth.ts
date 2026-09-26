@@ -40,7 +40,8 @@ export const currentUserSchema = z.object({
   email: z.string().email(),
   name: z.string(),
   organizationId: z.string().nullable(),
-  role: z.enum(ROLES).nullable(),
+  // Vazio só pro Super Admin (não pertence a organização).
+  roles: z.array(z.enum(ROLES)),
   isSuperAdmin: z.boolean(),
 });
 export type CurrentUser = z.infer<typeof currentUserSchema>;

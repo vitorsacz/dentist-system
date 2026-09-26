@@ -35,7 +35,7 @@ async function seedSuperAdmin() {
 
   const passwordHash = await bcrypt.hash(password, 10);
   await prisma.user.create({
-    data: { email, passwordHash, name, isSuperAdmin: true, organizationId: null, role: null },
+    data: { email, passwordHash, name, isSuperAdmin: true, organizationId: null, roles: [] },
   });
   console.log(`Super Admin criado: ${email}`);
 }
@@ -64,7 +64,7 @@ async function seedTenantUser(
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await prisma.user.create({ data: { organizationId, email, passwordHash, name, role } });
+  const user = await prisma.user.create({ data: { organizationId, email, passwordHash, name, roles: [role] } });
   console.log(`Usuário ${role} criado: ${email}`);
   return user;
 }

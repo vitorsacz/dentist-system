@@ -36,7 +36,7 @@ async function seedOrgContext(
       email: `${label}-dentist-${Date.now()}-${Math.random()}@test.com`,
       passwordHash,
       name: `${label} Dentista`,
-      role: "DENTIST",
+      roles: ["DENTIST"],
     },
   });
 
@@ -46,7 +46,7 @@ async function seedOrgContext(
       email: `${label}-admin-${Date.now()}-${Math.random()}@test.com`,
       passwordHash,
       name: `${label} Admin`,
-      role: "ADMIN",
+      roles: ["ADMIN"],
     },
   });
   await rawPrisma.organization.update({ where: { id: org.id }, data: { foundingAdminUserId: adminUser.id } });
@@ -227,7 +227,7 @@ describe("Isolamento cross-tenant", () => {
   it("GET organization/dentists: dentista inativo some do roster", async () => {
     const org = await seedOrgContext(app, "InativoTest");
     const dentistUser = await rawPrisma.user.findFirstOrThrow({
-      where: { organizationId: org.organizationId, role: "DENTIST" },
+      where: { organizationId: org.organizationId, roles: { has: "DENTIST" } },
     });
 
     const beforeDeactivation = await as(org.adminToken).get("/organization/dentists");
@@ -403,7 +403,7 @@ describe("Isolamento cross-tenant", () => {
       email: `membro-a-${Date.now()}@test.com`,
       password: TEST_PASSWORD,
       name: "Membro A",
-      role: "DENTIST",
+      roles: ["DENTIST"],
     });
     expect(created.status).toBe(201);
     const userId = created.body.userId;
@@ -423,7 +423,7 @@ describe("Isolamento cross-tenant", () => {
       email: secondAdminEmail,
       password: TEST_PASSWORD,
       name: "Segundo Admin",
-      role: "ADMIN",
+      roles: ["ADMIN"],
     });
     expect(created.status).toBe(201);
     const secondAdminUserId = created.body.userId;
@@ -458,7 +458,7 @@ describe("Isolamento cross-tenant", () => {
         name: "Super Admin Teste",
         isSuperAdmin: true,
         organizationId: null,
-        role: null,
+        roles: [],
       },
     });
     const superAdminLogin = await noAuth().post("/auth/login", { identifier: superAdminEmail, password: TEST_PASSWORD });

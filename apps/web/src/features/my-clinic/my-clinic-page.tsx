@@ -29,7 +29,7 @@ export function MyClinicPage() {
             {myClinicQuery.data?.members.map((member) => (
               <tr key={member.userId}>
                 <td className="px-4 py-3">{member.name}</td>
-                <td className="px-4 py-3">{ROLE_LABELS[member.role]}</td>
+                <td className="px-4 py-3">{member.roles.map((role) => ROLE_LABELS[role]).join(" · ")}</td>
                 <td className="px-4 py-3">{member.active ? "Sim" : "Não"}</td>
               </tr>
             ))}

@@ -1,17 +1,13 @@
 import { rolesHaveAccess, type Capability, type Role } from "@dentist-system/shared-types";
 
-// Papéis do usuário como lista. Hoje a API manda um papel só (`role`); quando
-// o usuário passar a ter vários (`roles`), a lista vem direto e nada mais
-// precisa mudar nas telas.
+// Papéis do usuário (R1: pode ter mais de um). Vazio pro Super Admin e pra
+// quem não está logado.
 interface UserWithRoles {
-  role?: Role | null;
-  roles?: readonly Role[];
+  roles: readonly Role[];
 }
 
 export function userRoles(user: UserWithRoles | null | undefined): readonly Role[] {
-  if (!user) return [];
-  if (user.roles) return user.roles;
-  return user.role ? [user.role] : [];
+  return user?.roles ?? [];
 }
 
 // Única forma de o front decidir "este usuário pode X?" — a matriz vive em
