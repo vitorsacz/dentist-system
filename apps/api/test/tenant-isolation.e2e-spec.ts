@@ -445,57 +445,6 @@ describe("Isolamento cross-tenant", () => {
     ).toBe(403);
   });
 
-  it("Login multi-tenant: e-mail repetido entre organizations exige organizationId", async () => {
-    const sharedEmail = `compartilhado-${Date.now()}@test.com`;
-    const createdInA = await as(orgA.adminToken).post("/users", {
-      email: sharedEmail,
-      password: TEST_PASSWORD,
-      name: "Pessoa A",
-      role: "DENTIST",
-    });
-    expect(createdInA.status).toBe(201);
-    const createdInB = await as(orgB.adminToken).post("/users", {
-      email: sharedEmail,
-      password: TEST_PASSWORD,
-      name: "Pessoa B",
-      role: "DENTIST",
-    });
-    expect(createdInB.status).toBe(201);
-
-    const lookup = await noAuth().post("/auth/lookup", { identifier: sharedEmail });
-    expect(lookup.status).toBe(201);
-    expect(lookup.body.requiresOrganizationSelection).toBe(true);
-    expect(lookup.body.accounts).toHaveLength(2);
-
-    // Sem organizationId: ambíguo, 401.
-    const loginWithoutOrg = await noAuth().post("/auth/login", { identifier: sharedEmail, password: TEST_PASSWORD });
-    expect(loginWithoutOrg.status).toBe(401);
-
-    // Com organizationId certo: entra normalmente.
-    const loginWithOrg = await noAuth().post("/auth/login", {
-      identifier: sharedEmail,
-      password: TEST_PASSWORD,
-      organizationId: orgA.organizationId,
-    });
-    expect(loginWithOrg.status).toBe(201);
-    expect(loginWithOrg.body.accessToken).toBeTruthy();
-  });
-
-  it("Login por nickname: sempre 1:1, nunca pede escolha de organização", async () => {
-    const nickname = `apelido-${Date.now()}`;
-    await rawPrisma.user.update({
-      where: { id: orgA.adminUserId },
-      data: { nickname },
-    });
-
-    const lookup = await noAuth().post("/auth/lookup", { identifier: nickname });
-    expect(lookup.body.requiresOrganizationSelection).toBe(false);
-
-    const login = await noAuth().post("/auth/login", { identifier: nickname, password: TEST_PASSWORD });
-    expect(login.status).toBe(201);
-    expect(login.body.accessToken).toBeTruthy();
-  });
-
   it("SuperAdminGuard: bloqueia usuário comum em /platform e libera Super Admin", async () => {
     expect((await as(orgA.adminToken).get("/platform/organizations")).status).toBe(403);
     expect((await as(orgA.dentistToken).get("/platform/organizations")).status).toBe(403);

@@ -1,11 +1,6 @@
-import { Body, Controller, Get, Post, Req, Res } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from "@nestjs/common";
 import type { Request, Response } from "express";
-import {
-  loginSchema,
-  lookupAccountsSchema,
-  type LoginInput,
-  type LookupAccountsInput,
-} from "@dentist-system/shared-types";
+import { loginSchema, type LoginInput, type LoginResult } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Public } from "../../common/decorators/public.decorator";
 import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.decorator";
@@ -19,21 +14,23 @@ const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Public()
-  @Post("lookup")
-  lookup(@Body(new ZodValidationPipe(lookupAccountsSchema)) body: LookupAccountsInput) {
-    return this.authService.lookupAccounts(body.identifier);
-  }
-
+  // Único ponto público que recebe um identifier. Não existe mais rota que
+  // diga se um e-mail existe ou em quais organizações está (o antigo
+  // POST auth/lookup foi removido): a lista de organizações só aparece depois
+  // da senha conferir, e só com as organizações em que ela conferiu.
   @Public()
   @Post("login")
+  @HttpCode(HttpStatus.OK)
   async login(
     @Body(new ZodValidationPipe(loginSchema)) body: LoginInput,
     @Res({ passthrough: true }) res: Response,
-  ) {
-    const { accessToken, refreshToken } = await this.authService.login(body);
-    this.setRefreshCookie(res, refreshToken);
-    return { accessToken };
+  ): Promise<LoginResult> {
+    const outcome = await this.authService.login(body);
+    if (outcome.kind === "organization-selection") {
+      return { requiresOrganizationSelection: true, accounts: outcome.accounts };
+    }
+    this.setRefreshCookie(res, outcome.refreshToken);
+    return { accessToken: outcome.accessToken };
   }
 
   @Public()

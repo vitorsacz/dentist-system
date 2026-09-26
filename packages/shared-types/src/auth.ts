@@ -1,23 +1,16 @@
 import { z } from "zod";
 import { ROLES } from "./enums";
 
-export const lookupAccountsSchema = z.object({
-  identifier: z.string().min(1),
-});
-export type LookupAccountsInput = z.infer<typeof lookupAccountsSchema>;
-
 export const accountOptionSchema = z.object({
   organizationId: z.string(),
   organizationName: z.string(),
 });
 export type AccountOption = z.infer<typeof accountOptionSchema>;
 
-export const lookupAccountsResultSchema = z.object({
-  requiresOrganizationSelection: z.boolean(),
-  accounts: z.array(accountOptionSchema),
-});
-export type LookupAccountsResult = z.infer<typeof lookupAccountsResultSchema>;
-
+// Identidade é isolada por organização: o mesmo e-mail pode ter conta em
+// várias, com senhas diferentes. `organizationId` só é enviado depois que o
+// próprio login respondeu `requiresOrganizationSelection` (a senha é validada
+// de novo nesse reenvio).
 export const loginSchema = z.object({
   identifier: z.string().min(1),
   password: z.string().min(1),
@@ -29,6 +22,18 @@ export const authTokensSchema = z.object({
   accessToken: z.string(),
 });
 export type AuthTokens = z.infer<typeof authTokensSchema>;
+
+// Resposta do login quando a senha confere em mais de uma organização e o
+// request não trouxe `organizationId`. Lista só as organizações em que a
+// senha conferiu — nunca as demais contas do mesmo e-mail.
+export const organizationSelectionSchema = z.object({
+  requiresOrganizationSelection: z.literal(true),
+  accounts: z.array(accountOptionSchema),
+});
+export type OrganizationSelection = z.infer<typeof organizationSelectionSchema>;
+
+export const loginResultSchema = z.union([authTokensSchema, organizationSelectionSchema]);
+export type LoginResult = z.infer<typeof loginResultSchema>;
 
 export const currentUserSchema = z.object({
   id: z.string(),

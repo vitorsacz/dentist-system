@@ -143,12 +143,34 @@ O sistema é multi-organização: toda tabela de negócio carrega `organizationI
 isolado automaticamente por uma Prisma Client Extension (não RLS do Postgres —
 ver decisão documentada no vault Obsidian do projeto) usando
 `AsyncLocalStorage` pra propagar o contexto de tenant por request
-(`apps/api/src/prisma/tenant.extension.ts` + `tenant-context.ts`). `User` é
-identidade global (email/senha); `Membership` liga um `User` a uma
-`Organization` com um papel (`Role`: `ADMIN`/`DENTIST`/`RECEPTIONIST`) — um
-usuário pode ter mais de uma membership em organizações diferentes, embora
-hoje o login sempre resolva a primeira automaticamente (sem seletor de
-organização, feature futura).
+(`apps/api/src/prisma/tenant.extension.ts` + `tenant-context.ts`).
+
+Identidade é **isolada por organização**: cada `User` pertence a uma única
+`Organization` (`organizationId`), com um papel (`Role`:
+`ADMIN`/`DENTIST`/`RECEPTIONIST`). O mesmo e-mail pode ter conta em várias
+organizações, como contas independentes e com senhas diferentes (e-mail é
+único só dentro da organização; `nickname`, opcional, é único globalmente). O
+Super Admin (`isSuperAdmin`) não pertence a nenhuma organização.
+
+### Login
+
+Um único endpoint público recebe credenciais: `POST /auth/login` com
+`{ identifier, password, organizationId? }` (`identifier` = e-mail ou
+apelido). Não existe rota que diga se um e-mail existe ou em quais
+organizações está — o antigo `POST /auth/lookup` foi removido.
+
+- A senha é validada contra todas as contas ativas daquele identifier;
+  só contam as contas em que ela confere.
+- Nenhuma confere (ou o e-mail não existe): `401` com a mesma mensagem
+  genérica nos dois casos. Quando o e-mail não existe, a API ainda roda um
+  `bcrypt.compare` contra um hash fixo, pro tempo de resposta não denunciar.
+- Uma confere: `200` com `{ accessToken }` + cookie de refresh.
+- Mais de uma confere e não veio `organizationId`: `200` **sem tokens**, com
+  `{ requiresOrganizationSelection: true, accounts: [{ organizationId,
+  organizationName }] }` — só as organizações em que a senha conferiu. A
+  tela de login mostra a escolha e reenvia com `organizationId` (a senha é
+  validada de novo).
+- Login por `nickname` nunca pede escolha (é único globalmente).
 
 Não existe cadastro público — o primeiro usuário/organização nascem do seed; a
 partir daí só o `ADMIN` da organização cria novos usuários pelo painel

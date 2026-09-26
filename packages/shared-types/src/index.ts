@@ -24,18 +24,18 @@ export {
 } from "./enums";
 
 export {
-  lookupAccountsSchema,
   accountOptionSchema,
-  lookupAccountsResultSchema,
   loginSchema,
   authTokensSchema,
+  organizationSelectionSchema,
+  loginResultSchema,
   currentUserSchema,
   resetPasswordSchema,
-  type LookupAccountsInput,
   type AccountOption,
-  type LookupAccountsResult,
   type LoginInput,
   type AuthTokens,
+  type OrganizationSelection,
+  type LoginResult,
   type CurrentUser,
   type ResetPasswordInput,
 } from "./auth";
