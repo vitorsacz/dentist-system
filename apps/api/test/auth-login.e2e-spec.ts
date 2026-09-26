@@ -1,10 +1,10 @@
-import cookieParser from "cookie-parser";
 import request from "supertest";
 import { Test } from "@nestjs/testing";
-import type { INestApplication } from "@nestjs/common";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import * as bcrypt from "bcrypt";
 import { PrismaClient } from "@prisma/client";
 import { AppModule } from "../src/app.module";
+import { configureApp } from "../src/app.setup";
 import { TEST_DATABASE_URL } from "./test-db";
 
 // Login sem vazamento de organizações (S1). Identidade é isolada por
@@ -18,7 +18,7 @@ const PASSWORD_A = "SenhaDaOrgA123";
 const PASSWORD_B = "SenhaDaOrgB456";
 
 describe("Login sem vazamento de organizações", () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   let orgA: { id: string; name: string };
   let orgB: { id: string; name: string };
   let orgC: { id: string; name: string };
@@ -50,8 +50,8 @@ describe("Login sem vazamento de organizações", () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    app.use(cookieParser());
+    app = moduleRef.createNestApplication<NestExpressApplication>();
+    configureApp(app);
     await app.init();
 
     await rawPrisma.organization.deleteMany({});
