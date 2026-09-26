@@ -5,9 +5,11 @@ import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { TEST_DATABASE_URL } from "./test-db";
 
-// Testa a migration de R1 pela cadeia real: aplica todas as migrations ANTES
-// dela num schema Postgres descartável, insere usuários no formato antigo
-// (coluna "role"), aplica a migration nova e confere o resultado.
+// Testa as migrations de R1 pela cadeia real: aplica todas as migrations ANTES
+// delas num schema Postgres descartável, insere usuários no formato antigo
+// (coluna "role") e aplica em ordem:
+// 1) expandir (add_user_roles): cria "roles" e copia o papel;
+// 2) contrair (drop_user_role): repreenche quem escapou e remove "role".
 //
 // Usa `prisma migrate deploy` de verdade (o mesmo do build do Render), com
 // uma pasta temporária de migrations — não depende do schema.prisma atual.
@@ -15,6 +17,7 @@ import { TEST_DATABASE_URL } from "./test-db";
 const SCHEMA = "r1_migration_test";
 const MIGRATIONS_DIR = join(__dirname, "..", "prisma", "migrations");
 const ADD_ROLES = "_add_user_roles";
+const DROP_ROLE = "_drop_user_role";
 
 function urlForSchema(schema: string) {
   const url = new URL(TEST_DATABASE_URL);
@@ -22,13 +25,14 @@ function urlForSchema(schema: string) {
   return url.toString();
 }
 
-describe("Migration R1: role → roles", () => {
+describe("Migrations R1: role → roles (expandir → contrair)", () => {
   const base = new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL } } });
   const scoped = new PrismaClient({ datasources: { db: { url: urlForSchema(SCHEMA) } } });
   const workDir = mkdtempSync(join(tmpdir(), "r1-migration-"));
   const workMigrations = join(workDir, "migrations");
   const allMigrations = readdirSync(MIGRATIONS_DIR).filter((name) => /^\d{14}_/.test(name)).sort();
   const addRolesIndex = allMigrations.findIndex((name) => name.endsWith(ADD_ROLES));
+  const dropRoleIndex = allMigrations.findIndex((name) => name.endsWith(DROP_ROLE));
 
   function copyMigrations(names: string[]) {
     for (const name of names) {
@@ -62,6 +66,7 @@ describe("Migration R1: role → roles", () => {
 
   beforeAll(async () => {
     expect(addRolesIndex).toBeGreaterThan(0);
+    expect(dropRoleIndex).toBe(addRolesIndex + 1);
     await base.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${SCHEMA}" CASCADE`);
     writeFileSync(
       join(workDir, "schema.prisma"),
@@ -112,7 +117,32 @@ describe("Migration R1: role → roles", () => {
       "recepcao@test.com": ["RECEPTIONIST"],
       "super@test.com": [],
     });
-    // Expandir, não contrair: a coluna antiga continua lá até o PR que a remove.
+    // Expandir, não contrair: a coluna antiga continua lá até a próxima migration.
     expect(await columnExists("role")).toBe(true);
+  }, 120000);
+
+  it("contrair: quem a API antiga criou depois da primeira migration é repreenchido; role some", async () => {
+    // Retardatários: gravados pela API antiga (só "role") entre a migration de
+    // expandir e a troca de versão no Render. Um pegou o DEFAULT [], o outro
+    // ficou com NULL.
+    await scoped.$executeRawUnsafe(
+      `INSERT INTO "User" (id, "organizationId", email, "passwordHash", name, role, "updatedAt")
+       VALUES ('tardio1', 'org1', 'tardio1@test.com', 'x', 'tardio1', 'DENTIST', NOW()),
+              ('tardio2', 'org1', 'tardio2@test.com', 'x', 'tardio2', 'RECEPTIONIST', NOW())`,
+    );
+    await scoped.$executeRawUnsafe(`UPDATE "User" SET roles = NULL WHERE id = 'tardio2'`);
+
+    copyMigrations([allMigrations[dropRoleIndex] as string]);
+    migrateDeploy();
+
+    expect(await rolesByEmail()).toEqual({
+      "admin@test.com": ["ADMIN"],
+      "dentista@test.com": ["DENTIST"],
+      "recepcao@test.com": ["RECEPTIONIST"],
+      "super@test.com": [],
+      "tardio1@test.com": ["DENTIST"],
+      "tardio2@test.com": ["RECEPTIONIST"],
+    });
+    expect(await columnExists("role")).toBe(false);
   }, 120000);
 });
