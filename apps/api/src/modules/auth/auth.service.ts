@@ -4,9 +4,9 @@ import { JwtService } from "@nestjs/jwt";
 import type { AccountOption, LoginInput, Role } from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
+import { RefreshSessionsService, type SessionClientInfo } from "../sessions/refresh-sessions.service";
 
 const ACCESS_TOKEN_TTL = "15m";
-const REFRESH_TOKEN_TTL = "30d";
 const BCRYPT_ROUNDS = 10;
 
 // Hash de uma senha que ninguém tem, comparado quando o identifier não bate
@@ -44,13 +44,14 @@ export class AuthService {
     @Inject(PRISMA_SERVICE) private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly refreshSessions: RefreshSessionsService,
   ) {}
 
   // Identidade é isolada por organização — o mesmo e-mail pode ter conta em
   // várias, cada uma com a própria senha. A senha é validada ANTES de revelar
   // qualquer organização: só quem acerta a senha vê onde ela confere. Nenhuma
   // resposta diferencia "e-mail inexistente" de "senha errada".
-  async login(input: LoginInput): Promise<LoginOutcome> {
+  async login(input: LoginInput, client: SessionClientInfo): Promise<LoginOutcome> {
     const { identifier, password, organizationId } = input;
 
     // Busca global (sem tenant no contexto): User fica fora da extension de
@@ -81,7 +82,7 @@ export class AuthService {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
     if (validAccounts.length === 1) {
-      return { kind: "tokens", ...this.issueTokens(onlyAccount) };
+      return { kind: "tokens", ...(await this.issueTokens(onlyAccount, client)) };
     }
 
     // Senha confere em mais de uma conta: o usuário escolhe a organização e
@@ -99,27 +100,37 @@ export class AuthService {
     };
   }
 
-  async refresh(refreshToken: string | undefined) {
-    if (!refreshToken) {
-      throw new UnauthorizedException("Refresh token ausente");
+  // Rotação do refresh token (ver RefreshSessionsService): o token do cookie
+  // é trocado por um novo a cada chamada; reuso de um token antigo derruba a
+  // família inteira.
+  async refresh(refreshToken: string | undefined, client: SessionClientInfo) {
+    const { userId, token } = await this.refreshSessions.rotate(refreshToken, client);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.active) {
+      await this.refreshSessions.revokeAllForUser(userId);
+      throw new UnauthorizedException("Sessão expirada. Faça login novamente.");
     }
-
-    try {
-      const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
-        secret: this.configService.getOrThrow<string>("JWT_REFRESH_SECRET"),
-      });
-      const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
-      if (!user || !user.active) {
-        throw new UnauthorizedException("Refresh token inválido");
-      }
-
-      return this.issueTokens(user);
-    } catch {
-      throw new UnauthorizedException("Refresh token inválido");
-    }
+    return { accessToken: this.signAccessToken(user), refreshToken: token };
   }
 
-  private issueTokens(user: AuthenticatedUserRecord) {
+  async logout(refreshToken: string | undefined, userId: string) {
+    await this.refreshSessions.revokeFamilyOfToken(refreshToken, userId);
+  }
+
+  async logoutEverywhere(userId: string) {
+    await this.refreshSessions.revokeAllForUser(userId);
+  }
+
+  private async issueTokens(user: AuthenticatedUserRecord, client: SessionClientInfo) {
+    return {
+      accessToken: this.signAccessToken(user),
+      refreshToken: await this.refreshSessions.start(user.id, client),
+    };
+  }
+
+  // Access token continua JWT de 15 min, sem estado no servidor. O refresh
+  // token não é mais JWT — é opaco e revogável (RefreshSessionsService).
+  private signAccessToken(user: AuthenticatedUserRecord) {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -127,16 +138,9 @@ export class AuthService {
       role: user.role,
       isSuperAdmin: user.isSuperAdmin,
     };
-
-    const accessToken = this.jwtService.sign(payload, {
+    return this.jwtService.sign(payload, {
       secret: this.configService.getOrThrow<string>("JWT_ACCESS_SECRET"),
       expiresIn: ACCESS_TOKEN_TTL,
     });
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.configService.getOrThrow<string>("JWT_REFRESH_SECRET"),
-      expiresIn: REFRESH_TOKEN_TTL,
-    });
-
-    return { accessToken, refreshToken };
   }
 }

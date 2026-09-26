@@ -64,7 +64,6 @@ cp apps/web/.env.example apps/web/.env
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/dentist_system"
 DIRECT_URL="postgresql://usuario:senha@localhost:5432/dentist_system"
 JWT_ACCESS_SECRET="gere-com-crypto-randomBytes-32-hex"
-JWT_REFRESH_SECRET="gere-outro-diferente"
 PORT=3000
 CORS_ORIGIN="http://localhost:5173"
 
@@ -186,6 +185,22 @@ Teste de isolamento cross-tenant: `pnpm --filter @dentist-system/api test`
 `TEST_DATABASE_URL` em CI) — seeda 2 organizations e confirma que acesso
 cruzado por ID em todo endpoint responde 404, nunca vazamento.
 
+### Sessões (refresh token revogável)
+
+- **Access token**: JWT de 15 minutos, só em memória no front.
+- **Refresh token**: valor aleatório opaco (32 bytes) no cookie httpOnly
+  `refresh_token`, válido por 30 dias. No banco (`RefreshSession`) fica só o
+  SHA-256 dele — nunca o token.
+- **Rotação**: cada `POST /auth/refresh` revoga o token atual e emite outro na
+  mesma família (família = um login num navegador). Reusar um token já
+  trocado revoga a família inteira (sinal de token roubado) e responde `401`.
+- `POST /auth/logout` revoga no servidor a família do navegador atual;
+  `POST /auth/logout-all` revoga todas as sessões do usuário (sair de todos os
+  dispositivos). Desativar um usuário também revoga todas as sessões dele.
+- No front, só existe um refresh em andamento por vez — na mesma aba (várias
+  requisições com `401` esperam a mesma promessa) e entre abas (Web Locks
+  API), pra chamadas paralelas não parecerem reuso de token.
+
 ### Rate limit e headers de segurança
 
 `@nestjs/throttler` como primeiro guard global, contando por IP do cliente
@@ -231,5 +246,5 @@ role no pooler — ver comentários no próprio script.
   ser IPv6-only e falhar em ambientes como o Render.
 
 Secrets de produção (`DATABASE_URL`, `DIRECT_URL`, `JWT_ACCESS_SECRET`,
-`JWT_REFRESH_SECRET`, `CORS_ORIGIN`, `SEED_*`) são configurados manualmente no
+`CORS_ORIGIN`, `SEED_*`) são configurados manualmente no
 dashboard do provedor — nunca versionados no repositório.
