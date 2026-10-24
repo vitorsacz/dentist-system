@@ -124,6 +124,11 @@ export function isPatientComplete(patient: {
   );
 }
 
+export const sharePatientSchema = z.object({
+  dentistId: z.string().min(1),
+});
+export type SharePatientInput = z.infer<typeof sharePatientSchema>;
+
 export const upsertAnamnesisSchema = z.object({
   allergies: z.string().optional(),
   medications: z.string().optional(),

@@ -90,7 +90,7 @@ function ToothRow({
   );
 }
 
-export function OdontogramTab({ patientId }: { patientId: string }) {
+export function OdontogramTab({ patientId, readOnly }: { patientId: string; readOnly?: boolean }) {
   const queryClient = useQueryClient();
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
 
@@ -203,7 +203,7 @@ export function OdontogramTab({ patientId }: { patientId: string }) {
                   <p className="text-xs text-muted">
                     {new Date(record.updatedAt).toLocaleDateString("pt-BR")}
                   </p>
-                  {record.status === "PLANNED" && (
+                  {record.status === "PLANNED" && !readOnly && (
                     <button
                       type="button"
                       onClick={() => completeMutation.mutate(record.id)}
@@ -218,6 +218,7 @@ export function OdontogramTab({ patientId }: { patientId: string }) {
             ))}
           </div>
 
+          {!readOnly && (
           <form
             onSubmit={handleSubmit((data) => mutation.mutate(data))}
             className="h-fit space-y-4 rounded-lg border border-line bg-surface p-6"
@@ -251,6 +252,7 @@ export function OdontogramTab({ patientId }: { patientId: string }) {
               Adicionar registro
             </button>
           </form>
+          )}
         </div>
       )}
     </div>

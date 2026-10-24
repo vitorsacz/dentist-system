@@ -6,7 +6,16 @@ import type {
   CreateClinicalRecordInput,
   UpsertToothRecordInput,
   CreateBudgetInput,
+  SharePatientInput,
 } from "@dentist-system/shared-types";
+
+export interface PatientAccess {
+  isOwner: boolean;
+  canWriteClinical: boolean;
+  canShare: boolean;
+  eligibleDentists?: { id: string; name: string }[];
+  activeShares?: { dentistId: string; dentist: { id: string; name: string }; sharedAt: string }[];
+}
 
 export interface Patient {
   id: string;
@@ -23,6 +32,13 @@ export interface Patient {
   preferredMusic: string | null;
   ownerDentist: { id: string; name: string } | null;
   createdAt: string;
+  access?: PatientAccess;
+}
+
+export interface UnassignedPatient {
+  id: string;
+  name: string;
+  phone: string;
 }
 
 export interface PatientRevision {
@@ -75,10 +91,15 @@ export interface Budget {
 
 export const patientsApi = {
   list: () => apiClient.get<Patient[]>("/patients"),
+  listUnassigned: () => apiClient.get<UnassignedPatient[]>("/patients/unassigned"),
   findOne: (id: string) => apiClient.get<Patient>(`/patients/${id}`),
   create: (input: CreatePatientInput) => apiClient.post<Patient>("/patients", input),
   update: (id: string, input: UpdatePatientInput) => apiClient.patch<Patient>(`/patients/${id}`, input),
   getRevisions: (id: string) => apiClient.get<PatientRevision[]>(`/patients/${id}/revisions`),
+  getAccess: (id: string) => apiClient.get<PatientAccess & { activeShares: PatientAccess["activeShares"] }>(`/patients/${id}/access`),
+  share: (id: string, input: SharePatientInput) => apiClient.post(`/patients/${id}/shares`, input),
+  revoke: (id: string, dentistId: string) => apiClient.delete(`/patients/${id}/shares/${dentistId}`),
+  claim: (id: string) => apiClient.post<Patient>(`/patients/${id}/claim`, {}),
 
   getAnamnesis: (patientId: string) => apiClient.get<Anamnesis | null>(`/patients/${patientId}/anamnesis`),
   upsertAnamnesis: (patientId: string, input: UpsertAnamnesisInput) =>

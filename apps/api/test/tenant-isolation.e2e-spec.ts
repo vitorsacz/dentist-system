@@ -327,7 +327,7 @@ describe("Isolamento cross-tenant", () => {
     expect(crossCreate.status).toBe(404);
 
     const listB = await as(orgB.dentistToken).get(`/budgets?patientId=${patientIdA}`);
-    expect(listB.body).toEqual([]);
+    expect(listB.status).toBe(404);
   });
 
   it("Attendance: criar em B referenciando patient/clinic/procedure de A dá 404 (FK cross-tenant + propagação em transação)", async () => {

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { FinancialReport, FinancialReportQuery } from "@dentist-system/shared-types";
+import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
 function dayKey(date: Date) {
@@ -10,11 +11,13 @@ function dayKey(date: Date) {
 export class ReportsService {
   constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
 
-  async financialReport(query: FinancialReportQuery): Promise<FinancialReport> {
+  async financialReport(query: FinancialReportQuery, actor: AuthenticatedUser): Promise<FinancialReport> {
+    const dentistOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN");
     const attendances = await this.prisma.attendance.findMany({
       where: {
         date: { gte: query.from, lte: query.to },
         ...(query.clinicId ? { clinicId: query.clinicId } : {}),
+        ...(dentistOnly ? { dentistUserId: actor.id } : {}),
       },
       include: { clinic: true },
     });

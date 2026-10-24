@@ -8,22 +8,24 @@ import type {
 import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 import { getTenantContext } from "../../prisma/tenant-context";
-import { PatientsService } from "../patients/patients.service";
+import { PatientAccessService } from "../patients/patient-access.service";
 import { ClinicsService } from "../clinics/clinics.service";
 
 @Injectable()
 export class AppointmentsService {
   constructor(
     @Inject(PRISMA_SERVICE) private readonly prisma: PrismaService,
-    private readonly patientsService: PatientsService,
+    private readonly patientAccess: PatientAccessService,
     private readonly clinicsService: ClinicsService,
   ) {}
 
-  list(query: ListAppointmentsQuery) {
+  list(query: ListAppointmentsQuery, actor: AuthenticatedUser) {
+    const dentistOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN");
     return this.prisma.appointment.findMany({
       where: {
         startsAt: { gte: query.from, lte: query.to },
         ...(query.clinicId ? { clinicId: query.clinicId } : {}),
+        ...(dentistOnly ? { dentistUserId: actor.id } : {}),
       },
       include: { patient: true, clinic: true },
       orderBy: { startsAt: "asc" },
@@ -46,7 +48,7 @@ export class AppointmentsService {
     // patientId/clinicId são FK pra outro model tenant-scoped. Reaproveita o
     // findOne() de cada service (tenant-safe de graça via o findUnique com
     // post-check) pra barrar referência cruzada entre organizações.
-    await this.patientsService.findOne(input.patientId);
+    await this.patientAccess.assertPatientAccess(input.patientId, actor, "registry");
     await this.clinicsService.findOne(input.clinicId);
 
     const { organizationId } = getTenantContext();

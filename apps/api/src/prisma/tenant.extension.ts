@@ -23,6 +23,7 @@ export const TENANT_SCOPED_MODELS = [
   "MaterialUsage",
   "Recall",
   "PatientRevision",
+  "PatientShare",
 ] as const;
 
 const READ_AND_BULK_OPS = new Set([

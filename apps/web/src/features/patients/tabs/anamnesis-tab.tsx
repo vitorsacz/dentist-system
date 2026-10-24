@@ -13,7 +13,7 @@ const FIELDS: { name: keyof UpsertAnamnesisInput; label: string }[] = [
   { name: "dentalHistory", label: "Histórico odontológico" },
 ];
 
-export function AnamnesisTab({ patientId }: { patientId: string }) {
+export function AnamnesisTab({ patientId, readOnly }: { patientId: string; readOnly?: boolean }) {
   const queryClient = useQueryClient();
   const anamnesisQuery = useQuery({
     queryKey: ["patients", patientId, "anamnesis"],
@@ -50,19 +50,22 @@ export function AnamnesisTab({ patientId }: { patientId: string }) {
         <div key={field.name}>
           <label className="mb-1 block text-sm text-muted">{field.label}</label>
           <textarea
-            className="w-full rounded-md border border-line px-3 py-2 text-sm"
+            className="w-full rounded-md border border-line px-3 py-2 text-sm disabled:bg-surface disabled:text-muted"
             rows={field.name === "chiefComplaint" ? 2 : 3}
+            disabled={readOnly}
             {...register(field.name)}
           />
         </div>
       ))}
-      <button
-        type="submit"
-        disabled={formState.isSubmitting}
-        className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-      >
-        {mutation.isSuccess ? "Salvo ✓" : "Salvar anamnese"}
-      </button>
+      {!readOnly && (
+        <button
+          type="submit"
+          disabled={formState.isSubmitting}
+          className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+        >
+          {mutation.isSuccess ? "Salvo ✓" : "Salvar anamnese"}
+        </button>
+      )}
     </form>
   );
 }

@@ -7,7 +7,7 @@ import {
 } from "@dentist-system/shared-types";
 import { patientsApi } from "../api";
 
-export function ClinicalRecordsTab({ patientId }: { patientId: string }) {
+export function ClinicalRecordsTab({ patientId, readOnly }: { patientId: string; readOnly?: boolean }) {
   const queryClient = useQueryClient();
   const recordsQuery = useQuery({
     queryKey: ["patients", patientId, "clinical-records"],
@@ -34,6 +34,7 @@ export function ClinicalRecordsTab({ patientId }: { patientId: string }) {
 
   return (
     <div className="space-y-6">
+      {!readOnly && (
       <form
         onSubmit={handleSubmit((data) => mutation.mutate(data))}
         className="max-w-2xl space-y-4 rounded-lg border border-line bg-surface p-6"
@@ -71,6 +72,7 @@ export function ClinicalRecordsTab({ patientId }: { patientId: string }) {
           Registrar
         </button>
       </form>
+      )}
 
       <div className="space-y-3">
         {recordsQuery.data?.map((record) => (

@@ -11,8 +11,11 @@ export class AttendancesController {
 
   @Roles(...ACCESS["attendances.read"])
   @Get()
-  listByPatient(@Query("patientId") patientId: string) {
-    return this.attendancesService.listByPatient(patientId);
+  listByPatient(
+    @Query("patientId") patientId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.attendancesService.listByPatient(patientId, user);
   }
 
   @Roles(...ACCESS["attendances.write"])
@@ -21,6 +24,6 @@ export class AttendancesController {
     @Body(new ZodValidationPipe(createAttendanceSchema)) body: CreateAttendanceInput,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.attendancesService.create(body, user.id);
+    return this.attendancesService.create(body, user);
   }
 }

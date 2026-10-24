@@ -1,8 +1,9 @@
 import { Inject, BadRequestException, Injectable } from "@nestjs/common";
 import type { CreateAttendanceInput } from "@dentist-system/shared-types";
+import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService, type TenantScopedTransactionClient } from "../../prisma/prisma.service";
 import { getTenantContext } from "../../prisma/tenant-context";
-import { PatientsService } from "../patients/patients.service";
+import { PatientAccessService } from "../patients/patient-access.service";
 import { ClinicsService } from "../clinics/clinics.service";
 import { ProceduresService } from "../procedures/procedures.service";
 import { AppointmentsService } from "../appointments/appointments.service";
@@ -11,25 +12,30 @@ import { AppointmentsService } from "../appointments/appointments.service";
 export class AttendancesService {
   constructor(
     @Inject(PRISMA_SERVICE) private readonly prisma: PrismaService,
-    private readonly patientsService: PatientsService,
+    private readonly patientAccess: PatientAccessService,
     private readonly clinicsService: ClinicsService,
     private readonly proceduresService: ProceduresService,
     private readonly appointmentsService: AppointmentsService,
   ) {}
 
-  listByPatient(patientId: string) {
+  listByPatient(patientId: string, actor: AuthenticatedUser) {
     return this.prisma.attendance.findMany({
-      where: { patientId },
+      where: {
+        patientId,
+        patient: this.patientAccess.patientWhere(actor, "clinicalRead"),
+        // DENTIST vê só os próprios atendimentos financeiros
+        ...(actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN")
+          ? { dentistUserId: actor.id }
+          : {}),
+      },
       include: { clinic: true, procedure: true },
       orderBy: { date: "desc" },
     });
   }
 
-  async create(input: CreateAttendanceInput, createdByUserId: string) {
-    // Mesma razão do appointments/recalls/budgets: a extension não valida FK
-    // cross-tenant em create(), só carimba organizationId na linha nova.
-    // Reaproveita os findOne() de cada service antes de abrir a transação.
-    await this.patientsService.findOne(input.patientId);
+  async create(input: CreateAttendanceInput, actor: AuthenticatedUser) {
+    // clinicalWrite: paciente no escopo do actor
+    await this.patientAccess.assertPatientAccess(input.patientId, actor, "clinicalWrite");
     await this.clinicsService.findOne(input.clinicId);
     await this.proceduresService.findOne(input.procedureId);
     if (input.appointmentId) {
@@ -49,7 +55,8 @@ export class AttendancesService {
           grossValue: input.grossValue,
           repassePercentage: input.repassePercentage,
           materialCost: input.materialCost,
-          createdByUserId,
+          createdByUserId: actor.id,
+          dentistUserId: actor.id,
           organizationId,
         },
       });

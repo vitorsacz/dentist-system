@@ -16,13 +16,18 @@ export const ACCESS = {
   // Pacientes (cadastro, não dado clínico). Leitura inclui ADMIN pro seletor
   // de paciente da Agenda.
   "patients.read": ["ADMIN", "DENTIST", "RECEPTIONIST"],
-  "patients.write": ["DENTIST", "RECEPTIONIST"],
+  "patients.write": ["ADMIN", "DENTIST", "RECEPTIONIST"],
+  // Compartilhamento: DENTIST (dono) ou ADMIN. Regra "só dono" aplicada no service.
+  "patients.share": ["ADMIN", "DENTIST"],
+  // Assumir paciente sem dono: só DENTIST.
+  "patients.claim": ["DENTIST"],
 
   // Dado clínico: anamnese, prontuário/evolução, odontograma.
-  "clinical.read": ["DENTIST"],
+  // Leitura: ADMIN lê tudo (sem escopo de dentista). Escrita: DENTIST + escopo.
+  "clinical.read": ["ADMIN", "DENTIST"],
   "clinical.write": ["DENTIST"],
 
-  "appointments.manage": ["DENTIST", "RECEPTIONIST"],
+  "appointments.manage": ["ADMIN", "DENTIST", "RECEPTIONIST"],
 
   // Atendimento financeiro (lançamento com baixa de estoque).
   "attendances.read": ["DENTIST"],

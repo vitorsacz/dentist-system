@@ -39,11 +39,30 @@ export function PatientsPage() {
 
   const needsDentistSelect = can(user, "organization.dentists");
 
+  const isDentist = can(user, "patients.claim");
+
   const patientsQuery = useQuery({ queryKey: ["patients"], queryFn: patientsApi.list });
   const dentistsQuery = useQuery({
     queryKey: ["organization", "dentists"],
     queryFn: myClinicApi.dentists,
     enabled: needsDentistSelect,
+  });
+  const unassignedQuery = useQuery({
+    queryKey: ["patients", "unassigned"],
+    queryFn: patientsApi.listUnassigned,
+    enabled: isDentist,
+  });
+
+  const claimMutation = useMutation({
+    mutationFn: patientsApi.claim,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["patients", "unassigned"] });
+    },
+    onError: (err: unknown) => {
+      const status = (err as { status?: number }).status;
+      if (status === 409) alert("Este paciente já tem dentista responsável.");
+    },
   });
 
   const {
@@ -226,6 +245,41 @@ export function PatientsPage() {
           </tbody>
         </table>
       </div>
+
+      {isDentist && unassignedQuery.data && unassignedQuery.data.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-base font-medium text-ink">Pacientes sem responsável</h2>
+          <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-line text-muted">
+                <tr>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Telefone</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {unassignedQuery.data.map((p) => (
+                  <tr key={p.id}>
+                    <td className="px-4 py-3">{p.name}</td>
+                    <td className="px-4 py-3">{p.phone}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        disabled={claimMutation.isPending}
+                        onClick={() => claimMutation.mutate(p.id)}
+                        className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-white disabled:opacity-60"
+                      >
+                        Assumir
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
