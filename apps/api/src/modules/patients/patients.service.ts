@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import type { CreatePatientInput, SharePatientInput, UpdatePatientInput } from "@dentist-system/shared-types";
@@ -193,8 +194,28 @@ export class PatientsService {
     });
   }
 
-  async bulkReassign(fromDentistId: string, toDentistId: string | null, actor: AuthenticatedUser) {
+  async bulkReassign(fromDentistId: string, toDentistId: string | null | undefined, actor: AuthenticatedUser) {
     const { organizationId } = getTenantContext();
+    const resolvedTo = toDentistId ?? null;
+
+    // 3b: from === to is a no-op that signals a caller mistake.
+    if (resolvedTo && fromDentistId === resolvedTo) {
+      throw new BadRequestException("fromDentistId e toDentistId não podem ser iguais");
+    }
+
+    // 3a: validate destination dentist.
+    if (resolvedTo) {
+      await this.validateOwnerDentist(resolvedTo, organizationId);
+    }
+
+    // 3c: batch limit.
+    const BATCH_LIMIT = 500;
+    const totalCount = await this.prisma.patient.count({ where: { ownerDentistId: fromDentistId } });
+    if (totalCount > BATCH_LIMIT) {
+      throw new UnprocessableEntityException(
+        `Lote contém ${totalCount} pacientes, acima do limite de ${BATCH_LIMIT}. Filtre por período ou repita em partes.`,
+      );
+    }
 
     const patients = await this.prisma.patient.findMany({
       where: { ownerDentistId: fromDentistId },
@@ -204,12 +225,12 @@ export class PatientsService {
     await this.prisma.$transaction(async (tx) => {
       await tx.patient.updateMany({
         where: { ownerDentistId: fromDentistId },
-        data: { ownerDentistId: toDentistId },
+        data: { ownerDentistId: resolvedTo },
       });
 
       for (const p of patients) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { organizationId: _orgId, ...snapshot } = p;
+        const { organizationId: _orgId, ...snapshot } = p;
         await tx.patientRevision.create({
           data: {
             patientId: p.id,
