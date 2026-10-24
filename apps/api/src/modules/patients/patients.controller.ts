@@ -26,13 +26,18 @@ export class PatientsController {
     return this.patientsService.findOne(id);
   }
 
+  @Get(":id/revisions")
+  findRevisions(@Param("id") id: string) {
+    return this.patientsService.findRevisions(id);
+  }
+
   @Roles(...ACCESS["patients.write"])
   @Post()
   create(
     @Body(new ZodValidationPipe(createPatientSchema)) body: CreatePatientInput,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.patientsService.create(body, user.id);
+    return this.patientsService.create(body, user);
   }
 
   @Roles(...ACCESS["patients.write"])
@@ -40,7 +45,8 @@ export class PatientsController {
   update(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(updatePatientSchema)) body: UpdatePatientInput,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.patientsService.update(id, body);
+    return this.patientsService.update(id, body, user);
   }
 }

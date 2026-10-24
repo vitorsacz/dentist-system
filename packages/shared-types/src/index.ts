@@ -81,10 +81,20 @@ export {
 } from "./platform";
 
 export {
+  SexEnum,
+  MaritalStatusEnum,
+  cpfSchema,
+  quickCreatePatientSchema,
+  completePatientSchema,
   createPatientSchema,
   updatePatientSchema,
+  isPatientComplete,
   upsertAnamnesisSchema,
   createClinicalRecordSchema,
+  type Sex,
+  type MaritalStatus,
+  type QuickCreatePatientInput,
+  type CompletePatientInput,
   type CreatePatientInput,
   type UpdatePatientInput,
   type UpsertAnamnesisInput,

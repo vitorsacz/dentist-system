@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import type {
   CreatePatientInput,
+  UpdatePatientInput,
   UpsertAnamnesisInput,
   CreateClinicalRecordInput,
   UpsertToothRecordInput,
@@ -13,7 +14,22 @@ export interface Patient {
   phone: string;
   birthDate: string | null;
   address: string | null;
+  sex: "F" | "M" | null;
+  maritalStatus: string | null;
+  profession: string | null;
+  email: string | null;
+  cpf: string | null;
+  preferredDrink: string | null;
+  preferredMusic: string | null;
+  ownerDentist: { id: string; name: string } | null;
   createdAt: string;
+}
+
+export interface PatientRevision {
+  id: string;
+  snapshot: Record<string, unknown>;
+  changedAt: string;
+  changedBy: { id: string; name: string };
 }
 
 export interface Anamnesis {
@@ -61,6 +77,8 @@ export const patientsApi = {
   list: () => apiClient.get<Patient[]>("/patients"),
   findOne: (id: string) => apiClient.get<Patient>(`/patients/${id}`),
   create: (input: CreatePatientInput) => apiClient.post<Patient>("/patients", input),
+  update: (id: string, input: UpdatePatientInput) => apiClient.patch<Patient>(`/patients/${id}`, input),
+  getRevisions: (id: string) => apiClient.get<PatientRevision[]>(`/patients/${id}/revisions`),
 
   getAnamnesis: (patientId: string) => apiClient.get<Anamnesis | null>(`/patients/${patientId}/anamnesis`),
   upsertAnamnesis: (patientId: string, input: UpsertAnamnesisInput) =>

@@ -79,6 +79,19 @@ enum TenantType {
   FREELANCER
 }
 
+enum Sex {
+  F
+  M
+}
+
+enum MaritalStatus {
+  SOLTEIRO
+  CASADO
+  DIVORCIADO
+  VIUVO
+  UNIAO_ESTAVEL
+}
+
 enum OrganizationStatus {
   ACTIVE
   SUSPENDED
@@ -102,14 +115,16 @@ model User {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  foundingOfOrganization Organization?    @relation("OrganizationFoundingAdmin")
-  createdPatients        Patient[]        @relation("PatientCreatedBy")
-  createdClinicalRecords ClinicalRecord[] @relation("ClinicalRecordCreatedBy")
-  createdBudgets         Budget[]         @relation("BudgetCreatedBy")
-  createdAttendances     Attendance[]     @relation("AttendanceCreatedBy")
-  refreshSessions        RefreshSession[]
-  appointmentsAsDentist  Appointment[]    @relation("AppointmentDentist")
-  attendancesAsDentist   Attendance[]     @relation("AttendanceDentist")
+  foundingOfOrganization  Organization?    @relation("OrganizationFoundingAdmin")
+  createdPatients         Patient[]        @relation("PatientCreatedBy")
+  ownedPatients           Patient[]        @relation("PatientOwner")
+  patientRevisions        PatientRevision[] @relation("PatientRevisionChangedBy")
+  createdClinicalRecords  ClinicalRecord[] @relation("ClinicalRecordCreatedBy")
+  createdBudgets          Budget[]         @relation("BudgetCreatedBy")
+  createdAttendances      Attendance[]     @relation("AttendanceCreatedBy")
+  refreshSessions         RefreshSession[]
+  appointmentsAsDentist   Appointment[]    @relation("AppointmentDentist")
+  attendancesAsDentist    Attendance[]     @relation("AttendanceDentist")
 
   @@unique([organizationId, email])
 }
@@ -152,6 +167,7 @@ model Organization {
   clinics              Clinic[]
   clinicFinancialTerms ClinicFinancialTerms[]
   patients             Patient[]
+  patientRevisions     PatientRevision[]
   anamneses            Anamnesis[]
   clinicalRecords      ClinicalRecord[]
   toothRecords         ToothRecord[]
@@ -220,11 +236,21 @@ model ClinicFinancialTerms {
 }
 
 model Patient {
-  id        String    @id @default(cuid())
-  name      String
-  phone     String
-  birthDate DateTime?
-  address   String?
+  id            String         @id @default(cuid())
+  name          String
+  phone         String
+  birthDate     DateTime?
+  address       String?
+  sex           Sex?
+  maritalStatus MaritalStatus?
+  profession    String?
+  email         String?
+  cpf           String?
+  preferredDrink String?
+  preferredMusic String?
+
+  ownerDentistId String?
+  ownerDentist   User?    @relation("PatientOwner", fields: [ownerDentistId], references: [id], onDelete: SetNull)
 
   createdByUserId String
   createdBy       User     @relation("PatientCreatedBy", fields: [createdByUserId], references: [id])
@@ -241,7 +267,26 @@ model Patient {
   appointments    Appointment[]
   attendances     Attendance[]
   recalls         Recall[]
+  revisions       PatientRevision[]
 
+  @@unique([organizationId, cpf])
+  @@index([organizationId])
+  @@index([ownerDentistId])
+}
+
+model PatientRevision {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  snapshot    Json
+  changedById String
+  changedBy   User     @relation("PatientRevisionChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  changedAt   DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
   @@index([organizationId])
 }
 
