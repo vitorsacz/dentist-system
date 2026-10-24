@@ -7,3 +7,9 @@ export const optionalCoercedDate = z.preprocess(
   (value) => (value === "" || value === null || value === undefined ? undefined : value),
   z.coerce.date().optional(),
 );
+
+// Inputs de texto e selects mandam "" quando vazios — normaliza para undefined
+// para que campos opcionais não falhem validação (email, enum, cpf etc.).
+export function emptyStringToUndefined(value: unknown): unknown {
+  return value === "" ? undefined : value;
+}

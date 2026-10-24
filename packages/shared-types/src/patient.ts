@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { optionalCoercedDate } from "./utils";
+import { optionalCoercedDate, emptyStringToUndefined } from "./utils";
 
 export const SexEnum = z.enum(["F", "M"]);
 export type Sex = z.infer<typeof SexEnum>;
@@ -31,16 +31,28 @@ function validateCpf(cpf: string): boolean {
   return remainder === parseInt(digits[10]!);
 }
 
+// Valida dígitos verificadores e normaliza para só dígitos (remove máscara).
+// "529.982.247-25" e "52998224725" são equivalentes e geram o mesmo valor
+// persistido, garantindo que @@unique([organizationId, cpf]) detecte duplicatas
+// independentemente da máscara enviada.
 export const cpfSchema = z
   .string()
   .min(1)
-  .refine((v) => validateCpf(v), { message: "CPF inválido" });
+  .refine((v) => validateCpf(v), { message: "CPF inválido" })
+  .transform((v) => v.replace(/\D/g, ""));
+
+// Helper: "" → undefined para campos opcionais de texto/enum/email.
+// Decisa PATCH: "" em campo opcional é tratado como "não informado" (undefined),
+// não como "limpar o campo" — use null explícito para limpar ownerDentistId.
+function optionalText<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess(emptyStringToUndefined, schema.optional());
+}
 
 // Cadastro rápido: mínimo para agendamento e chegada (recepção)
 export const quickCreatePatientSchema = z.object({
   name: z.string().min(1),
   phone: z.string().min(1),
-  ownerDentistId: z.string().optional(),
+  ownerDentistId: z.preprocess(emptyStringToUndefined, z.string().optional()),
 });
 export type QuickCreatePatientInput = z.infer<typeof quickCreatePatientSchema>;
 
@@ -60,37 +72,37 @@ export const completePatientSchema = quickCreatePatientSchema.extend({
 });
 export type CompletePatientInput = z.infer<typeof completePatientSchema>;
 
-// Schema usado no PATCH — todos os campos opcionais; ownerDentistId somente
-// para ADMIN/RECEPTIONIST (validado no service, não aqui)
-export const updatePatientSchema = z.object({
-  name: z.string().min(1).optional(),
-  phone: z.string().min(1).optional(),
+// POST aceita quick ou complete — campos completos todos opcionais.
+// Strings vazias são normalizadas para undefined antes de validar enum/email/cpf.
+export const createPatientSchema = quickCreatePatientSchema.extend({
   birthDate: optionalCoercedDate,
-  address: z.string().optional(),
-  sex: SexEnum.optional(),
-  maritalStatus: MaritalStatusEnum.optional(),
-  profession: z.string().optional(),
-  email: z.string().email().optional(),
-  cpf: cpfSchema.optional(),
-  preferredDrink: z.string().optional(),
-  preferredMusic: z.string().optional(),
+  address: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  sex: optionalText(SexEnum),
+  maritalStatus: optionalText(MaritalStatusEnum),
+  profession: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  email: optionalText(z.string().email()),
+  cpf: z.preprocess(emptyStringToUndefined, cpfSchema.optional()),
+  preferredDrink: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  preferredMusic: z.preprocess(emptyStringToUndefined, z.string().optional()),
+});
+export type CreatePatientInput = z.infer<typeof createPatientSchema>;
+
+// PATCH — "" é ignorado (não limpa o campo); para limpar ownerDentistId usar null.
+export const updatePatientSchema = z.object({
+  name: z.preprocess(emptyStringToUndefined, z.string().min(1).optional()),
+  phone: z.preprocess(emptyStringToUndefined, z.string().min(1).optional()),
+  birthDate: optionalCoercedDate,
+  address: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  sex: optionalText(SexEnum),
+  maritalStatus: optionalText(MaritalStatusEnum),
+  profession: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  email: optionalText(z.string().email()),
+  cpf: z.preprocess(emptyStringToUndefined, cpfSchema.optional()),
+  preferredDrink: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  preferredMusic: z.preprocess(emptyStringToUndefined, z.string().optional()),
   ownerDentistId: z.string().nullable().optional(),
 });
 export type UpdatePatientInput = z.infer<typeof updatePatientSchema>;
-
-// POST aceita quick ou complete — campos completos todos opcionais
-export const createPatientSchema = quickCreatePatientSchema.extend({
-  birthDate: optionalCoercedDate,
-  address: z.string().optional(),
-  sex: SexEnum.optional(),
-  maritalStatus: MaritalStatusEnum.optional(),
-  profession: z.string().optional(),
-  email: z.string().email().optional(),
-  cpf: cpfSchema.optional(),
-  preferredDrink: z.string().optional(),
-  preferredMusic: z.string().optional(),
-});
-export type CreatePatientInput = z.infer<typeof createPatientSchema>;
 
 export function isPatientComplete(patient: {
   birthDate?: Date | null;

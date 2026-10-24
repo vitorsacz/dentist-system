@@ -233,4 +233,66 @@ describe("Patients (e2e)", () => {
       expect([201, 409]).toContain(res.status);
     });
   });
+
+  describe('campos vazios ("" → undefined)', () => {
+    it('POST com cpf/email/sex/maritalStatus="" → 201 com campos null', async () => {
+      const res = await as(dentistToken).post("/patients", {
+        name: "Vazio A",
+        phone: "11900001001",
+        cpf: "",
+        email: "",
+        sex: "",
+        maritalStatus: "",
+        profession: "",
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.cpf).toBeNull();
+      expect(res.body.email).toBeNull();
+      expect(res.body.sex).toBeNull();
+      expect(res.body.maritalStatus).toBeNull();
+      expect(res.body.profession).toBeNull();
+    });
+  });
+
+  describe("CPF com máscara vs sem máscara", () => {
+    it("CPF mascarado e sem máscara na mesma org são detectados como duplicados → 409", async () => {
+      const cpfMasked = "111.444.777-35";
+      const cpfDigits = "11144477735";
+
+      const first = await as(dentistToken).post("/patients", {
+        name: "CPF Mask A",
+        phone: "11900002001",
+        cpf: cpfMasked,
+      });
+      expect(first.status).toBe(201);
+      expect(first.body.cpf).toBe(cpfDigits);
+
+      const second = await as(dentistToken).post("/patients", {
+        name: "CPF Mask B",
+        phone: "11900002002",
+        cpf: cpfDigits,
+      });
+      expect(second.status).toBe(409);
+    });
+  });
+
+  describe("PatientRevision — snapshot sem ownerDentist", () => {
+    it("snapshot não contém chave ownerDentist", async () => {
+      const created = await as(dentistToken).post("/patients", {
+        name: "Snapshot Test",
+        phone: "11900003001",
+      });
+      expect(created.status).toBe(201);
+      const patientId = created.body.id;
+
+      await as(dentistToken).patch(`/patients/${patientId}`, { name: "Snapshot Test editado" });
+
+      const revisions = await as(dentistToken).get(`/patients/${patientId}/revisions`);
+      expect(revisions.status).toBe(200);
+      expect(revisions.body.length).toBeGreaterThanOrEqual(1);
+      const snapshot = revisions.body[0].snapshot as Record<string, unknown>;
+      expect("ownerDentist" in snapshot).toBe(false);
+      expect("id" in snapshot).toBe(true);
+    });
+  });
 });

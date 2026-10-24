@@ -5,6 +5,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createPatientSchema, isPatientComplete, type CreatePatientInput } from "@dentist-system/shared-types";
 import { PageHeader } from "@/components/ui/page-header";
+import { useAuth } from "@/lib/auth-context";
+import { can } from "@/lib/access";
+import { myClinicApi } from "@/features/my-clinic/api";
 import { patientsApi } from "./api";
 
 const MARITAL_STATUS_OPTIONS = [
@@ -15,15 +18,39 @@ const MARITAL_STATUS_OPTIONS = [
   { value: "UNIAO_ESTAVEL", label: "União estável" },
 ];
 
+function maskCpf(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1-$2");
+}
+
+function maskPhone(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 10) return d.replace(/^(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
+  return d.replace(/^(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3");
+}
+
 export function PatientsPage() {
   const [showForm, setShowForm] = useState(false);
+  const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  const needsDentistSelect = can(user, "organization.dentists");
+
   const patientsQuery = useQuery({ queryKey: ["patients"], queryFn: patientsApi.list });
+  const dentistsQuery = useQuery({
+    queryKey: ["organization", "dentists"],
+    queryFn: myClinicApi.dentists,
+    enabled: needsDentistSelect,
+  });
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CreatePatientInput>({ resolver: zodResolver(createPatientSchema) });
 
@@ -63,34 +90,61 @@ export function PatientsPage() {
           </div>
           <div>
             <label className="mb-1 block text-sm text-muted">Telefone</label>
-            <input className="w-full rounded-md border border-line px-3 py-2 text-sm" {...register("phone")} />
+            <input
+              className="w-full rounded-md border border-line px-3 py-2 text-sm"
+              placeholder="(11) 99999-9999"
+              {...register("phone")}
+              onChange={(e) => {
+                const masked = maskPhone(e.target.value);
+                e.target.value = masked;
+                setValue("phone", masked);
+              }}
+            />
             {errors.phone && <p className="mt-1 text-sm text-bad">{errors.phone.message}</p>}
           </div>
+          {needsDentistSelect && (
+            <div>
+              <label className="mb-1 block text-sm text-muted">
+                Dentista responsável <span className="text-bad">*</span>
+              </label>
+              <select
+                className="w-full rounded-md border border-line px-3 py-2 text-sm"
+                {...register("ownerDentistId")}
+              >
+                <option value="">Selecionar dentista</option>
+                {dentistsQuery.data?.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+              {errors.ownerDentistId && (
+                <p className="mt-1 text-sm text-bad">{errors.ownerDentistId.message}</p>
+              )}
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm text-muted">CPF (opcional)</label>
             <input
               className="w-full rounded-md border border-line px-3 py-2 text-sm"
               placeholder="000.000.000-00"
               {...register("cpf")}
+              onChange={(e) => {
+                const masked = maskCpf(e.target.value);
+                e.target.value = masked;
+                setValue("cpf", masked);
+              }}
             />
             {errors.cpf && <p className="mt-1 text-sm text-bad">{errors.cpf.message}</p>}
           </div>
           <div>
             <label className="mb-1 block text-sm text-muted">E-mail (opcional)</label>
-            <input
-              type="email"
-              className="w-full rounded-md border border-line px-3 py-2 text-sm"
-              {...register("email")}
-            />
+            <input type="email" className="w-full rounded-md border border-line px-3 py-2 text-sm" {...register("email")} />
             {errors.email && <p className="mt-1 text-sm text-bad">{errors.email.message}</p>}
           </div>
           <div>
             <label className="mb-1 block text-sm text-muted">Data de nascimento (opcional)</label>
-            <input
-              type="date"
-              className="w-full rounded-md border border-line px-3 py-2 text-sm"
-              {...register("birthDate")}
-            />
+            <input type="date" className="w-full rounded-md border border-line px-3 py-2 text-sm" {...register("birthDate")} />
           </div>
           <div>
             <label className="mb-1 block text-sm text-muted">Sexo (opcional)</label>
@@ -119,19 +173,11 @@ export function PatientsPage() {
           </div>
           <div>
             <label className="mb-1 block text-sm text-muted">Bebida de espera (opcional)</label>
-            <input
-              className="w-full rounded-md border border-line px-3 py-2 text-sm"
-              placeholder="Ex.: café, água"
-              {...register("preferredDrink")}
-            />
+            <input className="w-full rounded-md border border-line px-3 py-2 text-sm" placeholder="Ex.: café, água" {...register("preferredDrink")} />
           </div>
           <div>
             <label className="mb-1 block text-sm text-muted">Música preferida (opcional)</label>
-            <input
-              className="w-full rounded-md border border-line px-3 py-2 text-sm"
-              placeholder="Ex.: MPB, sertanejo"
-              {...register("preferredMusic")}
-            />
+            <input className="w-full rounded-md border border-line px-3 py-2 text-sm" placeholder="Ex.: MPB, sertanejo" {...register("preferredMusic")} />
           </div>
           {createMutation.error && (
             <p className="text-sm text-bad sm:col-span-2">
@@ -173,9 +219,7 @@ export function PatientsPage() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Link to={`/patients/${patient.id}`} className="text-accent">
-                    Ver
-                  </Link>
+                  <Link to={`/patients/${patient.id}`} className="text-accent">Ver</Link>
                 </td>
               </tr>
             ))}

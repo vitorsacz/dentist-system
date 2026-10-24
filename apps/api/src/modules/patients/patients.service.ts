@@ -94,10 +94,13 @@ export class PatientsService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // Snapshot contém só as colunas do Patient, sem relações incluídas.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { ownerDentist: _od, ...patientSnapshot } = existing as typeof existing & { ownerDentist?: unknown };
         await tx.patientRevision.create({
           data: {
             patientId: id,
-            snapshot: existing as unknown as Prisma.InputJsonValue,
+            snapshot: patientSnapshot as unknown as Prisma.InputJsonValue,
             changedById: actor.id,
             organizationId,
           },
