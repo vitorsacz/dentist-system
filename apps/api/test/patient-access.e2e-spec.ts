@@ -525,6 +525,7 @@ describe("PatientAccess (e2e)", () => {
     let dentistDId: string;
     let deactivatePatientId: string;
     let deactivateApptId: string;
+    let dentistDRefreshCookie: string;
 
     beforeAll(async () => {
       const hash = await bcrypt.hash(TEST_PASSWORD, 10);
@@ -534,6 +535,14 @@ describe("PatientAccess (e2e)", () => {
         data: { organizationId: orgId, email: `dent-d-${ts}@test.com`, passwordHash: hash, name: "Dentista D", roles: ["DENTIST"] },
       });
       dentistDId = uD.id;
+
+      // Login as dentistD to capture a refresh cookie before deactivation.
+      const loginRes = await request(app.getHttpServer())
+        .post("/auth/login")
+        .send({ identifier: uD.email, password: TEST_PASSWORD });
+      const setCookieHeader = loginRes.headers["set-cookie"] as string[] | string | undefined;
+      const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : setCookieHeader ? [setCookieHeader] : [];
+      dentistDRefreshCookie = cookies.find((c) => c.startsWith("refresh_token=")) ?? "";
 
       const p = await rawPrisma.patient.create({
         data: { organizationId: orgId, name: "Paciente D", phone: `119${ts}`.slice(0, 11), createdByUserId: uD.id, ownerDentistId: uD.id },
@@ -598,6 +607,15 @@ describe("PatientAccess (e2e)", () => {
       });
       expect(share?.revokedAt).not.toBeNull();
     });
+
+    it("refresh with deactivated dentist session → 401", async () => {
+      // dentistDRefreshCookie was captured in beforeAll, deactivation happened in previous test.
+      expect(dentistDRefreshCookie).toBeTruthy();
+      await request(app.getHttpServer())
+        .post("/auth/refresh")
+        .set("Cookie", dentistDRefreshCookie)
+        .expect(401);
+    });
   });
 
   // ── 16. bulk-reassign — isolamento entre orgs ─────────────────────────────────
@@ -625,9 +643,18 @@ describe("PatientAccess (e2e)", () => {
 
     it("fromDentistId de outra org → 0 afetados (tenant extension filtra)", async () => {
       const res = await as(tokenY)
-        .post("/patients/bulk-reassign", { fromDentistId: dentistOrgBId })
+        .post("/patients/bulk-reassign", { fromDentistId: dentistOrgBId, toDentistId: null })
         .expect(201);
       expect(res.body.reassigned).toBe(0);
+    });
+
+    it("body sem toDentistId → 400 (campo obrigatório)", async () => {
+      const countBefore = await rawPrisma.patient.count({ where: { organizationId: orgId } });
+      await as(tokenY)
+        .post("/patients/bulk-reassign", { fromDentistId: userBId })
+        .expect(400);
+      const countAfter = await rawPrisma.patient.count({ where: { organizationId: orgId } });
+      expect(countAfter).toBe(countBefore);
     });
   });
 });

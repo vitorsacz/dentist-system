@@ -131,8 +131,8 @@ export type SharePatientInput = z.infer<typeof sharePatientSchema>;
 
 export const bulkReassignPatientsSchema = z.object({
   fromDentistId: z.string().min(1),
-  // null ou omitido = desatribuir pacientes (ownerDentistId = null)
-  toDentistId: z.string().nullable().optional(),
+  // null = desatribuir (ownerDentistId → null); string = ID do dentista destino
+  toDentistId: z.string().nullable(),
 });
 export type BulkReassignPatientsInput = z.infer<typeof bulkReassignPatientsSchema>;
 

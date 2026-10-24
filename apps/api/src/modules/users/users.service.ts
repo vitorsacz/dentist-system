@@ -146,8 +146,8 @@ export class UsersService {
       });
     }
 
-    if (input.active === false) {
-      // Desativar derruba as sessões em todos os navegadores.
+    if (input.active === false && !target.roles.includes("DENTIST")) {
+      // DENTIST sessions are revoked inside handleDentistDeactivation tx; others need it here.
       await this.refreshSessions.revokeAllForUser(userId);
     }
 
@@ -240,6 +240,12 @@ export class UsersService {
           data: { dentistUserId: reassignTo },
         });
       }
+
+      // 2d: revoke sessions inside tx so deactivation + session invalidation are atomic.
+      await tx.refreshSession.updateMany({
+        where: { userId: dentistId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
 
       return updated as UserRecord;
     });

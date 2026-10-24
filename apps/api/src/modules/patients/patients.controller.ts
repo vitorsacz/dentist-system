@@ -98,6 +98,6 @@ export class PatientsController {
     @Body(new ZodValidationPipe(bulkReassignPatientsSchema)) body: BulkReassignPatientsInput,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.patientsService.bulkReassign(body.fromDentistId, body.toDentistId ?? null, user);
+    return this.patientsService.bulkReassign(body.fromDentistId, body.toDentistId, user);
   }
 }

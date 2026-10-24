@@ -194,9 +194,9 @@ export class PatientsService {
     });
   }
 
-  async bulkReassign(fromDentistId: string, toDentistId: string | null | undefined, actor: AuthenticatedUser) {
+  async bulkReassign(fromDentistId: string, toDentistId: string | null, actor: AuthenticatedUser) {
     const { organizationId } = getTenantContext();
-    const resolvedTo = toDentistId ?? null;
+    const resolvedTo = toDentistId;
 
     // 3b: from === to is a no-op that signals a caller mistake.
     if (resolvedTo && fromDentistId === resolvedTo) {
