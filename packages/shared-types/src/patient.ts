@@ -1,16 +1,116 @@
 import { z } from "zod";
 import { optionalCoercedDate } from "./utils";
 
-export const createPatientSchema = z.object({
+export const SexEnum = z.enum(["F", "M"]);
+export type Sex = z.infer<typeof SexEnum>;
+
+export const MaritalStatusEnum = z.enum([
+  "SOLTEIRO",
+  "CASADO",
+  "DIVORCIADO",
+  "VIUVO",
+  "UNIAO_ESTAVEL",
+]);
+export type MaritalStatus = z.infer<typeof MaritalStatusEnum>;
+
+function validateCpf(cpf: string): boolean {
+  const digits = cpf.replace(/\D/g, "");
+  if (digits.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(digits)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(digits[i]!) * (10 - i);
+  let remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(digits[9]!)) return false;
+
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(digits[i]!) * (11 - i);
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  return remainder === parseInt(digits[10]!);
+}
+
+export const cpfSchema = z
+  .string()
+  .min(1)
+  .refine((v) => validateCpf(v), { message: "CPF inválido" });
+
+// Cadastro rápido: mínimo para agendamento e chegada (recepção)
+export const quickCreatePatientSchema = z.object({
   name: z.string().min(1),
   phone: z.string().min(1),
+  ownerDentistId: z.string().optional(),
+});
+export type QuickCreatePatientInput = z.infer<typeof quickCreatePatientSchema>;
+
+// Cadastro completo (modo paciente / ficha)
+export const completePatientSchema = quickCreatePatientSchema.extend({
+  birthDate: z.coerce.date().refine((d) => d <= new Date(), {
+    message: "Data de nascimento não pode ser futura",
+  }),
+  sex: SexEnum,
+  maritalStatus: MaritalStatusEnum,
+  profession: z.string().min(1),
+  email: z.string().email(),
+  cpf: cpfSchema,
+  address: z.string().min(1),
+  preferredDrink: z.string().optional(),
+  preferredMusic: z.string().optional(),
+});
+export type CompletePatientInput = z.infer<typeof completePatientSchema>;
+
+// Schema usado no PATCH — todos os campos opcionais; ownerDentistId somente
+// para ADMIN/RECEPTIONIST (validado no service, não aqui)
+export const updatePatientSchema = z.object({
+  name: z.string().min(1).optional(),
+  phone: z.string().min(1).optional(),
   birthDate: optionalCoercedDate,
   address: z.string().optional(),
+  sex: SexEnum.optional(),
+  maritalStatus: MaritalStatusEnum.optional(),
+  profession: z.string().optional(),
+  email: z.string().email().optional(),
+  cpf: cpfSchema.optional(),
+  preferredDrink: z.string().optional(),
+  preferredMusic: z.string().optional(),
+  ownerDentistId: z.string().nullable().optional(),
+});
+export type UpdatePatientInput = z.infer<typeof updatePatientSchema>;
+
+// POST aceita quick ou complete — campos completos todos opcionais
+export const createPatientSchema = quickCreatePatientSchema.extend({
+  birthDate: optionalCoercedDate,
+  address: z.string().optional(),
+  sex: SexEnum.optional(),
+  maritalStatus: MaritalStatusEnum.optional(),
+  profession: z.string().optional(),
+  email: z.string().email().optional(),
+  cpf: cpfSchema.optional(),
+  preferredDrink: z.string().optional(),
+  preferredMusic: z.string().optional(),
 });
 export type CreatePatientInput = z.infer<typeof createPatientSchema>;
 
-export const updatePatientSchema = createPatientSchema.partial();
-export type UpdatePatientInput = z.infer<typeof updatePatientSchema>;
+export function isPatientComplete(patient: {
+  birthDate?: Date | null;
+  sex?: string | null;
+  maritalStatus?: string | null;
+  profession?: string | null;
+  email?: string | null;
+  cpf?: string | null;
+  address?: string | null;
+}): boolean {
+  return !!(
+    patient.birthDate &&
+    patient.sex &&
+    patient.maritalStatus &&
+    patient.profession &&
+    patient.email &&
+    patient.cpf &&
+    patient.address
+  );
+}
 
 export const upsertAnamnesisSchema = z.object({
   allergies: z.string().optional(),
