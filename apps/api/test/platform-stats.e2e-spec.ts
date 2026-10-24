@@ -6,6 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.setup";
 import { TEST_DATABASE_URL } from "./test-db";
+import { teardownAll } from "./helpers/teardown";
 
 // Cobre o novo dashboard do Super Admin (/platform/stats/overview e
 // /platform/organizations/:id): guarda de acesso, agregação correta
@@ -88,8 +89,7 @@ describe("Platform stats (Super Admin)", () => {
     configureApp(app);
     await app.init();
 
-    await rawPrisma.organization.deleteMany({});
-    await rawPrisma.user.deleteMany({});
+    await teardownAll(rawPrisma);
 
     orgA = await seedFixtures("OrgA");
     orgB = await seedFixtures("OrgB");
@@ -126,8 +126,7 @@ describe("Platform stats (Super Admin)", () => {
   }, 30000);
 
   afterAll(async () => {
-    await rawPrisma.organization.deleteMany({});
-    await rawPrisma.user.deleteMany({});
+    await teardownAll(rawPrisma);
     await rawPrisma.$disconnect();
     await app.close();
   });

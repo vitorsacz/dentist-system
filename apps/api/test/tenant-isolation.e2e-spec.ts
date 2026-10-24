@@ -6,6 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.setup";
 import { TEST_DATABASE_URL } from "./test-db";
+import { teardownAll } from "./helpers/teardown";
 
 // Critério de aceite da fundação de multi-tenancy (ver plano técnico): 2
 // organizations seedadas, acesso cruzado por ID em todo endpoint tenant-scoped
@@ -120,8 +121,7 @@ describe("Isolamento cross-tenant", () => {
     configureApp(app);
     await app.init();
 
-    await rawPrisma.organization.deleteMany({});
-    await rawPrisma.user.deleteMany({});
+    await teardownAll(rawPrisma);
 
     orgA = await seedOrgContext(app, "OrgA");
     orgB = await seedOrgContext(app, "OrgB");
@@ -129,8 +129,7 @@ describe("Isolamento cross-tenant", () => {
   }, 30000);
 
   afterAll(async () => {
-    await rawPrisma.organization.deleteMany({});
-    await rawPrisma.user.deleteMany({});
+    await teardownAll(rawPrisma);
     await rawPrisma.$disconnect();
     await app.close();
   });
@@ -282,6 +281,8 @@ describe("Isolamento cross-tenant", () => {
       patientId: patientIdA,
       clinicId: clinicIdA,
       startsAt: "2027-01-10T13:00:00-03:00",
+      endsAt: "2027-01-10T14:00:00-03:00",
+      dentistUserId: orgA.dentistUserId,
     });
     expect(created.status).toBe(201);
     const appointmentId = created.body.id;
@@ -296,6 +297,8 @@ describe("Isolamento cross-tenant", () => {
       patientId: patientIdA,
       clinicId: clinicIdA,
       startsAt: "2027-01-11T13:00:00-03:00",
+      endsAt: "2027-01-11T14:00:00-03:00",
+      dentistUserId: orgB.dentistUserId,
     });
     expect(crossCreate.status).toBe(404);
   });
