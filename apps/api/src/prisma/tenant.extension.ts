@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { Logger, NotFoundException } from "@nestjs/common";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { getTenantContext } from "./tenant-context";
 
@@ -23,6 +23,7 @@ export const TENANT_SCOPED_MODELS = [
   "MaterialUsage",
   "Recall",
   "PatientRevision",
+  "PatientShare",
 ] as const;
 
 const READ_AND_BULK_OPS = new Set([
@@ -64,11 +65,25 @@ export function createTenantScopedClient<T extends PrismaClient>(base: T) {
 
           if (operation === "findUnique" || operation === "findUniqueOrThrow") {
             const result = (await query(args)) as { organizationId?: string } | null;
-            if (result && result.organizationId !== organizationId) {
-              if (operation === "findUniqueOrThrow") {
-                throw new NotFoundException("Registro não encontrado");
+            if (result) {
+              if (result.organizationId === undefined) {
+                if (process.env.NODE_ENV !== "production") {
+                  throw new Error(
+                    `[tenant-isolation] findUnique on ${model}: organizationId absent from result — add \`organizationId: true\` to the select, otherwise tenant isolation silently bypasses the cross-org check`,
+                  );
+                }
+                Logger.warn(
+                  `[tenant-isolation] findUnique on ${model} (op: ${operation}): organizationId absent from result — returning null`,
+                  "TenantExtension",
+                );
+                return null;
               }
-              return null;
+              if (result.organizationId !== organizationId) {
+                if (operation === "findUniqueOrThrow") {
+                  throw new NotFoundException("Registro não encontrado");
+                }
+                return null;
+              }
             }
             return result;
           }

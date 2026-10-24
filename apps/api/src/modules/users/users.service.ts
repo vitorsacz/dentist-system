@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 import {
   PALETTE_COLOR_TOKENS,
   type CreateTenantUserInput,
@@ -7,6 +7,7 @@ import {
   type ManagedTenantUser,
 } from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
+import { AppointmentStatus, Prisma } from "@prisma/client";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 import { RefreshSessionsService } from "../sessions/refresh-sessions.service";
 
@@ -107,11 +108,22 @@ export class UsersService {
       throw new BadRequestException("Você não pode desativar ou rebaixar a própria conta de admin");
     }
 
-    // 3) Capitania da clínica: só o admin fundador pode editar/desativar outro admin.
+    // 3) Capitania da clínica + proteção do founding user FREELANCER.
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { type: true, foundingAdminUserId: true },
+    });
     if (target.roles.includes("ADMIN") && target.id !== currentUserId) {
-      const organization = await this.prisma.organization.findUnique({ where: { id: organizationId } });
       if (organization?.foundingAdminUserId !== currentUserId) {
         throw new ForbiddenException("Só o admin fundador pode gerenciar outros admins desta clínica");
+      }
+    }
+    // Founding user de org FREELANCER deve sempre ter ADMIN e DENTIST.
+    if (organization?.foundingAdminUserId === userId && organization?.type === "FREELANCER") {
+      if (input.roles && (!input.roles.includes("ADMIN") || !input.roles.includes("DENTIST"))) {
+        throw new UnprocessableEntityException(
+          "O usuário fundador de um consultório FREELANCER não pode perder os papéis ADMIN ou DENTIST",
+        );
       }
     }
 
@@ -120,16 +132,123 @@ export class UsersService {
       input.colorToken ??
       (nextRoles.includes("DENTIST") && !target.colorToken ? await this.nextDentistColor(organizationId) : undefined);
 
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
-      data: { ...input, ...(colorToken ? { colorToken } : {}) },
-    });
-    // Desativar derruba as sessões em todos os navegadores: sem isso o
-    // refresh seguiria funcionando até o token expirar.
-    if (input.active === false) {
+    const { reassignTo, ...updateData } = input;
+    const updatePayload = { ...updateData, ...(colorToken ? { colorToken } : {}) };
+
+    let updated: UserRecord;
+    if (input.active === false && target.roles.includes("DENTIST")) {
+      // Tudo ou nada: desativação + reatribuição de pacientes/agendamentos/shares.
+      updated = await this.handleDentistDeactivation(userId, organizationId, reassignTo ?? null, updatePayload);
+    } else {
+      updated = await this.prisma.user.update({
+        where: { id: userId },
+        data: updatePayload as Prisma.UserUpdateInput,
+      });
+    }
+
+    if (input.active === false && !target.roles.includes("DENTIST")) {
+      // DENTIST sessions are revoked inside handleDentistDeactivation tx; others need it here.
       await this.refreshSessions.revokeAllForUser(userId);
     }
+
     return toManagedTenantUser(updated);
+  }
+
+  private async handleDentistDeactivation(
+    dentistId: string,
+    organizationId: string,
+    reassignTo: string | null,
+    updatePayload: Record<string, unknown>,
+  ): Promise<UserRecord> {
+    // 2b: self-reassign is pointless and signals a caller mistake.
+    if (reassignTo && reassignTo === dentistId) {
+      throw new UnprocessableEntityException("reassignTo não pode ser o próprio dentista");
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // 2c: agendamentos futuros não cancelados/concluídos.
+      const futureApptCount = await tx.appointment.count({
+        where: {
+          dentistUserId: dentistId,
+          startsAt: { gt: new Date() },
+          status: { notIn: [AppointmentStatus.CANCELED, AppointmentStatus.DONE] },
+        },
+      });
+      if (futureApptCount > 0 && !reassignTo) {
+        throw new ConflictException(
+          `Dentista possui ${futureApptCount} agendamento(s) futuro(s). Forneça reassignTo para reatribuir ou cancele-os primeiro.`,
+        );
+      }
+
+      if (reassignTo) {
+        const dest = await tx.user.findFirst({
+          where: { id: reassignTo, organizationId, active: true, roles: { has: "DENTIST" } },
+        });
+        if (!dest) throw new UnprocessableEntityException("Dentista de destino não encontrado ou inativo");
+      }
+
+      const patients = await tx.patient.findMany({
+        where: { ownerDentistId: dentistId, organizationId },
+        select: { id: true, name: true, phone: true, createdByUserId: true, ownerDentistId: true },
+      });
+
+      // 2a: user.update (active=false) DENTRO da transação.
+      const updated = await tx.user.update({
+        where: { id: dentistId },
+        data: updatePayload as Prisma.UserUpdateInput,
+      });
+
+      await tx.patient.updateMany({
+        where: { ownerDentistId: dentistId, organizationId },
+        data: { ownerDentistId: reassignTo },
+      });
+
+      // Revoke shares where D is the grantee (D's access to others' patients).
+      await tx.patientShare.updateMany({
+        where: { dentistId, revokedAt: null, organizationId },
+        data: { revokedAt: new Date(), revokedById: dentistId },
+      });
+      // Revoke shares for D's owned patients (other dentists' access to D's patients).
+      const patientIds = patients.map((p) => p.id);
+      if (patientIds.length > 0) {
+        await tx.patientShare.updateMany({
+          where: { patientId: { in: patientIds }, revokedAt: null, organizationId },
+          data: { revokedAt: new Date(), revokedById: dentistId },
+        });
+      }
+
+      for (const p of patients) {
+        await tx.patientRevision.create({
+          data: {
+            patientId: p.id,
+            snapshot: p as unknown as Prisma.InputJsonValue,
+            changedById: dentistId,
+            organizationId,
+          },
+        });
+      }
+
+      // 2c: reatribui agendamentos futuros quando reassignTo fornecido.
+      // TODO: validação de conflito de horário não implementada — tarefa futura.
+      if (reassignTo) {
+        await tx.appointment.updateMany({
+          where: {
+            dentistUserId: dentistId,
+            startsAt: { gt: new Date() },
+            status: { notIn: [AppointmentStatus.CANCELED, AppointmentStatus.DONE] },
+          },
+          data: { dentistUserId: reassignTo },
+        });
+      }
+
+      // 2d: revoke sessions inside tx so deactivation + session invalidation are atomic.
+      await tx.refreshSession.updateMany({
+        where: { userId: dentistId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      return updated as UserRecord;
+    });
   }
 
   private async nextDentistColor(organizationId: string) {

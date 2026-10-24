@@ -125,6 +125,9 @@ model User {
   refreshSessions         RefreshSession[]
   appointmentsAsDentist   Appointment[]    @relation("AppointmentDentist")
   attendancesAsDentist    Attendance[]     @relation("AttendanceDentist")
+  sharedPatientsAsDentist PatientShare[]   @relation("PatientShareDentist")
+  patientSharesCreated    PatientShare[]   @relation("PatientShareBy")
+  patientSharesRevoked    PatientShare[]   @relation("PatientShareRevokedBy")
 
   @@unique([organizationId, email])
 }
@@ -168,6 +171,7 @@ model Organization {
   clinicFinancialTerms ClinicFinancialTerms[]
   patients             Patient[]
   patientRevisions     PatientRevision[]
+  patientShares        PatientShare[]
   anamneses            Anamnesis[]
   clinicalRecords      ClinicalRecord[]
   toothRecords         ToothRecord[]
@@ -268,10 +272,31 @@ model Patient {
   attendances     Attendance[]
   recalls         Recall[]
   revisions       PatientRevision[]
+  shares          PatientShare[]
 
   @@unique([organizationId, cpf])
   @@index([organizationId])
   @@index([ownerDentistId])
+}
+
+model PatientShare {
+  id             String    @id @default(cuid())
+  patientId      String
+  patient        Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  dentistId      String
+  dentist        User      @relation("PatientShareDentist", fields: [dentistId], references: [id], onDelete: Cascade)
+  sharedById     String
+  sharedBy       User      @relation("PatientShareBy", fields: [sharedById], references: [id], onDelete: Restrict)
+  sharedAt       DateTime  @default(now())
+  revokedAt      DateTime?
+  revokedById    String?
+  revokedBy      User?     @relation("PatientShareRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, dentistId])
+  @@index([dentistId])
+  @@index([patientId])
 }
 
 model PatientRevision {

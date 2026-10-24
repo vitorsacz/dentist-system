@@ -1,8 +1,9 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { CreateBudgetInput, UpdateBudgetStatusInput } from "@dentist-system/shared-types";
+import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 import { getTenantContext } from "../../prisma/tenant-context";
-import { PatientsService } from "../patients/patients.service";
+import { PatientAccessService } from "../patients/patient-access.service";
 import { ProceduresService } from "../procedures/procedures.service";
 
 const budgetInclude = {
@@ -18,11 +19,12 @@ function withTotal<T extends { items: { value: unknown }[] }>(budget: T) {
 export class BudgetsService {
   constructor(
     @Inject(PRISMA_SERVICE) private readonly prisma: PrismaService,
-    private readonly patientsService: PatientsService,
+    private readonly patientAccess: PatientAccessService,
     private readonly proceduresService: ProceduresService,
   ) {}
 
-  async listByPatient(patientId: string) {
+  async listByPatient(patientId: string, actor: AuthenticatedUser) {
+    await this.patientAccess.assertPatientAccess(patientId, actor, "registry");
     const budgets = await this.prisma.budget.findMany({
       where: { patientId },
       include: budgetInclude,
@@ -31,29 +33,25 @@ export class BudgetsService {
     return budgets.map(withTotal);
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actor: AuthenticatedUser) {
     const budget = await this.prisma.budget.findUnique({ where: { id }, include: budgetInclude });
-    if (!budget) {
-      throw new NotFoundException("Orçamento não encontrado");
-    }
+    if (!budget) throw new NotFoundException("Orçamento não encontrado");
+    await this.patientAccess.assertPatientAccess(budget.patientId, actor, "registry");
     return withTotal(budget);
   }
 
-  async create(input: CreateBudgetInput, createdByUserId: string) {
-    await this.patientsService.findOne(input.patientId);
+  async create(input: CreateBudgetInput, actor: AuthenticatedUser) {
+    await this.patientAccess.assertPatientAccess(input.patientId, actor, "registry");
     for (const item of input.items) {
       await this.proceduresService.findOne(item.procedureId);
     }
 
-    // BudgetItem é nested write (`items: { create: [...] }`) — a extension só
-    // intercepta operações de topo do model alvo (Budget), não dispara pro
-    // model aninhado. Único call site no projeto com esse formato; injeta
-    // organizationId manualmente em cada item.
+    // BudgetItem é nested write — injeta organizationId manualmente em cada item.
     const { organizationId } = getTenantContext();
     const budget = await this.prisma.budget.create({
       data: {
         patientId: input.patientId,
-        createdByUserId,
+        createdByUserId: actor.id,
         organizationId,
         items: {
           create: input.items.map((item) => ({
@@ -70,13 +68,15 @@ export class BudgetsService {
     return withTotal(budget);
   }
 
-  async updateStatus(id: string, input: UpdateBudgetStatusInput) {
-    await this.findOne(id);
-    const budget = await this.prisma.budget.update({
+  async updateStatus(id: string, input: UpdateBudgetStatusInput, actor: AuthenticatedUser) {
+    const budget = await this.prisma.budget.findUnique({ where: { id }, include: budgetInclude });
+    if (!budget) throw new NotFoundException("Orçamento não encontrado");
+    await this.patientAccess.assertPatientAccess(budget.patientId, actor, "registry");
+    const updated = await this.prisma.budget.update({
       where: { id },
       data: { status: input.status },
       include: budgetInclude,
     });
-    return withTotal(budget);
+    return withTotal(updated);
   }
 }

@@ -5,41 +5,74 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import type { CreatePatientInput, UpdatePatientInput } from "@dentist-system/shared-types";
+import type { CreatePatientInput, SharePatientInput, UpdatePatientInput } from "@dentist-system/shared-types";
 import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 import { getTenantContext } from "../../prisma/tenant-context";
+import { PatientAccessService } from "./patient-access.service";
+
+const ownerDentistInclude = { ownerDentist: { select: { id: true, name: true } } } as const;
 
 @Injectable()
 export class PatientsService {
-  constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PRISMA_SERVICE) private readonly prisma: PrismaService,
+    private readonly patientAccess: PatientAccessService,
+  ) {}
 
-  list() {
-    return this.prisma.patient.findMany({
-      orderBy: { name: "asc" },
-      include: { ownerDentist: { select: { id: true, name: true } } },
-    });
+  list(actor: AuthenticatedUser, ownerDentistId?: string) {
+    const where: Prisma.PatientWhereInput = {
+      ...this.patientAccess.patientWhere(actor, "registry"),
+      ...(ownerDentistId && actor.roles.includes("ADMIN") ? { ownerDentistId } : {}),
+    };
+    return this.prisma.patient.findMany({ where, orderBy: { name: "asc" }, include: ownerDentistInclude });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actor?: AuthenticatedUser) {
+    if (actor) {
+      return this.patientAccess.assertPatientAccess(id, actor, "registry") as Promise<
+        Awaited<ReturnType<PrismaService["patient"]["findUnique"]>>
+      >;
+    }
     const patient = await this.prisma.patient.findUnique({
       where: { id },
-      include: { ownerDentist: { select: { id: true, name: true } } },
+      include: ownerDentistInclude,
     });
-    if (!patient) {
-      throw new NotFoundException("Paciente não encontrado");
-    }
+    if (!patient) throw new NotFoundException("Paciente não encontrado");
     return patient;
   }
 
-  async findRevisions(patientId: string) {
-    await this.findOne(patientId);
+  async findOneWithAccess(id: string, actor: AuthenticatedUser) {
+    await this.patientAccess.assertPatientAccess(id, actor, "registry");
+    const patient = await this.prisma.patient.findUnique({
+      where: { id },
+      include: ownerDentistInclude,
+    });
+    if (!patient) throw new NotFoundException("Paciente não encontrado");
+    const access = await this.patientAccess.accessFor(id, actor);
+    return { ...patient, access };
+  }
+
+  async findRevisions(patientId: string, actor: AuthenticatedUser) {
+    await this.patientAccess.assertPatientAccess(patientId, actor, "registry");
     return this.prisma.patientRevision.findMany({
       where: { patientId },
       orderBy: { changedAt: "desc" },
       include: { changedBy: { select: { id: true, name: true } } },
+    });
+  }
+
+  async listUnassigned() {
+    const { organizationId } = getTenantContext();
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { type: true } });
+    if (org?.type === "FREELANCER") throw new ForbiddenException("Não disponível para consultórios freelancer");
+    return this.prisma.patient.findMany({
+      where: { ownerDentistId: null },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, phone: true },
     });
   }
 
@@ -56,7 +89,7 @@ export class PatientsService {
     try {
       return await this.prisma.patient.create({
         data: { ...input, ownerDentistId, createdByUserId: actor.id, organizationId },
-        include: { ownerDentist: { select: { id: true, name: true } } },
+        include: ownerDentistInclude,
       });
     } catch (error) {
       this.mapCpfConflict(error);
@@ -65,12 +98,14 @@ export class PatientsService {
   }
 
   async update(id: string, input: UpdatePatientInput, actor: AuthenticatedUser) {
-    const existing = await this.findOne(id);
+    const existing = await this.patientAccess.assertPatientAccess(id, actor, "registry");
     const { organizationId } = getTenantContext();
 
-    // DENTIST-only não pode alterar ownerDentistId
     if ("ownerDentistId" in input) {
-      const isDentistOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN") && !actor.roles.includes("RECEPTIONIST");
+      const isDentistOnly =
+        actor.roles.includes("DENTIST") &&
+        !actor.roles.includes("ADMIN") &&
+        !actor.roles.includes("RECEPTIONIST");
       if (isDentistOnly) {
         throw new ForbiddenException("Dentista não pode alterar o responsável do paciente");
       }
@@ -94,7 +129,6 @@ export class PatientsService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Snapshot contém só as colunas do Patient, sem relações incluídas.
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { ownerDentist: _od, ...patientSnapshot } = existing as typeof existing & { ownerDentist?: unknown };
         await tx.patientRevision.create({
@@ -109,7 +143,7 @@ export class PatientsService {
         return tx.patient.update({
           where: { id },
           data: updateData,
-          include: { ownerDentist: { select: { id: true, name: true } } },
+          include: ownerDentistInclude,
         });
       });
     } catch (error) {
@@ -118,10 +152,141 @@ export class PatientsService {
     }
   }
 
-  // Resolve ownerDentistId seguindo as regras:
-  // - FREELANCER: sempre o próprio actor, ignora input
-  // - DENTIST-only no create: só pode setar a si mesmo
-  // - ADMIN/RECEPTIONIST no create: obrigatório; valida org + DENTIST + active
+  async share(patientId: string, input: SharePatientInput, actor: AuthenticatedUser) {
+    const patient = await this.patientAccess.assertPatientAccess(patientId, actor, "registry");
+    const { organizationId } = getTenantContext();
+
+    const canShare =
+      patient.ownerDentistId === actor.id || actor.roles.includes("ADMIN");
+    if (!canShare) {
+      throw new ForbiddenException("Apenas o dentista responsável ou um admin pode compartilhar");
+    }
+
+    await this.validateOwnerDentist(input.dentistId, organizationId);
+
+    return this.prisma.patientShare.upsert({
+      where: { patientId_dentistId: { patientId, dentistId: input.dentistId } },
+      create: { patientId, dentistId: input.dentistId, sharedById: actor.id, organizationId },
+      update: { revokedAt: null, sharedAt: new Date(), sharedById: actor.id },
+      select: { id: true, dentistId: true, sharedAt: true, dentist: { select: { id: true, name: true } } },
+    });
+  }
+
+  async revoke(patientId: string, dentistId: string, actor: AuthenticatedUser) {
+    const patient = await this.patientAccess.assertPatientAccess(patientId, actor, "registry");
+    const canShare =
+      patient.ownerDentistId === actor.id || actor.roles.includes("ADMIN");
+    if (!canShare) {
+      throw new ForbiddenException("Apenas o dentista responsável ou um admin pode revogar");
+    }
+
+    const share = await this.prisma.patientShare.findUnique({
+      where: { patientId_dentistId: { patientId, dentistId } },
+    });
+    if (!share || share.revokedAt !== null) {
+      throw new NotFoundException("Compartilhamento não encontrado");
+    }
+
+    return this.prisma.patientShare.update({
+      where: { patientId_dentistId: { patientId, dentistId } },
+      data: { revokedAt: new Date(), revokedById: actor.id },
+      select: { id: true, dentistId: true, revokedAt: true },
+    });
+  }
+
+  async bulkReassign(fromDentistId: string, toDentistId: string | null, actor: AuthenticatedUser) {
+    const { organizationId } = getTenantContext();
+    const resolvedTo = toDentistId;
+
+    // 3b: from === to is a no-op that signals a caller mistake.
+    if (resolvedTo && fromDentistId === resolvedTo) {
+      throw new BadRequestException("fromDentistId e toDentistId não podem ser iguais");
+    }
+
+    // 3a: validate destination dentist.
+    if (resolvedTo) {
+      await this.validateOwnerDentist(resolvedTo, organizationId);
+    }
+
+    // 3c: batch limit.
+    const BATCH_LIMIT = 500;
+    const totalCount = await this.prisma.patient.count({ where: { ownerDentistId: fromDentistId } });
+    if (totalCount > BATCH_LIMIT) {
+      throw new UnprocessableEntityException(
+        `Lote contém ${totalCount} pacientes, acima do limite de ${BATCH_LIMIT}. Filtre por período ou repita em partes.`,
+      );
+    }
+
+    const patients = await this.prisma.patient.findMany({
+      where: { ownerDentistId: fromDentistId },
+      select: { id: true, name: true, phone: true, createdByUserId: true, ownerDentistId: true, organizationId: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.patient.updateMany({
+        where: { ownerDentistId: fromDentistId },
+        data: { ownerDentistId: resolvedTo },
+      });
+
+      for (const p of patients) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { organizationId: _orgId, ...snapshot } = p;
+        await tx.patientRevision.create({
+          data: {
+            patientId: p.id,
+            snapshot: snapshot as unknown as Prisma.InputJsonValue,
+            changedById: actor.id,
+            organizationId,
+          },
+        });
+      }
+    });
+
+    return { reassigned: patients.length };
+  }
+
+  async claim(patientId: string, actor: AuthenticatedUser) {
+    const { organizationId } = getTenantContext();
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { type: true } });
+    if (org?.type === "FREELANCER") throw new ForbiddenException("Não disponível para consultórios freelancer");
+
+    const existing = await this.prisma.patient.findUnique({
+      where: { id: patientId },
+      include: ownerDentistInclude,
+    });
+    if (!existing) throw new NotFoundException("Paciente não encontrado");
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.patient.updateMany({
+        where: { id: patientId, ownerDentistId: null },
+        data: { ownerDentistId: actor.id },
+      });
+      if (updated.count === 0) {
+        throw new ConflictException("Paciente já tem dentista responsável");
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { ownerDentist: _od, ...snapshot } = existing as typeof existing & { ownerDentist?: unknown };
+      await tx.patientRevision.create({
+        data: {
+          patientId,
+          snapshot: snapshot as unknown as Prisma.InputJsonValue,
+          changedById: actor.id,
+          organizationId,
+        },
+      });
+      return tx.patient.findUnique({ where: { id: patientId }, include: ownerDentistInclude });
+    });
+
+    return result;
+  }
+
+  async getAccess(patientId: string, actor: AuthenticatedUser) {
+    await this.patientAccess.assertPatientAccess(patientId, actor, "registry");
+    const access = await this.patientAccess.accessFor(patientId, actor);
+    const shares = await this.patientAccess.activeShares(patientId);
+    return { ...access, activeShares: shares };
+  }
+
   private async resolveOwnerDentistId(
     inputId: string | undefined | null,
     organizationId: string,
@@ -133,26 +298,25 @@ export class PatientsService {
       select: { type: true },
     });
 
-    // Freelancer: responsável sempre é o próprio freelancer
     if (org?.type === "FREELANCER") {
       return actor.id;
     }
 
-    const isDentistOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN") && !actor.roles.includes("RECEPTIONIST");
+    const isDentistOnly =
+      actor.roles.includes("DENTIST") &&
+      !actor.roles.includes("ADMIN") &&
+      !actor.roles.includes("RECEPTIONIST");
 
     if (isDentistOnly) {
       if (operation === "create") {
-        // DENTIST só pode setar a si mesmo; se não vier, usa o próprio
         if (inputId && inputId !== actor.id) {
           throw new NotFoundException("Dentista não encontrado");
         }
         return inputId ?? actor.id;
       }
-      // update sem ownerDentistId: sem-op (caller já rejeitou com 403)
       return inputId ?? null;
     }
 
-    // ADMIN ou RECEPTIONIST
     if (operation === "create" && !inputId) {
       throw new BadRequestException("ownerDentistId é obrigatório para ADMIN e RECEPTIONIST");
     }

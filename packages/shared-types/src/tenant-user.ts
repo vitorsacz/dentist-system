@@ -16,6 +16,8 @@ export const updateTenantUserSchema = z.object({
   roles: tenantRolesSchema.optional(),
   active: z.boolean().optional(),
   colorToken: z.enum(PALETTE_COLOR_TOKENS).optional(),
+  // Used when active=false for a DENTIST: reassign their patients to another dentist (omit to unassign).
+  reassignTo: z.string().optional(),
 });
 export type UpdateTenantUserInput = z.infer<typeof updateTenantUserSchema>;
 

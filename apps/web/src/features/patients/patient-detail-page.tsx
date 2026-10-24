@@ -55,6 +55,12 @@ export function PatientDetailPage() {
     queryFn: () => patientsApi.findOne(patientId),
   });
 
+  const accessQuery = useQuery({
+    queryKey: ["patients", patientId, "access"],
+    queryFn: () => patientsApi.getAccess(patientId),
+    enabled: !!patientQuery.data,
+  });
+
   const dentistsQuery = useQuery({
     queryKey: ["organization", "dentists"],
     queryFn: myClinicApi.dentists,
@@ -68,6 +74,19 @@ export function PatientDetailPage() {
   });
 
   const patient = patientQuery.data;
+  const access = accessQuery.data;
+
+  const shareMutation = useMutation({
+    mutationFn: (dentistId: string) => patientsApi.share(patientId, { dentistId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["patients", patientId, "access"] }),
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: (dentistId: string) => patientsApi.revoke(patientId, dentistId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["patients", patientId, "access"] }),
+  });
+
+  const [shareSelect, setShareSelect] = useState("");
 
   const {
     register,
@@ -274,6 +293,51 @@ export function PatientDetailPage() {
         </>
       )}
 
+      {access?.canShare && (
+        <div className="rounded-lg border border-line bg-surface p-4 text-sm">
+          <h3 className="mb-3 font-medium text-ink">Acesso clínico</h3>
+          {access.activeShares && access.activeShares.length > 0 && (
+            <ul className="mb-3 space-y-1">
+              {access.activeShares.map((s) => (
+                <li key={s.dentistId} className="flex items-center justify-between">
+                  <span className="text-muted">{s.dentist.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => revokeMutation.mutate(s.dentistId)}
+                    disabled={revokeMutation.isPending}
+                    className="text-xs text-bad disabled:opacity-60"
+                  >
+                    Revogar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {access.eligibleDentists && access.eligibleDentists.length > 0 && (
+            <div className="flex gap-2">
+              <select
+                className="flex-1 rounded-md border border-line px-3 py-1.5 text-sm"
+                value={shareSelect}
+                onChange={(e) => setShareSelect(e.target.value)}
+              >
+                <option value="">Compartilhar com dentista...</option>
+                {access.eligibleDentists.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!shareSelect || shareMutation.isPending}
+                onClick={() => { if (shareSelect) { shareMutation.mutate(shareSelect); setShareSelect(""); } }}
+                className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+              >
+                Compartilhar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-4 border-b border-line">
         {tabs.map((t) => (
           <button
@@ -288,9 +352,9 @@ export function PatientDetailPage() {
         ))}
       </div>
 
-      {tab === "anamnesis" && canSeeClinical && <AnamnesisTab patientId={patientId} />}
-      {tab === "clinical-records" && canSeeClinical && <ClinicalRecordsTab patientId={patientId} />}
-      {tab === "odontogram" && canSeeClinical && <OdontogramTab patientId={patientId} />}
+      {tab === "anamnesis" && canSeeClinical && <AnamnesisTab patientId={patientId} readOnly={access ? !access.canWriteClinical : undefined} />}
+      {tab === "clinical-records" && canSeeClinical && <ClinicalRecordsTab patientId={patientId} readOnly={access ? !access.canWriteClinical : undefined} />}
+      {tab === "odontogram" && canSeeClinical && <OdontogramTab patientId={patientId} readOnly={access ? !access.canWriteClinical : undefined} />}
       {tab === "budgets" && <BudgetsTab patientId={patientId} />}
       {tab === "revisions" && (
         <div className="space-y-3">

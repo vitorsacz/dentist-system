@@ -17,14 +17,17 @@ export class BudgetsController {
 
   @Roles(...ACCESS["budgets.read"])
   @Get()
-  listByPatient(@Query("patientId") patientId: string) {
-    return this.budgetsService.listByPatient(patientId);
+  listByPatient(
+    @Query("patientId") patientId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.budgetsService.listByPatient(patientId, user);
   }
 
   @Roles(...ACCESS["budgets.read"])
   @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.budgetsService.findOne(id);
+  findOne(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.budgetsService.findOne(id, user);
   }
 
   @Roles(...ACCESS["budgets.write"])
@@ -33,7 +36,7 @@ export class BudgetsController {
     @Body(new ZodValidationPipe(createBudgetSchema)) body: CreateBudgetInput,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.budgetsService.create(body, user.id);
+    return this.budgetsService.create(body, user);
   }
 
   @Roles(...ACCESS["budgets.status"])
@@ -41,7 +44,8 @@ export class BudgetsController {
   updateStatus(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(updateBudgetStatusSchema)) body: UpdateBudgetStatusInput,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.budgetsService.updateStatus(id, body);
+    return this.budgetsService.updateStatus(id, body, user);
   }
 }

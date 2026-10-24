@@ -15,8 +15,11 @@ export class ClinicalRecordsController {
 
   @Roles(...ACCESS["clinical.read"])
   @Get()
-  listByPatient(@Param("patientId") patientId: string) {
-    return this.clinicalRecordsService.listByPatient(patientId);
+  listByPatient(
+    @Param("patientId") patientId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.clinicalRecordsService.listByPatient(patientId, user);
   }
 
   @Roles(...ACCESS["clinical.write"])
@@ -26,6 +29,6 @@ export class ClinicalRecordsController {
     @Body(new ZodValidationPipe(createClinicalRecordSchema)) body: CreateClinicalRecordInput,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.clinicalRecordsService.create(patientId, body, user.id);
+    return this.clinicalRecordsService.create(patientId, body, user);
   }
 }

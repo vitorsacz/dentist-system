@@ -171,4 +171,29 @@ describe("Platform stats (Super Admin)", () => {
     const notFound = await as(superAdminToken).get("/platform/organizations/id-inexistente");
     expect(notFound.status).toBe(404);
   });
+
+  it("type omitido cria org CLINIC; founding user é ADMIN sem DENTIST", async () => {
+    const ts = Date.now();
+    const res = await request(app.getHttpServer())
+      .post("/platform/organizations")
+      .set("Authorization", `Bearer ${superAdminToken}`)
+      .send({
+        name: `Org Default Type ${ts}`,
+        foundingAdminEmail: `default-type-${ts}@test.com`,
+        foundingAdminName: "Admin Default",
+        foundingAdminPassword: TEST_PASSWORD,
+        // type intencionalmente omitido — default deve ser CLINIC
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.type).toBe("CLINIC");
+
+    const org = await rawPrisma.organization.findUnique({ where: { id: res.body.id } });
+    expect(org?.type).toBe("CLINIC");
+
+    const foundingUser = await rawPrisma.user.findFirst({
+      where: { id: org?.foundingAdminUserId ?? "" },
+    });
+    expect(foundingUser?.roles).toContain("ADMIN");
+    expect(foundingUser?.roles).not.toContain("DENTIST");
+  });
 });

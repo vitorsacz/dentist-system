@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { upsertToothRecordSchema, type UpsertToothRecordInput } from "@dentist-system/shared-types";
+import { ApiError } from "@/lib/api-client";
 import { patientsApi, type ToothRecord } from "../api";
 
 const UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
@@ -90,7 +91,7 @@ function ToothRow({
   );
 }
 
-export function OdontogramTab({ patientId }: { patientId: string }) {
+export function OdontogramTab({ patientId, readOnly }: { patientId: string; readOnly?: boolean }) {
   const queryClient = useQueryClient();
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
 
@@ -141,6 +142,13 @@ export function OdontogramTab({ patientId }: { patientId: string }) {
   function selectTooth(tooth: number) {
     setSelectedTooth(tooth);
     setValue("toothNumber", tooth);
+  }
+
+  if (recordsQuery.error) {
+    const status = recordsQuery.error instanceof ApiError ? recordsQuery.error.status : 0;
+    if (status === 403) return <p className="p-4 text-sm text-muted">Sem permissão de acesso.</p>;
+    if (status === 404) return <p className="p-4 text-sm text-muted">Dados não encontrados.</p>;
+    return <p className="p-4 text-sm text-bad">Erro ao carregar odontograma.</p>;
   }
 
   return (
@@ -203,7 +211,7 @@ export function OdontogramTab({ patientId }: { patientId: string }) {
                   <p className="text-xs text-muted">
                     {new Date(record.updatedAt).toLocaleDateString("pt-BR")}
                   </p>
-                  {record.status === "PLANNED" && (
+                  {record.status === "PLANNED" && !readOnly && (
                     <button
                       type="button"
                       onClick={() => completeMutation.mutate(record.id)}
@@ -218,6 +226,7 @@ export function OdontogramTab({ patientId }: { patientId: string }) {
             ))}
           </div>
 
+          {!readOnly && (
           <form
             onSubmit={handleSubmit((data) => mutation.mutate(data))}
             className="h-fit space-y-4 rounded-lg border border-line bg-surface p-6"
@@ -251,6 +260,7 @@ export function OdontogramTab({ patientId }: { patientId: string }) {
               Adicionar registro
             </button>
           </form>
+          )}
         </div>
       )}
     </div>

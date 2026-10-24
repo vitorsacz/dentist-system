@@ -4,7 +4,9 @@ import type {
   PlatformOrganization,
   PlatformOrganizationDetail,
 } from "@dentist-system/shared-types";
+import { PALETTE_COLOR_TOKENS } from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
+import { Role } from "@prisma/client";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
 interface OrganizationRecord {
@@ -33,16 +35,21 @@ export class PlatformService {
 
   async createOrganization(input: CreateOrganizationInput): Promise<PlatformOrganization> {
     const passwordHash = await bcrypt.hash(input.foundingAdminPassword, 10);
+    const orgType = input.type ?? "CLINIC";
+    // FREELANCER founding user is also DENTIST — they are the sole practitioner.
+    const foundingRoles: Role[] = orgType === "FREELANCER" ? [Role.ADMIN, Role.DENTIST] : [Role.ADMIN];
+    const foundingColorToken = orgType === "FREELANCER" ? PALETTE_COLOR_TOKENS[0] : undefined;
 
     const organization = await this.prisma.$transaction(async (tx) => {
-      const org = await tx.organization.create({ data: { name: input.name } });
+      const org = await tx.organization.create({ data: { name: input.name, type: orgType } });
       const admin = await tx.user.create({
         data: {
           organizationId: org.id,
           email: input.foundingAdminEmail,
           passwordHash,
           name: input.foundingAdminName,
-          roles: ["ADMIN"],
+          roles: foundingRoles,
+          colorToken: foundingColorToken,
         },
       });
       return tx.organization.update({

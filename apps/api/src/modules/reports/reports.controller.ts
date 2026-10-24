@@ -2,6 +2,7 @@ import { Controller, Get, Query } from "@nestjs/common";
 import { ACCESS, financialReportQuerySchema, type FinancialReportQuery } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { ReportsService } from "./reports.service";
 
 @Controller("reports")
@@ -12,7 +13,8 @@ export class ReportsController {
   @Get("financial")
   financialReport(
     @Query(new ZodValidationPipe(financialReportQuerySchema)) query: FinancialReportQuery,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.reportsService.financialReport(query);
+    return this.reportsService.financialReport(query, user);
   }
 }

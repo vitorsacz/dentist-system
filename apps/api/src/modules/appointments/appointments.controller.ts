@@ -19,13 +19,16 @@ export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
   @Get()
-  list(@Query(new ZodValidationPipe(listAppointmentsQuerySchema)) query: ListAppointmentsQuery) {
-    return this.appointmentsService.list(query);
+  list(
+    @Query(new ZodValidationPipe(listAppointmentsQuerySchema)) query: ListAppointmentsQuery,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.appointmentsService.list(query, user);
   }
 
   @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.appointmentsService.findOne(id);
+  findOne(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.appointmentsService.findOne(id, user);
   }
 
   @Post()

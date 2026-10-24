@@ -3,6 +3,7 @@ import { TENANT_TYPES, ORGANIZATION_STATUSES } from "./enums";
 
 export const createOrganizationSchema = z.object({
   name: z.string().min(1),
+  type: z.enum(TENANT_TYPES).optional().default("CLINIC"),
   foundingAdminEmail: z.string().email(),
   foundingAdminName: z.string().min(1),
   foundingAdminPassword: z.string().min(8, "Senha deve ter ao menos 8 caracteres"),
