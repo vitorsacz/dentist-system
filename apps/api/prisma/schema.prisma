@@ -329,7 +329,7 @@ model Anamnesis {
   updatedAt        DateTime @updatedAt
 
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
 }
@@ -347,7 +347,7 @@ model ClinicalRecord {
   createdAt       DateTime @default(now())
 
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([patientId, date])
   @@index([organizationId])
@@ -364,7 +364,7 @@ model ToothRecord {
   updatedAt   DateTime          @updatedAt
 
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([patientId])
   @@index([organizationId])
@@ -397,7 +397,7 @@ model Budget {
   updatedAt       DateTime @updatedAt
 
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   items BudgetItem[]
 
@@ -427,7 +427,7 @@ model Appointment {
   patientId     String
   patient       Patient           @relation(fields: [patientId], references: [id], onDelete: Restrict)
   clinicId      String
-  clinic        Clinic            @relation(fields: [clinicId], references: [id])
+  clinic        Clinic            @relation(fields: [clinicId], references: [id], onDelete: Restrict)
   dentistUserId String
   dentistUser   User              @relation("AppointmentDentist", fields: [dentistUserId], references: [id], onDelete: Restrict)
   startsAt      DateTime
@@ -437,7 +437,7 @@ model Appointment {
   createdAt     DateTime          @default(now())
 
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   attendance Attendance?
 
@@ -454,7 +454,7 @@ model Attendance {
   appointmentId     String?          @unique
   appointment       Appointment?     @relation(fields: [appointmentId], references: [id])
   clinicId          String
-  clinic            Clinic           @relation(fields: [clinicId], references: [id])
+  clinic            Clinic           @relation(fields: [clinicId], references: [id], onDelete: Restrict)
   procedureId       String
   procedure         ProcedureCatalog @relation(fields: [procedureId], references: [id])
   dentistUserId     String?
@@ -469,7 +469,7 @@ model Attendance {
   createdAt       DateTime @default(now())
 
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   materialUsages MaterialUsage[]
 
@@ -535,7 +535,7 @@ model Recall {
   status    RecallStatus @default(PENDING)
 
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([patientId])
   @@index([organizationId])
