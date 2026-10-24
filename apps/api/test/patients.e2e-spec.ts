@@ -13,7 +13,6 @@ const TEST_PASSWORD = "SenhaForte12345";
 
 describe("Patients (e2e)", () => {
   let app: NestExpressApplication;
-  let adminToken: string;
   let adminUserId: string;
   let dentistToken: string;
   let dentistUserId: string;
@@ -67,9 +66,6 @@ describe("Patients (e2e)", () => {
       data: { organizationId: orgBId, email: `admin-b-${Date.now()}@test.com`, passwordHash, name: "Admin B", roles: ["ADMIN"] },
     });
     await rawPrisma.organization.update({ where: { id: orgBId }, data: { foundingAdminUserId: orgBAdmin.id } });
-
-    const loginAdmin = await request(app.getHttpServer()).post("/auth/login").send({ identifier: adminUser.email, password: TEST_PASSWORD });
-    adminToken = loginAdmin.body.accessToken;
 
     const loginDentist = await request(app.getHttpServer()).post("/auth/login").send({ identifier: dentistUser.email, password: TEST_PASSWORD });
     dentistToken = loginDentist.body.accessToken;
