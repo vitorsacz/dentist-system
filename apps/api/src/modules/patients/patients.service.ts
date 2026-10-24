@@ -22,12 +22,12 @@ export class PatientsService {
     private readonly patientAccess: PatientAccessService,
   ) {}
 
-  list(actor: AuthenticatedUser) {
-    return this.prisma.patient.findMany({
-      where: this.patientAccess.patientWhere(actor, "registry"),
-      orderBy: { name: "asc" },
-      include: ownerDentistInclude,
-    });
+  list(actor: AuthenticatedUser, ownerDentistId?: string) {
+    const where: Prisma.PatientWhereInput = {
+      ...this.patientAccess.patientWhere(actor, "registry"),
+      ...(ownerDentistId && actor.roles.includes("ADMIN") ? { ownerDentistId } : {}),
+    };
+    return this.prisma.patient.findMany({ where, orderBy: { name: "asc" }, include: ownerDentistInclude });
   }
 
   async findOne(id: string, actor?: AuthenticatedUser) {
@@ -64,7 +64,10 @@ export class PatientsService {
     });
   }
 
-  listUnassigned() {
+  async listUnassigned() {
+    const { organizationId } = getTenantContext();
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { type: true } });
+    if (org?.type === "FREELANCER") throw new ForbiddenException("Não disponível para consultórios freelancer");
     return this.prisma.patient.findMany({
       where: { ownerDentistId: null },
       orderBy: { name: "asc" },
@@ -185,13 +188,46 @@ export class PatientsService {
 
     return this.prisma.patientShare.update({
       where: { patientId_dentistId: { patientId, dentistId } },
-      data: { revokedAt: new Date() },
+      data: { revokedAt: new Date(), revokedById: actor.id },
       select: { id: true, dentistId: true, revokedAt: true },
     });
   }
 
+  async bulkReassign(fromDentistId: string, toDentistId: string | null, actor: AuthenticatedUser) {
+    const { organizationId } = getTenantContext();
+
+    const patients = await this.prisma.patient.findMany({
+      where: { ownerDentistId: fromDentistId },
+      select: { id: true, name: true, phone: true, createdByUserId: true, ownerDentistId: true, organizationId: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.patient.updateMany({
+        where: { ownerDentistId: fromDentistId },
+        data: { ownerDentistId: toDentistId },
+      });
+
+      for (const p of patients) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { organizationId: _orgId, ...snapshot } = p;
+        await tx.patientRevision.create({
+          data: {
+            patientId: p.id,
+            snapshot: snapshot as unknown as Prisma.InputJsonValue,
+            changedById: actor.id,
+            organizationId,
+          },
+        });
+      }
+    });
+
+    return { reassigned: patients.length };
+  }
+
   async claim(patientId: string, actor: AuthenticatedUser) {
     const { organizationId } = getTenantContext();
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { type: true } });
+    if (org?.type === "FREELANCER") throw new ForbiddenException("Não disponível para consultórios freelancer");
 
     const existing = await this.prisma.patient.findUnique({
       where: { id: patientId },

@@ -65,11 +65,18 @@ export function createTenantScopedClient<T extends PrismaClient>(base: T) {
 
           if (operation === "findUnique" || operation === "findUniqueOrThrow") {
             const result = (await query(args)) as { organizationId?: string } | null;
-            if (result && result.organizationId !== organizationId) {
-              if (operation === "findUniqueOrThrow") {
-                throw new NotFoundException("Registro não encontrado");
+            if (result) {
+              if (result.organizationId === undefined && process.env.NODE_ENV !== "production") {
+                throw new Error(
+                  `[tenant-isolation] findUnique on ${model}: organizationId absent from result — add \`organizationId: true\` to the select, otherwise tenant isolation silently bypasses the cross-org check`,
+                );
               }
-              return null;
+              if (result.organizationId !== organizationId) {
+                if (operation === "findUniqueOrThrow") {
+                  throw new NotFoundException("Registro não encontrado");
+                }
+                return null;
+              }
             }
             return result;
           }

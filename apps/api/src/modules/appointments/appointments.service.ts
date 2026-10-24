@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import type {
   CreateAppointmentInput,
@@ -21,24 +21,38 @@ export class AppointmentsService {
 
   list(query: ListAppointmentsQuery, actor: AuthenticatedUser) {
     const dentistOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN");
+    const baseWhere = {
+      startsAt: { gte: query.from, lte: query.to },
+      ...(query.clinicId ? { clinicId: query.clinicId } : {}),
+      ...(dentistOnly ? { dentistUserId: actor.id } : {}),
+    };
+
+    if (dentistOnly) {
+      return this.prisma.appointment.findMany({
+        where: baseWhere,
+        include: { patient: { select: { id: true, name: true, phone: true } }, clinic: true },
+        orderBy: { startsAt: "asc" },
+      });
+    }
     return this.prisma.appointment.findMany({
-      where: {
-        startsAt: { gte: query.from, lte: query.to },
-        ...(query.clinicId ? { clinicId: query.clinicId } : {}),
-        ...(dentistOnly ? { dentistUserId: actor.id } : {}),
-      },
+      where: baseWhere,
       include: { patient: true, clinic: true },
       orderBy: { startsAt: "asc" },
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actor?: AuthenticatedUser) {
     const appointment = await this.prisma.appointment.findUnique({
       where: { id },
       include: { patient: true, clinic: true },
     });
-    if (!appointment) {
-      throw new NotFoundException("Agendamento não encontrado");
+    if (!appointment) throw new NotFoundException("Agendamento não encontrado");
+
+    if (actor) {
+      const dentistOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN");
+      if (dentistOnly && appointment.dentistUserId !== actor.id) {
+        throw new NotFoundException("Agendamento não encontrado");
+      }
     }
     return appointment;
   }
@@ -53,6 +67,7 @@ export class AppointmentsService {
 
     const { organizationId } = getTenantContext();
     await this.validateDentist(input.dentistUserId, organizationId, actor);
+    await this.validateDentistForPatient(input.patientId, input.dentistUserId);
 
     try {
       return await this.prisma.appointment.create({ data: { ...input, organizationId } });
@@ -63,11 +78,12 @@ export class AppointmentsService {
   }
 
   async update(id: string, input: UpdateAppointmentInput, actor: AuthenticatedUser) {
-    const existing = await this.findOne(id);
+    const existing = await this.findOne(id, actor);
 
     if (input.dentistUserId) {
       const { organizationId } = getTenantContext();
       await this.validateDentist(input.dentistUserId, organizationId, actor);
+      await this.validateDentistForPatient(existing.patientId, input.dentistUserId);
     }
 
     // Valida endsAt > startsAt considerando os valores já gravados quando o
@@ -111,6 +127,26 @@ export class AppointmentsService {
     ) {
       throw new NotFoundException("Dentista não encontrado");
     }
+  }
+
+  // Decisão B: dentistUserId must be owner, active share holder, or patient unassigned.
+  private async validateDentistForPatient(patientId: string, dentistUserId: string): Promise<void> {
+    const patient = await this.prisma.patient.findUnique({
+      where: { id: patientId },
+      select: { ownerDentistId: true, organizationId: true },
+    });
+    if (!patient || patient.ownerDentistId === null) return;
+    if (patient.ownerDentistId === dentistUserId) return;
+
+    const activeShare = await this.prisma.patientShare.findUnique({
+      where: { patientId_dentistId: { patientId, dentistId: dentistUserId } },
+      select: { revokedAt: true, organizationId: true },
+    });
+    if (activeShare && activeShare.revokedAt === null) return;
+
+    throw new UnprocessableEntityException(
+      "O dentista designado não é responsável nem tem compartilhamento ativo para este paciente",
+    );
   }
 
   private mapCheckViolation(error: unknown): void {

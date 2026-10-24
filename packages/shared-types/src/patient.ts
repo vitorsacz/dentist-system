@@ -129,6 +129,12 @@ export const sharePatientSchema = z.object({
 });
 export type SharePatientInput = z.infer<typeof sharePatientSchema>;
 
+export const bulkReassignPatientsSchema = z.object({
+  fromDentistId: z.string().min(1),
+  toDentistId: z.string().optional(),
+});
+export type BulkReassignPatientsInput = z.infer<typeof bulkReassignPatientsSchema>;
+
 export const upsertAnamnesisSchema = z.object({
   allergies: z.string().optional(),
   medications: z.string().optional(),

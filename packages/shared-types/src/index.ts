@@ -90,6 +90,7 @@ export {
   updatePatientSchema,
   isPatientComplete,
   sharePatientSchema,
+  bulkReassignPatientsSchema,
   upsertAnamnesisSchema,
   createClinicalRecordSchema,
   type Sex,
@@ -99,6 +100,7 @@ export {
   type CreatePatientInput,
   type UpdatePatientInput,
   type SharePatientInput,
+  type BulkReassignPatientsInput,
   type UpsertAnamnesisInput,
   type CreateClinicalRecordInput,
 } from "./patient";

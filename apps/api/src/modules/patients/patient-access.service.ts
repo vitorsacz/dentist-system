@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
@@ -22,7 +22,6 @@ export class PatientAccessService {
     const hasReceptionist = actor.roles.includes("RECEPTIONIST");
 
     if (kind === "registry" && (hasAdmin || hasReceptionist)) return {};
-    if (kind === "clinicalRead" && hasAdmin) return {};
 
     if (hasDentist) {
       return {
@@ -52,7 +51,6 @@ export class PatientAccessService {
     const hasReceptionist = actor.roles.includes("RECEPTIONIST");
 
     if (kind === "registry" && (hasAdmin || hasReceptionist)) return patient;
-    if (kind === "clinicalRead" && hasAdmin) return patient;
 
     const isOwner = patient.ownerDentistId === actor.id;
     const activeShare =
@@ -65,13 +63,8 @@ export class PatientAccessService {
     const inScope = isOwner || (activeShare !== null && activeShare?.revokedAt === null);
 
     if (kind === "clinicalWrite") {
-      // canRead: ADMIN reads all; DENTIST → scope
-      const canRead = hasAdmin || (hasDentist && inScope);
-      if (!canRead) throw new NotFoundException("Paciente não encontrado");
-      // canWrite: needs DENTIST + scope
-      if (!hasDentist || !inScope) {
-        throw new ForbiddenException("Sem permissão para escrever dado clínico deste paciente");
-      }
+      // canRead/write: DENTIST + scope only (ADMIN without DENTIST loses clinicalRead — Decisão A)
+      if (!hasDentist || !inScope) throw new NotFoundException("Paciente não encontrado");
       return patient;
     }
 

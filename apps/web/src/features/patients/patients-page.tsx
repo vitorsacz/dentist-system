@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/lib/auth-context";
 import { can } from "@/lib/access";
 import { myClinicApi } from "@/features/my-clinic/api";
+import type { MyClinic } from "@dentist-system/shared-types";
 import { patientsApi } from "./api";
 
 const MARITAL_STATUS_OPTIONS = [
@@ -47,10 +48,16 @@ export function PatientsPage() {
     queryFn: myClinicApi.dentists,
     enabled: needsDentistSelect,
   });
+  const orgQuery = useQuery<MyClinic>({
+    queryKey: ["organization"],
+    queryFn: myClinicApi.get,
+    enabled: isDentist,
+  });
+  const isFreelancer = orgQuery.data?.type === "FREELANCER";
   const unassignedQuery = useQuery({
     queryKey: ["patients", "unassigned"],
     queryFn: patientsApi.listUnassigned,
-    enabled: isDentist,
+    enabled: isDentist && !isFreelancer,
   });
 
   const claimMutation = useMutation({
@@ -246,7 +253,7 @@ export function PatientsPage() {
         </table>
       </div>
 
-      {isDentist && unassignedQuery.data && unassignedQuery.data.length > 0 && (
+      {isDentist && !isFreelancer && unassignedQuery.data && unassignedQuery.data.length > 0 && (
         <div className="space-y-2">
           <h2 className="text-base font-medium text-ink">Pacientes sem responsável</h2>
           <div className="overflow-x-auto rounded-lg border border-line bg-surface">

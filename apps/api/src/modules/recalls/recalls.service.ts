@@ -30,7 +30,7 @@ export class RecallsService {
   }
 
   async updateStatus(id: string, input: UpdateRecallStatusInput, actor: AuthenticatedUser) {
-    const recall = await this.prisma.recall.findUnique({ where: { id }, select: { id: true, patientId: true } });
+    const recall = await this.prisma.recall.findUnique({ where: { id }, select: { id: true, patientId: true, organizationId: true } });
     if (!recall) throw new NotFoundException("Retorno não encontrado");
     await this.patientAccess.assertPatientAccess(recall.patientId, actor, "registry");
     return this.prisma.recall.update({ where: { id }, data: { status: input.status } });

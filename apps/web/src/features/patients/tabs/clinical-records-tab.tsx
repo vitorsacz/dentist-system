@@ -5,6 +5,7 @@ import {
   createClinicalRecordSchema,
   type CreateClinicalRecordInput,
 } from "@dentist-system/shared-types";
+import { QueryStateWrapper } from "@/lib/use-query-state";
 import { patientsApi } from "../api";
 
 export function ClinicalRecordsTab({ patientId, readOnly }: { patientId: string; readOnly?: boolean }) {
@@ -74,17 +75,21 @@ export function ClinicalRecordsTab({ patientId, readOnly }: { patientId: string;
       </form>
       )}
 
-      <div className="space-y-3">
-        {recordsQuery.data?.map((record) => (
-          <div key={record.id} className="rounded-lg border border-line bg-surface p-4">
-            <div className="flex justify-between text-sm text-muted">
-              <span>{new Date(record.date).toLocaleDateString("pt-BR")}</span>
-            </div>
-            <p className="mt-1 text-sm text-ink">{record.procedureNote}</p>
-            {record.observations && <p className="mt-1 text-sm text-muted">{record.observations}</p>}
+      <QueryStateWrapper query={recordsQuery}>
+        {(records) => (
+          <div className="space-y-3">
+            {records.map((record) => (
+              <div key={record.id} className="rounded-lg border border-line bg-surface p-4">
+                <div className="flex justify-between text-sm text-muted">
+                  <span>{new Date(record.date).toLocaleDateString("pt-BR")}</span>
+                </div>
+                <p className="mt-1 text-sm text-ink">{record.procedureNote}</p>
+                {record.observations && <p className="mt-1 text-sm text-muted">{record.observations}</p>}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )}
+      </QueryStateWrapper>
     </div>
   );
 }

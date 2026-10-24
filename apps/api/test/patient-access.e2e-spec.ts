@@ -15,7 +15,7 @@ const TEST_PASSWORD = "SenhaForte12345";
  * Personas:
  *   A  = DENTIST, dono de P1
  *   B  = DENTIST, dono de P2, não acessa P1 inicialmente
- *   Y  = ADMIN (sem DENTIST), vê tudo no registry, lê clínico, mas NÃO escreve clínico
+ *   Y  = ADMIN (sem DENTIST), vê tudo no registry, mas NÃO lê nem escreve clínico (Decisão A)
  *   R  = RECEPTIONIST
  */
 describe("PatientAccess (e2e)", () => {
@@ -38,6 +38,8 @@ describe("PatientAccess (e2e)", () => {
         srv().post(url).set("Authorization", `Bearer ${token}`).send(body),
       put: (url: string, body?: object) =>
         srv().put(url).set("Authorization", `Bearer ${token}`).send(body),
+      patch: (url: string, body?: object) =>
+        srv().patch(url).set("Authorization", `Bearer ${token}`).send(body),
       delete: (url: string) => srv().delete(url).set("Authorization", `Bearer ${token}`),
     };
   }
@@ -231,14 +233,14 @@ describe("PatientAccess (e2e)", () => {
         .expect(200);
     });
 
-    it("Y (ADMIN, no DENTIST) cannot write anamnesis of P1 → 403", async () => {
+    it("Y (ADMIN, no DENTIST) cannot write anamnesis of P1 → 403 (Decisão A: ADMIN not in clinical.write)", async () => {
       await as(tokenY)
         .put(`/patients/${p1Id}/anamnesis`, { chiefComplaint: "Y admin tentativa", allergies: "", medications: "", healthConditions: "", dentalHistory: "" })
         .expect(403);
     });
 
-    it("Y (ADMIN) can READ anamnesis of P1", async () => {
-      await as(tokenY).get(`/patients/${p1Id}/anamnesis`).expect(200);
+    it("Y (ADMIN, no DENTIST) cannot READ anamnesis of P1 → 403 (Decisão A: ADMIN removed from clinical.read)", async () => {
+      await as(tokenY).get(`/patients/${p1Id}/anamnesis`).expect(403);
     });
 
     it("B outside scope cannot read anamnesis of P1 → 404", async () => {
@@ -335,6 +337,92 @@ describe("PatientAccess (e2e)", () => {
     it("A re-shares P1 with B → 201 and B can access again", async () => {
       await as(tokenA).post(`/patients/${p1Id}/shares`, { dentistId: userBId }).expect(201);
       await as(tokenB).get(`/patients/${p1Id}/anamnesis`).expect(200);
+    });
+  });
+
+  // ── 12. Appointments scope (DENTIST restricted to own appointments) ──────────
+  describe("Appointments scope", () => {
+    let apptAId: string;
+    let apptBId: string;
+    let clinicId: string;
+
+    beforeAll(async () => {
+      const clinicRes = await as(tokenA).post("/clinics", { name: "Consultório Teste", type: "PROPRIO" }).then(async () => {
+        const list = await rawPrisma.clinic.findFirst({ where: { organizationId: orgId } });
+        return list;
+      });
+      clinicId = clinicRes?.id ?? "";
+
+      const now = new Date();
+      const start = new Date(now.getTime() + 3600_000).toISOString();
+      const end = new Date(now.getTime() + 7200_000).toISOString();
+
+      // A creates appointment for P1 with A as dentist
+      const resA = await as(tokenA).post("/appointments", {
+        patientId: p1Id,
+        dentistUserId: (await rawPrisma.user.findFirst({ where: { organizationId: orgId, roles: { has: "DENTIST" }, email: { contains: "dent-a-" } } }))?.id,
+        clinicId,
+        startsAt: start,
+        endsAt: end,
+        status: "SCHEDULED",
+      });
+      apptAId = resA.body.id as string;
+
+      const start2 = new Date(now.getTime() + 8_000_000).toISOString();
+      const end2 = new Date(now.getTime() + 10_000_000).toISOString();
+      // B creates appointment for P2 with B as dentist
+      const resB = await as(tokenB).post("/appointments", {
+        patientId: p2Id,
+        dentistUserId: userBId,
+        clinicId,
+        startsAt: start2,
+        endsAt: end2,
+        status: "SCHEDULED",
+      });
+      apptBId = resB.body.id as string;
+    });
+
+    it("A cannot GET appointment of B → 404", async () => {
+      if (!apptBId) return;
+      await as(tokenA).get(`/appointments/${apptBId}`).expect(404);
+    });
+
+    it("A cannot PATCH appointment of B → 404", async () => {
+      if (!apptBId) return;
+      await as(tokenA).patch(`/appointments/${apptBId}`, { status: "CONFIRMED" }).expect(404);
+    });
+
+    it("A can GET own appointment", async () => {
+      if (!apptAId) return;
+      await as(tokenA).get(`/appointments/${apptAId}`).expect(200);
+    });
+
+    it("Y (ADMIN) can GET any appointment", async () => {
+      if (!apptAId || !apptBId) return;
+      await as(tokenY).get(`/appointments/${apptAId}`).expect(200);
+      await as(tokenY).get(`/appointments/${apptBId}`).expect(200);
+    });
+  });
+
+  // ── 13. Recalls updateStatus scope ────────────────────────────────────────────
+  describe("Recall updateStatus scope", () => {
+    let recallByBId: string;
+
+    beforeAll(async () => {
+      // B creates a recall for P2
+      const dueDate = new Date(Date.now() + 2_000_000_000).toISOString();
+      const res = await as(tokenB).post("/recalls", { patientId: p2Id, type: "ROTINA", dueDate });
+      recallByBId = res.body.id as string;
+    });
+
+    it("A cannot update recall of B's patient → 404", async () => {
+      if (!recallByBId) return;
+      await as(tokenA).patch(`/recalls/${recallByBId}/status`, { status: "DONE" }).expect(404);
+    });
+
+    it("B can update own recall → 200", async () => {
+      if (!recallByBId) return;
+      await as(tokenB).patch(`/recalls/${recallByBId}/status`, { status: "DONE" }).expect(200);
     });
   });
 });

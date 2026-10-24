@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import {
   ACCESS,
+  bulkReassignPatientsSchema,
   createPatientSchema,
   sharePatientSchema,
   updatePatientSchema,
+  type BulkReassignPatientsInput,
   type CreatePatientInput,
   type SharePatientInput,
   type UpdatePatientInput,
@@ -19,8 +21,8 @@ export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
   @Get()
-  list(@CurrentUser() user: AuthenticatedUser) {
-    return this.patientsService.list(user);
+  list(@CurrentUser() user: AuthenticatedUser, @Query("ownerDentistId") ownerDentistId?: string) {
+    return this.patientsService.list(user, ownerDentistId);
   }
 
   // Deve vir ANTES de :id para não ser capturado como id="unassigned"
@@ -88,5 +90,14 @@ export class PatientsController {
   @Post(":id/claim")
   claim(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.patientsService.claim(id, user);
+  }
+
+  @Roles(...ACCESS["users.manage"])
+  @Post("bulk-reassign")
+  bulkReassign(
+    @Body(new ZodValidationPipe(bulkReassignPatientsSchema)) body: BulkReassignPatientsInput,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.patientsService.bulkReassign(body.fromDentistId, body.toDentistId ?? null, user);
   }
 }

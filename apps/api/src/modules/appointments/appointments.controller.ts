@@ -27,8 +27,8 @@ export class AppointmentsController {
   }
 
   @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.appointmentsService.findOne(id);
+  findOne(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.appointmentsService.findOne(id, user);
   }
 
   @Post()

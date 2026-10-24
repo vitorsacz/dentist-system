@@ -127,6 +127,7 @@ model User {
   attendancesAsDentist    Attendance[]     @relation("AttendanceDentist")
   sharedPatientsAsDentist PatientShare[]   @relation("PatientShareDentist")
   patientSharesCreated    PatientShare[]   @relation("PatientShareBy")
+  patientSharesRevoked    PatientShare[]   @relation("PatientShareRevokedBy")
 
   @@unique([organizationId, email])
 }
@@ -288,6 +289,8 @@ model PatientShare {
   sharedBy       User      @relation("PatientShareBy", fields: [sharedById], references: [id], onDelete: Restrict)
   sharedAt       DateTime  @default(now())
   revokedAt      DateTime?
+  revokedById    String?
+  revokedBy      User?     @relation("PatientShareRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 

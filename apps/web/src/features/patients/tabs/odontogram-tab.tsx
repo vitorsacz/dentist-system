@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { upsertToothRecordSchema, type UpsertToothRecordInput } from "@dentist-system/shared-types";
+import { ApiError } from "@/lib/api-client";
 import { patientsApi, type ToothRecord } from "../api";
 
 const UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
@@ -141,6 +142,13 @@ export function OdontogramTab({ patientId, readOnly }: { patientId: string; read
   function selectTooth(tooth: number) {
     setSelectedTooth(tooth);
     setValue("toothNumber", tooth);
+  }
+
+  if (recordsQuery.error) {
+    const status = recordsQuery.error instanceof ApiError ? recordsQuery.error.status : 0;
+    if (status === 403) return <p className="p-4 text-sm text-muted">Sem permissão de acesso.</p>;
+    if (status === 404) return <p className="p-4 text-sm text-muted">Dados não encontrados.</p>;
+    return <p className="p-4 text-sm text-bad">Erro ao carregar odontograma.</p>;
   }
 
   return (

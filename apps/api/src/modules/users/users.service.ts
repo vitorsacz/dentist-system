@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 import {
   PALETTE_COLOR_TOKENS,
   type CreateTenantUserInput,
@@ -7,6 +7,7 @@ import {
   type ManagedTenantUser,
 } from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
+import { Prisma } from "@prisma/client";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 import { RefreshSessionsService } from "../sessions/refresh-sessions.service";
 
@@ -120,16 +121,56 @@ export class UsersService {
       input.colorToken ??
       (nextRoles.includes("DENTIST") && !target.colorToken ? await this.nextDentistColor(organizationId) : undefined);
 
+    const { reassignTo, ...updateData } = input;
+
     const updated = await this.prisma.user.update({
       where: { id: userId },
-      data: { ...input, ...(colorToken ? { colorToken } : {}) },
+      data: { ...updateData, ...(colorToken ? { colorToken } : {}) },
     });
-    // Desativar derruba as sessões em todos os navegadores: sem isso o
-    // refresh seguiria funcionando até o token expirar.
     if (input.active === false) {
+      // Desativar derruba as sessões em todos os navegadores.
       await this.refreshSessions.revokeAllForUser(userId);
+
+      if (target.roles.includes("DENTIST")) {
+        await this.handleDentistDeactivation(userId, organizationId, reassignTo ?? null);
+      }
     }
     return toManagedTenantUser(updated);
+  }
+
+  private async handleDentistDeactivation(dentistId: string, organizationId: string, reassignTo: string | null) {
+    if (reassignTo) {
+      const target = await this.prisma.user.findFirst({ where: { id: reassignTo, organizationId, active: true, roles: { has: "DENTIST" } } });
+      if (!target) throw new UnprocessableEntityException("Dentista de destino não encontrado ou inativo");
+    }
+
+    const patients = await this.prisma.patient.findMany({
+      where: { ownerDentistId: dentistId, organizationId },
+      select: { id: true, name: true, phone: true, createdByUserId: true, ownerDentistId: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.patient.updateMany({
+        where: { ownerDentistId: dentistId, organizationId },
+        data: { ownerDentistId: reassignTo },
+      });
+
+      await tx.patientShare.updateMany({
+        where: { dentistId, revokedAt: null, organizationId },
+        data: { revokedAt: new Date(), revokedById: dentistId },
+      });
+
+      for (const p of patients) {
+        await tx.patientRevision.create({
+          data: {
+            patientId: p.id,
+            snapshot: p as unknown as Prisma.InputJsonValue,
+            changedById: dentistId,
+            organizationId,
+          },
+        });
+      }
+    });
   }
 
   private async nextDentistColor(organizationId: string) {

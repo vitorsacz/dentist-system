@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { upsertAnamnesisSchema, type UpsertAnamnesisInput } from "@dentist-system/shared-types";
-import { patientsApi } from "../api";
+import { QueryStateWrapper } from "@/lib/use-query-state";
+import { patientsApi, type Anamnesis } from "../api";
 
 const FIELDS: { name: keyof UpsertAnamnesisInput; label: string }[] = [
   { name: "chiefComplaint", label: "Queixa principal" },
@@ -13,28 +14,28 @@ const FIELDS: { name: keyof UpsertAnamnesisInput; label: string }[] = [
   { name: "dentalHistory", label: "Histórico odontológico" },
 ];
 
-export function AnamnesisTab({ patientId, readOnly }: { patientId: string; readOnly?: boolean }) {
+function AnamnesisForm({ patientId, readOnly, anamnesis }: { patientId: string; readOnly?: boolean; anamnesis: Anamnesis }) {
   const queryClient = useQueryClient();
-  const anamnesisQuery = useQuery({
-    queryKey: ["patients", patientId, "anamnesis"],
-    queryFn: () => patientsApi.getAnamnesis(patientId),
-  });
-
   const { register, handleSubmit, reset, formState } = useForm<UpsertAnamnesisInput>({
     resolver: zodResolver(upsertAnamnesisSchema),
+    defaultValues: {
+      chiefComplaint: anamnesis.chiefComplaint ?? "",
+      allergies: anamnesis.allergies ?? "",
+      medications: anamnesis.medications ?? "",
+      healthConditions: anamnesis.healthConditions ?? "",
+      dentalHistory: anamnesis.dentalHistory ?? "",
+    },
   });
 
   useEffect(() => {
-    if (anamnesisQuery.data) {
-      reset({
-        chiefComplaint: anamnesisQuery.data.chiefComplaint ?? "",
-        allergies: anamnesisQuery.data.allergies ?? "",
-        medications: anamnesisQuery.data.medications ?? "",
-        healthConditions: anamnesisQuery.data.healthConditions ?? "",
-        dentalHistory: anamnesisQuery.data.dentalHistory ?? "",
-      });
-    }
-  }, [anamnesisQuery.data, reset]);
+    reset({
+      chiefComplaint: anamnesis.chiefComplaint ?? "",
+      allergies: anamnesis.allergies ?? "",
+      medications: anamnesis.medications ?? "",
+      healthConditions: anamnesis.healthConditions ?? "",
+      dentalHistory: anamnesis.dentalHistory ?? "",
+    });
+  }, [anamnesis, reset]);
 
   const mutation = useMutation({
     mutationFn: (data: UpsertAnamnesisInput) => patientsApi.upsertAnamnesis(patientId, data),
@@ -67,5 +68,18 @@ export function AnamnesisTab({ patientId, readOnly }: { patientId: string; readO
         </button>
       )}
     </form>
+  );
+}
+
+export function AnamnesisTab({ patientId, readOnly }: { patientId: string; readOnly?: boolean }) {
+  const anamnesisQuery = useQuery({
+    queryKey: ["patients", patientId, "anamnesis"],
+    queryFn: () => patientsApi.getAnamnesis(patientId),
+  });
+
+  return (
+    <QueryStateWrapper query={anamnesisQuery}>
+      {(data) => <AnamnesisForm patientId={patientId} readOnly={readOnly} anamnesis={data} />}
+    </QueryStateWrapper>
   );
 }

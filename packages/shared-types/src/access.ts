@@ -24,7 +24,7 @@ export const ACCESS = {
 
   // Dado clínico: anamnese, prontuário/evolução, odontograma.
   // Leitura: ADMIN lê tudo (sem escopo de dentista). Escrita: DENTIST + escopo.
-  "clinical.read": ["ADMIN", "DENTIST"],
+  "clinical.read": ["DENTIST"],
   "clinical.write": ["DENTIST"],
 
   "appointments.manage": ["ADMIN", "DENTIST", "RECEPTIONIST"],
