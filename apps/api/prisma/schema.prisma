@@ -108,6 +108,8 @@ model User {
   createdBudgets         Budget[]         @relation("BudgetCreatedBy")
   createdAttendances     Attendance[]     @relation("AttendanceCreatedBy")
   refreshSessions        RefreshSession[]
+  appointmentsAsDentist  Appointment[]    @relation("AppointmentDentist")
+  attendancesAsDentist   Attendance[]     @relation("AttendanceDentist")
 
   @@unique([organizationId, email])
 }
@@ -348,15 +350,18 @@ model BudgetItem {
 }
 
 model Appointment {
-  id        String            @id @default(cuid())
-  patientId String
-  patient   Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  clinicId  String
-  clinic    Clinic            @relation(fields: [clinicId], references: [id])
-  startsAt  DateTime
-  status    AppointmentStatus @default(SCHEDULED)
-  notes     String?
-  createdAt DateTime          @default(now())
+  id            String            @id @default(cuid())
+  patientId     String
+  patient       Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  clinicId      String
+  clinic        Clinic            @relation(fields: [clinicId], references: [id])
+  dentistUserId String
+  dentistUser   User              @relation("AppointmentDentist", fields: [dentistUserId], references: [id], onDelete: Restrict)
+  startsAt      DateTime
+  endsAt        DateTime
+  status        AppointmentStatus @default(SCHEDULED)
+  notes         String?
+  createdAt     DateTime          @default(now())
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -365,6 +370,8 @@ model Appointment {
 
   @@index([clinicId, startsAt])
   @@index([organizationId])
+  @@index([patientId])
+  @@index([dentistUserId])
 }
 
 model Attendance {
@@ -377,6 +384,8 @@ model Attendance {
   clinic            Clinic           @relation(fields: [clinicId], references: [id])
   procedureId       String
   procedure         ProcedureCatalog @relation(fields: [procedureId], references: [id])
+  dentistUserId     String?
+  dentistUser       User?            @relation("AttendanceDentist", fields: [dentistUserId], references: [id], onDelete: Restrict)
   date              DateTime
   grossValue        Decimal          @db.Decimal(10, 2)
   repassePercentage Decimal          @db.Decimal(5, 2)
@@ -393,6 +402,8 @@ model Attendance {
 
   @@index([clinicId, date])
   @@index([organizationId])
+  @@index([patientId])
+  @@index([dentistUserId])
 }
 
 model Material {
