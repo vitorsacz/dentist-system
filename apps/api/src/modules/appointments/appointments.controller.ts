@@ -10,6 +10,7 @@ import {
 } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { AppointmentsService } from "./appointments.service";
 
 @Controller("appointments")
@@ -28,15 +29,19 @@ export class AppointmentsController {
   }
 
   @Post()
-  create(@Body(new ZodValidationPipe(createAppointmentSchema)) body: CreateAppointmentInput) {
-    return this.appointmentsService.create(body);
+  create(
+    @Body(new ZodValidationPipe(createAppointmentSchema)) body: CreateAppointmentInput,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.appointmentsService.create(body, user);
   }
 
   @Patch(":id")
   update(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(updateAppointmentSchema)) body: UpdateAppointmentInput,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.appointmentsService.update(id, body);
+    return this.appointmentsService.update(id, body, user);
   }
 }

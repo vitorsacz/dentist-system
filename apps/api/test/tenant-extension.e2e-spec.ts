@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { createTenantScopedClient } from "../src/prisma/tenant.extension";
 import { runWithTenantContext } from "../src/prisma/tenant-context";
 import { TEST_DATABASE_URL } from "./test-db";
+import { teardownAll } from "./helpers/teardown";
 
 const base = new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL } } });
 const prisma = createTenantScopedClient(base);
@@ -22,18 +23,17 @@ describe("Prisma tenant isolation extension", () => {
   let userA: { id: string };
 
   beforeAll(async () => {
-    await base.organization.deleteMany({});
-    await base.user.deleteMany({});
+    await teardownAll(base);
     orgA = await base.organization.create({ data: { name: "Org A (teste)" } });
     orgB = await base.organization.create({ data: { name: "Org B (teste)" } });
     userA = await base.user.create({
-      data: { email: `user-a-${Date.now()}@test.com`, passwordHash: "x", name: "Usuário A" },
+      // organizationId obrigatório desde a Migration 3 (CHECK User_identity_check)
+      data: { organizationId: orgA.id, email: `user-a-${Date.now()}@test.com`, passwordHash: "x", name: "Usuário A" },
     });
   });
 
   afterAll(async () => {
-    await base.organization.deleteMany({});
-    await base.user.deleteMany({});
+    await teardownAll(base);
     await base.$disconnect();
   });
 
