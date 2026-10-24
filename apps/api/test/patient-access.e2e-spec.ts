@@ -24,6 +24,7 @@ describe("PatientAccess (e2e)", () => {
   let tokenB: string;
   let tokenY: string;
   let tokenR: string;
+  let userAId: string;
   let userBId: string;
   let orgId: string;
   let p1Id: string; // owned by A
@@ -65,6 +66,7 @@ describe("PatientAccess (e2e)", () => {
     const uA = await rawPrisma.user.create({
       data: { organizationId: orgId, email: `dent-a-${ts}@test.com`, passwordHash: hash, name: "Dentista A", roles: ["DENTIST"] },
     });
+    userAId = uA.id;
     const uB = await rawPrisma.user.create({
       data: { organizationId: orgId, email: `dent-b-${ts}@test.com`, passwordHash: hash, name: "Dentista B", roles: ["DENTIST"] },
     });
@@ -423,6 +425,209 @@ describe("PatientAccess (e2e)", () => {
     it("B can update own recall → 200", async () => {
       if (!recallByBId) return;
       await as(tokenB).patch(`/recalls/${recallByBId}/status`, { status: "DONE" }).expect(200);
+    });
+  });
+
+  // ── 14. FREELANCER org — founding user has ADMIN+DENTIST ─────────────────────
+  describe("FREELANCER org — founding user (ADMIN+DENTIST)", () => {
+    let freelancerToken: string;
+    let freelancerUserId: string;
+    let freelancerOrgId: string;
+    let freelancerPatientId: string;
+    let freelancerClinicId: string;
+
+    beforeAll(async () => {
+      const hash = await bcrypt.hash(TEST_PASSWORD, 10);
+      const ts = Date.now() + 100;
+
+      // Simulate real onboarding: FREELANCER org founding user gets ADMIN+DENTIST.
+      const org = await rawPrisma.organization.create({ data: { name: "Freelancer Test Org", type: "FREELANCER" } });
+      freelancerOrgId = org.id;
+      const founder = await rawPrisma.user.create({
+        data: {
+          organizationId: freelancerOrgId,
+          email: `freelancer-${ts}@test.com`,
+          passwordHash: hash,
+          name: "Freelancer Dr",
+          roles: ["ADMIN", "DENTIST"],
+          colorToken: "BRAND",
+        },
+      });
+      freelancerUserId = founder.id;
+      await rawPrisma.organization.update({ where: { id: freelancerOrgId }, data: { foundingAdminUserId: founder.id } });
+
+      const loginRes = await request(app.getHttpServer())
+        .post("/auth/login")
+        .send({ identifier: founder.email, password: TEST_PASSWORD });
+      freelancerToken = loginRes.body.accessToken as string;
+
+      const clinicRes = await as(freelancerToken).post("/clinics", { name: "Consultório Freelancer", type: "OWN" });
+      freelancerClinicId = clinicRes.body.id as string;
+    }, 15000);
+
+    it("founding user can create patient → ownerDentist = self", async () => {
+      const res = await as(freelancerToken)
+        .post("/patients", { name: "Paciente Freelancer", phone: "11999999901" })
+        .expect(201);
+      expect(res.body.ownerDentist?.id).toBe(freelancerUserId);
+      freelancerPatientId = res.body.id as string;
+    });
+
+    it("founding user can read anamnesis (has DENTIST role)", async () => {
+      await as(freelancerToken).get(`/patients/${freelancerPatientId}/anamnesis`).expect(200);
+    });
+
+    it("founding user can write anamnesis", async () => {
+      await as(freelancerToken)
+        .put(`/patients/${freelancerPatientId}/anamnesis`, {
+          chiefComplaint: "Dor",
+          allergies: "",
+          medications: "",
+          healthConditions: "",
+          dentalHistory: "",
+        })
+        .expect(200);
+    });
+
+    it("founding user can create appointment with dentistUserId = self", async () => {
+      const now = new Date();
+      await as(freelancerToken)
+        .post("/appointments", {
+          patientId: freelancerPatientId,
+          dentistUserId: freelancerUserId,
+          clinicId: freelancerClinicId,
+          startsAt: new Date(now.getTime() + 3_600_000).toISOString(),
+          endsAt: new Date(now.getTime() + 7_200_000).toISOString(),
+          status: "SCHEDULED",
+        })
+        .expect(201);
+    });
+
+    it("founding user can create and read recalls", async () => {
+      const dueDate = new Date(Date.now() + 86_400_000).toISOString();
+      await as(freelancerToken).post("/recalls", { patientId: freelancerPatientId, type: "ROTINA", dueDate }).expect(201);
+      const res = await as(freelancerToken).get("/recalls").expect(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThan(0);
+    });
+
+    it("FREELANCER org: listUnassigned → 403", async () => {
+      await as(freelancerToken).get("/patients/unassigned").expect(403);
+    });
+
+    it("FREELANCER org: claim → 403", async () => {
+      await as(freelancerToken).post(`/patients/${freelancerPatientId}/claim`).expect(403);
+    });
+  });
+
+  // ── 15. DENTIST deactivation — atomicidade e reatribuição ─────────────────────
+  describe("DENTIST deactivation", () => {
+    let dentistDId: string;
+    let deactivatePatientId: string;
+    let deactivateApptId: string;
+
+    beforeAll(async () => {
+      const hash = await bcrypt.hash(TEST_PASSWORD, 10);
+      const ts = Date.now() + 200;
+
+      const uD = await rawPrisma.user.create({
+        data: { organizationId: orgId, email: `dent-d-${ts}@test.com`, passwordHash: hash, name: "Dentista D", roles: ["DENTIST"] },
+      });
+      dentistDId = uD.id;
+
+      const p = await rawPrisma.patient.create({
+        data: { organizationId: orgId, name: "Paciente D", phone: `119${ts}`.slice(0, 11), createdByUserId: uD.id, ownerDentistId: uD.id },
+      });
+      deactivatePatientId = p.id;
+
+      // Create a share from D with A
+      await rawPrisma.patientShare.create({
+        data: { organizationId: orgId, patientId: p.id, dentistId: userAId, sharedById: uD.id },
+      });
+
+      const clinic = await rawPrisma.clinic.create({
+        data: { organizationId: orgId, name: "Consultório Deactivation", type: "OWN" },
+      });
+      const now = new Date();
+      const appt = await rawPrisma.appointment.create({
+        data: {
+          organizationId: orgId,
+          patientId: p.id,
+          dentistUserId: uD.id,
+          clinicId: clinic.id,
+          startsAt: new Date(now.getTime() + 86_400_000),
+          endsAt: new Date(now.getTime() + 90_000_000),
+          status: "SCHEDULED",
+        },
+      });
+      deactivateApptId = appt.id;
+    }, 15000);
+
+    it("409 when future appointments exist and no reassignTo — user stays active", async () => {
+      const res = await as(tokenY)
+        .patch(`/users/${dentistDId}`, { active: false })
+        .expect(409);
+      expect(res.body.message).toMatch(/agendamento/i);
+
+      const user = await rawPrisma.user.findUnique({ where: { id: dentistDId } });
+      expect(user?.active).toBe(true);
+    });
+
+    it("422 when reassignTo === dentistId (self-reassign)", async () => {
+      await as(tokenY)
+        .patch(`/users/${dentistDId}`, { active: false, reassignTo: dentistDId })
+        .expect(422);
+    });
+
+    it("reassignTo moves patients + future appointments + revokes shares atomically", async () => {
+      await as(tokenY)
+        .patch(`/users/${dentistDId}`, { active: false, reassignTo: userAId })
+        .expect(200);
+
+      const user = await rawPrisma.user.findUnique({ where: { id: dentistDId } });
+      expect(user?.active).toBe(false);
+
+      const patient = await rawPrisma.patient.findUnique({ where: { id: deactivatePatientId } });
+      expect(patient?.ownerDentistId).toBe(userAId);
+
+      const appt = await rawPrisma.appointment.findUnique({ where: { id: deactivateApptId } });
+      expect(appt?.dentistUserId).toBe(userAId);
+
+      const share = await rawPrisma.patientShare.findFirst({
+        where: { patientId: deactivatePatientId, dentistId: userAId },
+      });
+      expect(share?.revokedAt).not.toBeNull();
+    });
+  });
+
+  // ── 16. bulk-reassign — isolamento entre orgs ─────────────────────────────────
+  describe("bulk-reassign cross-org isolation", () => {
+    let orgBId: string;
+    let dentistOrgBId: string;
+
+    beforeAll(async () => {
+      const hash = await bcrypt.hash(TEST_PASSWORD, 10);
+      const ts = Date.now() + 300;
+
+      const orgB = await rawPrisma.organization.create({ data: { name: "Org B Isolamento" } });
+      orgBId = orgB.id;
+      const uOrgB = await rawPrisma.user.create({
+        data: { organizationId: orgBId, email: `dent-orgb-${ts}@test.com`, passwordHash: hash, name: "Dentista Org B", roles: ["DENTIST"] },
+      });
+      dentistOrgBId = uOrgB.id;
+    }, 10000);
+
+    it("ADMIN da org A com toDentistId da org B → 404 (dentista não pertence ao tenant)", async () => {
+      await as(tokenY)
+        .post("/patients/bulk-reassign", { fromDentistId: userBId, toDentistId: dentistOrgBId })
+        .expect(404);
+    });
+
+    it("fromDentistId de outra org → 0 afetados (tenant extension filtra)", async () => {
+      const res = await as(tokenY)
+        .post("/patients/bulk-reassign", { fromDentistId: dentistOrgBId })
+        .expect(201);
+      expect(res.body.reassigned).toBe(0);
     });
   });
 });
