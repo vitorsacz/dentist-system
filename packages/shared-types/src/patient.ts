@@ -105,7 +105,7 @@ export const updatePatientSchema = z.object({
 export type UpdatePatientInput = z.infer<typeof updatePatientSchema>;
 
 export function isPatientComplete(patient: {
-  birthDate?: Date | null;
+  birthDate?: Date | string | null;
   sex?: string | null;
   maritalStatus?: string | null;
   profession?: string | null;

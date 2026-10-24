@@ -113,7 +113,7 @@ export function PatientsPage() {
               >
                 <option value="">Selecionar dentista</option>
                 {dentistsQuery.data?.map((d) => (
-                  <option key={d.id} value={d.id}>
+                  <option key={d.userId} value={d.userId}>
                     {d.name}
                   </option>
                 ))}

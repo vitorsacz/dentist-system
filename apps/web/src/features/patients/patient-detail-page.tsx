@@ -155,7 +155,7 @@ export function PatientDetailPage() {
               <select className="w-full rounded-md border border-line px-3 py-2 text-sm" {...register("ownerDentistId")}>
                 <option value="">Sem responsável</option>
                 {dentistsQuery.data?.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                  <option key={d.userId} value={d.userId}>{d.name}</option>
                 ))}
               </select>
             </div>
