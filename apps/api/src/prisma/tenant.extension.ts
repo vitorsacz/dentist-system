@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { Logger, NotFoundException } from "@nestjs/common";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { getTenantContext } from "./tenant-context";
 
@@ -66,10 +66,17 @@ export function createTenantScopedClient<T extends PrismaClient>(base: T) {
           if (operation === "findUnique" || operation === "findUniqueOrThrow") {
             const result = (await query(args)) as { organizationId?: string } | null;
             if (result) {
-              if (result.organizationId === undefined && process.env.NODE_ENV !== "production") {
-                throw new Error(
-                  `[tenant-isolation] findUnique on ${model}: organizationId absent from result — add \`organizationId: true\` to the select, otherwise tenant isolation silently bypasses the cross-org check`,
+              if (result.organizationId === undefined) {
+                if (process.env.NODE_ENV !== "production") {
+                  throw new Error(
+                    `[tenant-isolation] findUnique on ${model}: organizationId absent from result — add \`organizationId: true\` to the select, otherwise tenant isolation silently bypasses the cross-org check`,
+                  );
+                }
+                Logger.warn(
+                  `[tenant-isolation] findUnique on ${model} (op: ${operation}): organizationId absent from result — returning null`,
+                  "TenantExtension",
                 );
+                return null;
               }
               if (result.organizationId !== organizationId) {
                 if (operation === "findUniqueOrThrow") {
