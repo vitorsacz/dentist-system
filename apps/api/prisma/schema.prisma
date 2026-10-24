@@ -190,6 +190,7 @@ model Clinic {
   id             String             @id @default(cuid())
   name           String
   type           ClinicType
+  active         Boolean            @default(true)
   dailyRentValue Decimal?           @db.Decimal(10, 2)
   colorToken     PaletteColorToken?
   createdAt      DateTime           @default(now())
@@ -252,6 +253,7 @@ model Patient {
   cpf           String?
   preferredDrink String?
   preferredMusic String?
+  active        Boolean  @default(true)
 
   ownerDentistId String?
   ownerDentist   User?    @relation("PatientOwner", fields: [ownerDentistId], references: [id], onDelete: SetNull)
@@ -262,7 +264,7 @@ model Patient {
   updatedAt       DateTime @updatedAt
 
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   anamnesis       Anamnesis?
   clinicalRecords ClinicalRecord[]
@@ -318,7 +320,7 @@ model PatientRevision {
 model Anamnesis {
   id               String   @id @default(cuid())
   patientId        String   @unique
-  patient          Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient          Patient  @relation(fields: [patientId], references: [id], onDelete: Restrict)
   allergies        String?
   medications      String?
   healthConditions String?
@@ -335,7 +337,7 @@ model Anamnesis {
 model ClinicalRecord {
   id            String   @id @default(cuid())
   patientId     String
-  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Restrict)
   date          DateTime
   procedureNote String
   observations  String?
@@ -354,7 +356,7 @@ model ClinicalRecord {
 model ToothRecord {
   id          String            @id @default(cuid())
   patientId   String
-  patient     Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient     Patient           @relation(fields: [patientId], references: [id], onDelete: Restrict)
   toothNumber Int
   procedure   String
   status      ToothRecordStatus
@@ -386,7 +388,7 @@ model ProcedureCatalog {
 model Budget {
   id        String       @id @default(cuid())
   patientId String
-  patient   Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient   Patient      @relation(fields: [patientId], references: [id], onDelete: Restrict)
   status    BudgetStatus @default(PENDING)
 
   createdByUserId String
@@ -416,13 +418,14 @@ model BudgetItem {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@index([budgetId])
   @@index([organizationId])
 }
 
 model Appointment {
   id            String            @id @default(cuid())
   patientId     String
-  patient       Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient       Patient           @relation(fields: [patientId], references: [id], onDelete: Restrict)
   clinicId      String
   clinic        Clinic            @relation(fields: [clinicId], references: [id])
   dentistUserId String
@@ -447,7 +450,7 @@ model Appointment {
 model Attendance {
   id                String           @id @default(cuid())
   patientId         String
-  patient           Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient           Patient          @relation(fields: [patientId], references: [id], onDelete: Restrict)
   appointmentId     String?          @unique
   appointment       Appointment?     @relation(fields: [appointmentId], references: [id])
   clinicId          String
@@ -519,13 +522,14 @@ model MaterialUsage {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@index([attendanceId])
   @@index([organizationId])
 }
 
 model Recall {
   id        String       @id @default(cuid())
   patientId String
-  patient   Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient   Patient      @relation(fields: [patientId], references: [id], onDelete: Restrict)
   dueDate   DateTime
   reason    String?
   status    RecallStatus @default(PENDING)
