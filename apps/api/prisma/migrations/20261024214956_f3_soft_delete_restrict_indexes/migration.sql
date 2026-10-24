@@ -17,6 +17,18 @@ ALTER TABLE "ClinicalRecord" DROP CONSTRAINT "ClinicalRecord_patientId_fkey";
 ALTER TABLE "Patient" DROP CONSTRAINT "Patient_organizationId_fkey";
 
 -- DropForeignKey
+ALTER TABLE "PatientRevision" DROP CONSTRAINT "PatientRevision_organizationId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "PatientRevision" DROP CONSTRAINT "PatientRevision_patientId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "PatientShare" DROP CONSTRAINT "PatientShare_organizationId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "PatientShare" DROP CONSTRAINT "PatientShare_patientId_fkey";
+
+-- DropForeignKey
 ALTER TABLE "Recall" DROP CONSTRAINT "Recall_patientId_fkey";
 
 -- DropForeignKey
@@ -36,6 +48,18 @@ CREATE INDEX "MaterialUsage_attendanceId_idx" ON "MaterialUsage"("attendanceId")
 
 -- AddForeignKey
 ALTER TABLE "Patient" ADD CONSTRAINT "Patient_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PatientShare" ADD CONSTRAINT "PatientShare_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PatientShare" ADD CONSTRAINT "PatientShare_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PatientRevision" ADD CONSTRAINT "PatientRevision_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PatientRevision" ADD CONSTRAINT "PatientRevision_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Anamnesis" ADD CONSTRAINT "Anamnesis_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

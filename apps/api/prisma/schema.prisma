@@ -284,7 +284,7 @@ model Patient {
 model PatientShare {
   id             String    @id @default(cuid())
   patientId      String
-  patient        Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient        Patient   @relation(fields: [patientId], references: [id], onDelete: Restrict)
   dentistId      String
   dentist        User      @relation("PatientShareDentist", fields: [dentistId], references: [id], onDelete: Cascade)
   sharedById     String
@@ -294,7 +294,7 @@ model PatientShare {
   revokedById    String?
   revokedBy      User?     @relation("PatientShareRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@unique([patientId, dentistId])
   @@index([dentistId])
@@ -304,14 +304,14 @@ model PatientShare {
 model PatientRevision {
   id          String   @id @default(cuid())
   patientId   String
-  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Restrict)
   snapshot    Json
   changedById String
   changedBy   User     @relation("PatientRevisionChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
   changedAt   DateTime @default(now())
 
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([patientId])
   @@index([organizationId])
