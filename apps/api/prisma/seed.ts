@@ -1,7 +1,11 @@
 import { PrismaClient, type Role } from "@prisma/client";
 import * as bcrypt from "bcrypt";
+import { seedHmlPersonas } from "./scripts/seed-test-personas";
+import { chooseSeed } from "./seed-dispatch";
 
 const prisma = new PrismaClient();
+
+const APP_ENV = process.env.APP_ENV ?? "dev";
 
 const DEFAULT_ORG_NAME = "Consultório Padrão";
 
@@ -69,7 +73,7 @@ async function seedTenantUser(
   return user;
 }
 
-async function main() {
+async function seedDev() {
   await seedSuperAdmin();
 
   let org = await prisma.organization.findFirst({ where: { name: DEFAULT_ORG_NAME } });
@@ -78,7 +82,9 @@ async function main() {
     console.log(`Organização padrão criada: ${org.id}`);
   }
 
-  // ADMIN seedado vira o admin fundador da organização padrão (capitania).
+  // TODO: em APP_ENV=prod o bootstrap deveria criar apenas o Super Admin,
+  // sem admin/dentista de teste. Implementar quando hml tiver fluxo de
+  // onboarding que dispensa o seed de admin.
   const admin = await seedTenantUser(org.id, "ADMIN", "SEED_ADMIN_EMAIL", "SEED_ADMIN_PASSWORD", "SEED_ADMIN_NAME", "Admin");
   if (admin && !org.foundingAdminUserId) {
     await prisma.organization.update({ where: { id: org.id }, data: { foundingAdminUserId: admin.id } });
@@ -93,6 +99,16 @@ async function main() {
     if (!existingProcedure) {
       await prisma.procedureCatalog.create({ data: { ...procedure, organizationId: org.id } });
     }
+  }
+}
+
+async function main() {
+  if (chooseSeed(APP_ENV) === "hml") {
+    await seedHmlPersonas(prisma);
+  } else {
+    // dev e prod: bootstrap com SEED_* vars. É idempotente — reruns são seguros.
+    // seedHmlPersonas (dados fictícios) nunca é chamado fora de APP_ENV=hml.
+    await seedDev();
   }
 }
 

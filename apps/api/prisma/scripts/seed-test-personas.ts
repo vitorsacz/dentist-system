@@ -1,27 +1,33 @@
 import { PrismaClient, type Role } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 
-const prisma = new PrismaClient();
-const PASSWORD = "senha123456";
+const HML_PASSWORD = "senha123456";
 
-async function findOrCreateOrg(name: string, type: "CLINIC" | "FREELANCER") {
+async function findOrCreateOrg(prisma: PrismaClient, name: string, type: "CLINIC" | "FREELANCER") {
   const existing = await prisma.organization.findFirst({ where: { name } });
   if (existing) return existing;
   return prisma.organization.create({ data: { name, type } });
 }
 
-async function findOrCreateUser(organizationId: string, email: string, name: string, role: Role) {
+async function findOrCreateUser(
+  prisma: PrismaClient,
+  organizationId: string,
+  email: string,
+  name: string,
+  role: Role,
+) {
   const existing = await prisma.user.findFirst({ where: { organizationId, email } });
   if (existing) return existing;
-  const passwordHash = await bcrypt.hash(PASSWORD, 10);
+  const passwordHash = await bcrypt.hash(HML_PASSWORD, 10);
   return prisma.user.create({ data: { organizationId, email, passwordHash, name, roles: [role] } });
 }
 
-async function main() {
+export async function seedHmlPersonas(prisma: PrismaClient) {
   // Freelancer: tenant próprio, usuário único, gerencia os próprios
   // consultórios (multi-local).
-  const freelancerOrg = await findOrCreateOrg("Dra. Freelancer Teste", "FREELANCER");
+  const freelancerOrg = await findOrCreateOrg(prisma, "Dra. Freelancer Teste", "FREELANCER");
   const freelancerUser = await findOrCreateUser(
+    prisma,
     freelancerOrg.id,
     "freelancer@example.com",
     "Dra. Freelancer Teste",
@@ -39,10 +45,17 @@ async function main() {
 
   // Clínica: tenant com admin fundador + dentista de equipe + recepcionista,
   // consultório fixo (não pode adicionar novos — ver Roadmap/Arquitetura).
-  const clinicOrg = await findOrCreateOrg("Clínica Teste RBAC", "CLINIC");
-  const adminUser = await findOrCreateUser(clinicOrg.id, "admin-clinica@example.com", "Admin Clínica Teste", "ADMIN");
-  await findOrCreateUser(clinicOrg.id, "dentista-clinica@example.com", "Dr. Dentista Clínica Teste", "DENTIST");
+  const clinicOrg = await findOrCreateOrg(prisma, "Clínica Teste RBAC", "CLINIC");
+  const adminUser = await findOrCreateUser(
+    prisma,
+    clinicOrg.id,
+    "admin-clinica@example.com",
+    "Admin Clínica Teste",
+    "ADMIN",
+  );
+  await findOrCreateUser(prisma, clinicOrg.id, "dentista-clinica@example.com", "Dr. Dentista Clínica Teste", "DENTIST");
   await findOrCreateUser(
+    prisma,
     clinicOrg.id,
     "recepcao-clinica@example.com",
     "Recepcionista Clínica Teste",
@@ -68,9 +81,13 @@ async function main() {
   console.log(`  Clínica RECEPTIONIST: recepcao-clinica@example.com`);
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+// Permite rodar diretamente: tsx seed-test-personas.ts
+if (require.main === module || process.argv[1]?.endsWith("seed-test-personas.ts")) {
+  const prisma = new PrismaClient();
+  seedHmlPersonas(prisma)
+    .catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}
