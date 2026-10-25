@@ -57,7 +57,7 @@ export function resolveCalendarAxis(organizationType: TenantType, canListDentist
   return canListDentists ? "dentist" : "none";
 }
 
-export function useAgendaData(currentUser: CurrentUser | null, from: Date, to: Date) {
+export function useAgendaData(currentUser: CurrentUser | null, from: Date, to: Date, clinicId?: string) {
   const orgQuery = useQuery({ queryKey: ["my-clinic"], queryFn: myClinicApi.get });
   const clinicsQuery = useQuery({ queryKey: ["clinics"], queryFn: () => clinicsApi.list() });
 
@@ -74,8 +74,8 @@ export function useAgendaData(currentUser: CurrentUser | null, from: Date, to: D
   });
 
   const appointmentsQuery = useQuery({
-    queryKey: ["appointments", from.toISOString(), to.toISOString()],
-    queryFn: () => appointmentsApi.list({ from, to }),
+    queryKey: ["appointments", from.toISOString(), to.toISOString(), clinicId],
+    queryFn: () => appointmentsApi.list({ from, to, clinicId }),
   });
 
   const locations: MockLocation[] = useMemo(() => {
@@ -91,7 +91,7 @@ export function useAgendaData(currentUser: CurrentUser | null, from: Date, to: D
     if (axis !== "dentist") return [];
     const roster = dentistsQuery.data ?? [];
     return roster.map((dentist, index) => ({
-      id: dentist.userId,
+      id: dentist.id,
       name: dentist.name,
       colorToken: fromApiColorToken(dentist.colorToken) ?? locationColorForIndex(index),
     }));

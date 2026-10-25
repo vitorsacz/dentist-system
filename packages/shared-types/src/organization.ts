@@ -22,8 +22,10 @@ export type MyClinic = z.infer<typeof myClinicSchema>;
 // inclusive DENTIST; este aqui é ADMIN/RECEPTIONIST only, ver
 // OrganizationController). Só dentistas ativos.
 export const organizationDentistSchema = z.object({
-  userId: z.string(),
+  id: z.string(),
   name: z.string(),
+  nickname: z.string().nullable(),
   colorToken: z.enum(PALETTE_COLOR_TOKENS).nullable(),
+  active: z.boolean(),
 });
 export type OrganizationDentist = z.infer<typeof organizationDentistSchema>;

@@ -37,12 +37,15 @@ export class OrganizationService {
   async findDentists(organizationId: string): Promise<OrganizationDentist[]> {
     const dentists = await this.prisma.user.findMany({
       where: { organizationId, roles: { has: "DENTIST" }, active: true },
+      select: { id: true, name: true, nickname: true, colorToken: true, active: true },
       orderBy: { name: "asc" },
     });
     return dentists.map((user) => ({
-      userId: user.id,
+      id: user.id,
       name: user.name,
+      nickname: user.nickname,
       colorToken: user.colorToken as OrganizationDentist["colorToken"],
+      active: user.active,
     }));
   }
 }

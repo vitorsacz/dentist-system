@@ -47,7 +47,8 @@ function initialWeekRange(): { from: Date; to: Date } {
 export function AgendaPage() {
   const { user } = useAuth();
   const [visibleRange, setVisibleRange] = useState(initialWeekRange);
-  const mock = useAgendaData(user, visibleRange.from, visibleRange.to);
+  const [selectedClinicId, setSelectedClinicId] = useState<string | undefined>(undefined);
+  const mock = useAgendaData(user, visibleRange.from, visibleRange.to, selectedClinicId);
   const queryClient = useQueryClient();
   const calendarRef = useRef<FullCalendar>(null);
 
@@ -251,7 +252,9 @@ export function AgendaPage() {
           <CalendarSidebar
             locations={mock.locations}
             hiddenLocationIds={hiddenLocationIds}
+            selectedClinicId={selectedClinicId}
             onToggle={toggleLocation}
+            onSelectClinic={setSelectedClinicId}
             onAddLocation={handleAddLocation}
             onChangeColor={handleChangeLocationColor}
           />
