@@ -82,7 +82,9 @@ async function seedDev() {
     console.log(`Organização padrão criada: ${org.id}`);
   }
 
-  // ADMIN seedado vira o admin fundador da organização padrão (capitania).
+  // TODO: em APP_ENV=prod o bootstrap deveria criar apenas o Super Admin,
+  // sem admin/dentista de teste. Implementar quando hml tiver fluxo de
+  // onboarding que dispensa o seed de admin.
   const admin = await seedTenantUser(org.id, "ADMIN", "SEED_ADMIN_EMAIL", "SEED_ADMIN_PASSWORD", "SEED_ADMIN_NAME", "Admin");
   if (admin && !org.foundingAdminUserId) {
     await prisma.organization.update({ where: { id: org.id }, data: { foundingAdminUserId: admin.id } });

@@ -18,8 +18,6 @@ services:
         value: none
       - key: COOKIE_SECURE
         value: "true"
-      - key: COMMIT_SHA
-        sync: false
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL

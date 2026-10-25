@@ -38,5 +38,11 @@ export const envSchema = z
 export type Env = z.infer<typeof envSchema>;
 
 export function validateEnv(config: Record<string, unknown>): Env {
-  return envSchema.parse(config);
+  const isProd = config.NODE_ENV === "production";
+  return envSchema.parse({
+    COOKIE_SAMESITE: config.COOKIE_SAMESITE ?? (isProd ? "none" : "lax"),
+    COOKIE_SECURE: config.COOKIE_SECURE ?? (isProd ? "true" : "false"),
+    ...config,
+    COMMIT_SHA: config.COMMIT_SHA ?? config.RENDER_GIT_COMMIT ?? "unknown",
+  });
 }

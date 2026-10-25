@@ -1,6 +1,5 @@
 import { refreshCookieOptions } from "../src/config/cookie-policy";
 import { validateEnv } from "../src/config/env.validation";
-import { chooseSeed } from "../prisma/seed-dispatch";
 
 describe("refreshCookieOptions", () => {
   it("none + secure=true → SameSite=None; Secure (cross-site production)", () => {
@@ -44,23 +43,44 @@ describe("validateEnv — validação COOKIE_SAMESITE + COOKIE_SECURE", () => {
     ).not.toThrow();
   });
 
-  it("defaults preservam comportamento de produção (none + true)", () => {
-    const env = validateEnv({ ...base });
+  it("NODE_ENV=production sem variáveis → none + Secure=true", () => {
+    const env = validateEnv({ ...base, NODE_ENV: "production" });
     expect(env.COOKIE_SAMESITE).toBe("none");
     expect(env.COOKIE_SECURE).toBe(true);
   });
+
+  it("NODE_ENV=development sem variáveis → lax + Secure=false", () => {
+    const env = validateEnv({ ...base, NODE_ENV: "development" });
+    expect(env.COOKIE_SAMESITE).toBe("lax");
+    expect(env.COOKIE_SECURE).toBe(false);
+  });
+
+  it("override explícito tem prioridade sobre NODE_ENV", () => {
+    const env = validateEnv({ ...base, NODE_ENV: "production", COOKIE_SAMESITE: "strict", COOKIE_SECURE: "false" });
+    expect(env.COOKIE_SAMESITE).toBe("strict");
+    expect(env.COOKIE_SECURE).toBe(false);
+  });
 });
 
-describe("chooseSeed", () => {
-  it("APP_ENV=prod → bootstrap (nunca bloqueia seed legítimo)", () => {
-    expect(chooseSeed("prod")).toBe("bootstrap");
+describe("validateEnv — COMMIT_SHA fallback", () => {
+  const base = {
+    DATABASE_URL: "postgresql://x:x@localhost:5432/db",
+    DIRECT_URL: "postgresql://x:x@localhost:5432/db",
+    JWT_ACCESS_SECRET: "secret",
+  };
+
+  it("COMMIT_SHA explícito tem prioridade sobre RENDER_GIT_COMMIT", () => {
+    const env = validateEnv({ ...base, COMMIT_SHA: "abc123", RENDER_GIT_COMMIT: "ignored" });
+    expect(env.COMMIT_SHA).toBe("abc123");
   });
 
-  it("APP_ENV=dev → bootstrap", () => {
-    expect(chooseSeed("dev")).toBe("bootstrap");
+  it("cai para RENDER_GIT_COMMIT quando COMMIT_SHA não definido", () => {
+    const env = validateEnv({ ...base, RENDER_GIT_COMMIT: "render456" });
+    expect(env.COMMIT_SHA).toBe("render456");
   });
 
-  it("APP_ENV=hml → hml (personas fictícias)", () => {
-    expect(chooseSeed("hml")).toBe("hml");
+  it("'unknown' quando nenhum está definido", () => {
+    const env = validateEnv({ ...base });
+    expect(env.COMMIT_SHA).toBe("unknown");
   });
 });
