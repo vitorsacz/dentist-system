@@ -129,6 +129,11 @@ export const sharePatientSchema = z.object({
 });
 export type SharePatientInput = z.infer<typeof sharePatientSchema>;
 
+export const togglePatientActiveSchema = z.object({
+  active: z.boolean(),
+});
+export type TogglePatientActiveInput = z.infer<typeof togglePatientActiveSchema>;
+
 export const bulkReassignPatientsSchema = z.object({
   fromDentistId: z.string().min(1),
   // null = desatribuir (ownerDentistId → null); string = ID do dentista destino

@@ -126,6 +126,22 @@ export function PatientDetailPage() {
     },
   });
 
+  const toggleActiveMutation = useMutation({
+    mutationFn: (active: boolean) => patientsApi.toggleActive(patientId, active),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["patients", patientId] }),
+  });
+
+  const isAdmin = can(user, "users.manage");
+
+  function handleToggleActive() {
+    if (!patient) return;
+    const next = !patient.active;
+    const msg = next
+      ? "Reativar este paciente?"
+      : "Desativar não apaga histórico nem cancela agendamentos. Deseja continuar?";
+    if (confirm(msg)) toggleActiveMutation.mutate(next);
+  }
+
   const tabs: { key: TabKey; label: string }[] = [
     ...(canSeeClinical
       ? ([
@@ -254,6 +270,9 @@ export function PatientDetailPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-semibold text-ink">{patient?.name}</h1>
+                {patient && !patient.active && (
+                  <span className="rounded-full bg-bad/10 px-2 py-0.5 text-xs text-bad">Inativo</span>
+                )}
                 {patient && !isPatientComplete(patient) && (
                   <span className="rounded-full bg-warn/10 px-2 py-0.5 text-xs text-warn">
                     Cadastro incompleto
@@ -265,12 +284,24 @@ export function PatientDetailPage() {
                 <p className="mt-1 text-xs text-muted">Responsável: {patient.ownerDentist.name}</p>
               )}
             </div>
-            <button
-              onClick={startEdit}
-              className="rounded-md border border-line px-3 py-1.5 text-sm text-muted hover:text-ink"
-            >
-              Editar dados
-            </button>
+            <div className="flex gap-2">
+              {patient && (isAdmin || access?.canShare) && (
+                <button
+                  type="button"
+                  disabled={toggleActiveMutation.isPending}
+                  onClick={handleToggleActive}
+                  className="rounded-md border border-line px-3 py-1.5 text-sm text-muted hover:text-ink disabled:opacity-60"
+                >
+                  {patient.active ? "Desativar" : "Reativar"}
+                </button>
+              )}
+              <button
+                onClick={startEdit}
+                className="rounded-md border border-line px-3 py-1.5 text-sm text-muted hover:text-ink"
+              >
+                Editar dados
+              </button>
+            </div>
           </div>
 
           {patient && (

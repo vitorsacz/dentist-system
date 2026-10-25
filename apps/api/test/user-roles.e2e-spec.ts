@@ -6,6 +6,7 @@ import { PrismaClient, type Role } from "@prisma/client";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.setup";
 import { TEST_DATABASE_URL } from "./test-db";
+import { teardownAll } from "./helpers/teardown";
 
 // Múltiplos papéis por usuário (R1). A permissão vem de QUALQUER um dos
 // papéis; as regras de gestão de usuários (users.service) valem pra lista.
@@ -63,13 +64,11 @@ describe("Múltiplos papéis por usuário", () => {
     app = moduleRef.createNestApplication<NestExpressApplication>();
     configureApp(app);
     await app.init();
-    await rawPrisma.organization.deleteMany({});
-    await rawPrisma.user.deleteMany({});
+    await teardownAll(rawPrisma);
   }, 30000);
 
   afterAll(async () => {
-    await rawPrisma.organization.deleteMany({});
-    await rawPrisma.user.deleteMany({});
+    await teardownAll(rawPrisma);
     await rawPrisma.$disconnect();
     await app.close();
   });

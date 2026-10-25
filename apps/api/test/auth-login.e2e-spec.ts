@@ -6,6 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.setup";
 import { TEST_DATABASE_URL } from "./test-db";
+import { teardownAll } from "./helpers/teardown";
 
 // Login sem vazamento de organizações (S1). Identidade é isolada por
 // organização: o mesmo e-mail pode ter conta em várias, com senhas
@@ -54,16 +55,14 @@ describe("Login sem vazamento de organizações", () => {
     configureApp(app);
     await app.init();
 
-    await rawPrisma.organization.deleteMany({});
-    await rawPrisma.user.deleteMany({});
+    await teardownAll(rawPrisma);
     orgA = await rawPrisma.organization.create({ data: { name: "Clínica A (teste login)" } });
     orgB = await rawPrisma.organization.create({ data: { name: "Clínica B (teste login)" } });
     orgC = await rawPrisma.organization.create({ data: { name: "Clínica C (teste login)" } });
   }, 30000);
 
   afterAll(async () => {
-    await rawPrisma.organization.deleteMany({});
-    await rawPrisma.user.deleteMany({});
+    await teardownAll(rawPrisma);
     await rawPrisma.$disconnect();
     await app.close();
   });

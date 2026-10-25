@@ -8,7 +8,7 @@ import {
   UnprocessableEntityException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import type { CreatePatientInput, SharePatientInput, UpdatePatientInput } from "@dentist-system/shared-types";
+import type { CreatePatientInput, SharePatientInput, TogglePatientActiveInput, UpdatePatientInput } from "@dentist-system/shared-types";
 import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 import { getTenantContext } from "../../prisma/tenant-context";
@@ -23,10 +23,13 @@ export class PatientsService {
     private readonly patientAccess: PatientAccessService,
   ) {}
 
-  list(actor: AuthenticatedUser, ownerDentistId?: string) {
+  list(actor: AuthenticatedUser, ownerDentistId?: string, includeInactive?: boolean) {
+    const isAdmin = actor.roles.includes("ADMIN");
     const where: Prisma.PatientWhereInput = {
       ...this.patientAccess.patientWhere(actor, "registry"),
-      ...(ownerDentistId && actor.roles.includes("ADMIN") ? { ownerDentistId } : {}),
+      ...(ownerDentistId && isAdmin ? { ownerDentistId } : {}),
+      // ADMIN with includeInactive=true sees all; everyone else sees only active
+      ...(isAdmin && includeInactive ? {} : { active: true }),
     };
     return this.prisma.patient.findMany({ where, orderBy: { name: "asc" }, include: ownerDentistInclude });
   }
@@ -70,9 +73,30 @@ export class PatientsService {
     const org = await this.prisma.organization.findUnique({ where: { id: organizationId }, select: { type: true } });
     if (org?.type === "FREELANCER") throw new ForbiddenException("Não disponível para consultórios freelancer");
     return this.prisma.patient.findMany({
-      where: { ownerDentistId: null },
+      where: { ownerDentistId: null, active: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true, phone: true },
+    });
+  }
+
+  async toggleActive(patientId: string, input: TogglePatientActiveInput, actor: AuthenticatedUser) {
+    const { organizationId } = getTenantContext();
+    const existing = await this.patientAccess.assertPatientAccess(patientId, actor, "registry");
+    const isAdmin = actor.roles.includes("ADMIN");
+    const isOwner = existing.ownerDentistId === actor.id;
+    if (!isAdmin && !isOwner) {
+      throw new ForbiddenException("Apenas o dentista responsável ou um ADMIN pode alterar o status do paciente");
+    }
+    if (existing.active === input.active) {
+      return this.prisma.patient.findUnique({ where: { id: patientId }, include: ownerDentistInclude });
+    }
+    return this.prisma.$transaction(async (tx) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { ownerDentist: _od, ...snapshot } = existing as typeof existing & { ownerDentist?: unknown };
+      await tx.patientRevision.create({
+        data: { patientId, snapshot: snapshot as unknown as Prisma.InputJsonValue, changedById: actor.id, organizationId },
+      });
+      return tx.patient.update({ where: { id: patientId }, data: { active: input.active }, include: ownerDentistInclude });
     });
   }
 

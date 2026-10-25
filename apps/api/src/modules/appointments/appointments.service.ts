@@ -30,7 +30,7 @@ export class AppointmentsService {
     if (dentistOnly) {
       return this.prisma.appointment.findMany({
         where: baseWhere,
-        include: { patient: { select: { id: true, name: true, phone: true } }, clinic: true },
+        include: { patient: { select: { id: true, name: true, phone: true, active: true } }, clinic: true },
         orderBy: { startsAt: "asc" },
       });
     }
@@ -62,8 +62,14 @@ export class AppointmentsService {
     // patientId/clinicId são FK pra outro model tenant-scoped. Reaproveita o
     // findOne() de cada service (tenant-safe de graça via o findUnique com
     // post-check) pra barrar referência cruzada entre organizações.
-    await this.patientAccess.assertPatientAccess(input.patientId, actor, "registry");
-    await this.clinicsService.findOne(input.clinicId);
+    const patient = await this.patientAccess.assertPatientAccess(input.patientId, actor, "registry");
+    if (!patient.active) {
+      throw new UnprocessableEntityException("Paciente inativo");
+    }
+    const clinic = await this.clinicsService.findOne(input.clinicId);
+    if (!clinic.active) {
+      throw new UnprocessableEntityException("Consultório inativo");
+    }
 
     const { organizationId } = getTenantContext();
     await this.validateDentist(input.dentistUserId, organizationId, actor);

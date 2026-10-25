@@ -50,6 +50,9 @@ export function AppointmentDetailPanel({
           <div>
             <p className="text-sm text-muted">Agendamento</p>
             <h2 className="text-xl font-semibold text-ink">{appointment.patientName}</h2>
+            {appointment.patientActive === false && (
+              <Badge tone="warning">Paciente inativo</Badge>
+            )}
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-gray-100 hover:text-ink">
             <X className="h-5 w-5" />

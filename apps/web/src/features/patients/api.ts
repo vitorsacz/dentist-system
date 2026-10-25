@@ -32,6 +32,7 @@ export interface Patient {
   preferredMusic: string | null;
   ownerDentist: { id: string; name: string } | null;
   createdAt: string;
+  active: boolean;
   access?: PatientAccess;
 }
 
@@ -90,7 +91,10 @@ export interface Budget {
 }
 
 export const patientsApi = {
-  list: () => apiClient.get<Patient[]>("/patients"),
+  list: (params?: { includeInactive?: boolean }) => {
+    const qs = params?.includeInactive ? "?includeInactive=true" : "";
+    return apiClient.get<Patient[]>(`/patients${qs}`);
+  },
   listUnassigned: () => apiClient.get<UnassignedPatient[]>("/patients/unassigned"),
   findOne: (id: string) => apiClient.get<Patient>(`/patients/${id}`),
   create: (input: CreatePatientInput) => apiClient.post<Patient>("/patients", input),
@@ -100,6 +104,7 @@ export const patientsApi = {
   share: (id: string, input: SharePatientInput) => apiClient.post(`/patients/${id}/shares`, input),
   revoke: (id: string, dentistId: string) => apiClient.delete(`/patients/${id}/shares/${dentistId}`),
   claim: (id: string) => apiClient.post<Patient>(`/patients/${id}/claim`, {}),
+  toggleActive: (id: string, active: boolean) => apiClient.patch<Patient>(`/patients/${id}/active`, { active }),
 
   getAnamnesis: (patientId: string) => apiClient.get<Anamnesis | null>(`/patients/${patientId}/anamnesis`),
   upsertAnamnesis: (patientId: string, input: UpsertAnamnesisInput) =>

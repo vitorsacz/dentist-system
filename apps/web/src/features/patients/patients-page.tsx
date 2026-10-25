@@ -35,14 +35,18 @@ function maskPhone(v: string): string {
 
 export function PatientsPage() {
   const [showForm, setShowForm] = useState(false);
+  const [includeInactive, setIncludeInactive] = useState(false);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const needsDentistSelect = can(user, "organization.dentists");
-
+  const isAdmin = can(user, "users.manage");
   const isDentist = can(user, "patients.claim");
 
-  const patientsQuery = useQuery({ queryKey: ["patients"], queryFn: patientsApi.list });
+  const patientsQuery = useQuery({
+    queryKey: ["patients", { includeInactive }],
+    queryFn: () => patientsApi.list({ includeInactive }),
+  });
   const dentistsQuery = useQuery({
     queryKey: ["organization", "dentists"],
     queryFn: myClinicApi.dentists,
@@ -220,6 +224,18 @@ export function PatientsPage() {
         </form>
       )}
 
+      {isAdmin && (
+        <label className="flex items-center gap-2 text-sm text-muted">
+          <input
+            type="checkbox"
+            checked={includeInactive}
+            onChange={(e) => setIncludeInactive(e.target.checked)}
+            className="rounded"
+          />
+          Mostrar inativos
+        </label>
+      )}
+
       <div className="overflow-x-auto rounded-lg border border-line bg-surface">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-line text-muted">
@@ -233,8 +249,13 @@ export function PatientsPage() {
           </thead>
           <tbody className="divide-y divide-line">
             {patientsQuery.data?.map((patient) => (
-              <tr key={patient.id}>
-                <td className="px-4 py-3">{patient.name}</td>
+              <tr key={patient.id} className={!patient.active ? "opacity-60" : undefined}>
+                <td className="px-4 py-3 flex items-center gap-2">
+                  {patient.name}
+                  {!patient.active && (
+                    <span className="rounded-full bg-bad/10 px-2 py-0.5 text-xs text-bad">Inativo</span>
+                  )}
+                </td>
                 <td className="px-4 py-3">{patient.phone}</td>
                 <td className="px-4 py-3 text-muted">{patient.ownerDentist?.name ?? "—"}</td>
                 <td className="px-4 py-3">

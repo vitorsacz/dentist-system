@@ -36,6 +36,7 @@ export interface MockAppointment {
   start: Date;
   end: Date;
   status: AppointmentStatus;
+  patientActive?: boolean;
 }
 
 // Qual eixo a sidebar de calendários mostra — decisão centralizada aqui
@@ -194,7 +195,7 @@ function buildAppointments(calendars: MockCalendar[]): MockAppointment[] {
 
 export function useAgendaData(currentUser: CurrentUser | null) {
   const orgQuery = useQuery({ queryKey: ["my-clinic"], queryFn: myClinicApi.get });
-  const clinicsQuery = useQuery({ queryKey: ["clinics"], queryFn: clinicsApi.list });
+  const clinicsQuery = useQuery({ queryKey: ["clinics"], queryFn: () => clinicsApi.list() });
 
   // Enquanto o tipo do tenant não carregou, assume o eixo mais restrito
   // ("none") em vez de arriscar mostrar a sidebar errada por um instante.

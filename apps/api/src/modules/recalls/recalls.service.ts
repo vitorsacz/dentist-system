@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 import type { CreateRecallInput, UpdateRecallStatusInput } from "@dentist-system/shared-types";
 import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
@@ -24,7 +24,10 @@ export class RecallsService {
   }
 
   async create(input: CreateRecallInput, actor: AuthenticatedUser) {
-    await this.patientAccess.assertPatientAccess(input.patientId, actor, "registry");
+    const patient = await this.patientAccess.assertPatientAccess(input.patientId, actor, "registry");
+    if (!patient.active) {
+      throw new UnprocessableEntityException("Paciente inativo");
+    }
     const { organizationId } = getTenantContext();
     return this.prisma.recall.create({ data: { ...input, organizationId } });
   }
