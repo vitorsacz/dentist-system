@@ -1,5 +1,6 @@
 import { refreshCookieOptions } from "../src/config/cookie-policy";
 import { validateEnv } from "../src/config/env.validation";
+import { chooseSeed } from "../prisma/seed-dispatch";
 
 describe("refreshCookieOptions", () => {
   it("none + secure=true → SameSite=None; Secure (cross-site production)", () => {
@@ -47,5 +48,19 @@ describe("validateEnv — validação COOKIE_SAMESITE + COOKIE_SECURE", () => {
     const env = validateEnv({ ...base });
     expect(env.COOKIE_SAMESITE).toBe("none");
     expect(env.COOKIE_SECURE).toBe(true);
+  });
+});
+
+describe("chooseSeed", () => {
+  it("APP_ENV=prod → bootstrap (nunca bloqueia seed legítimo)", () => {
+    expect(chooseSeed("prod")).toBe("bootstrap");
+  });
+
+  it("APP_ENV=dev → bootstrap", () => {
+    expect(chooseSeed("dev")).toBe("bootstrap");
+  });
+
+  it("APP_ENV=hml → hml (personas fictícias)", () => {
+    expect(chooseSeed("hml")).toBe("hml");
   });
 });
