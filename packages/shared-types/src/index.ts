@@ -91,6 +91,7 @@ export {
   isPatientComplete,
   sharePatientSchema,
   bulkReassignPatientsSchema,
+  togglePatientActiveSchema,
   upsertAnamnesisSchema,
   createClinicalRecordSchema,
   type Sex,
@@ -101,6 +102,7 @@ export {
   type UpdatePatientInput,
   type SharePatientInput,
   type BulkReassignPatientsInput,
+  type TogglePatientActiveInput,
   type UpsertAnamnesisInput,
   type CreateClinicalRecordInput,
 } from "./patient";
@@ -115,8 +117,10 @@ export {
 export {
   createClinicSchema,
   updateClinicSchema,
+  toggleClinicActiveSchema,
   type CreateClinicInput,
   type UpdateClinicInput,
+  type ToggleClinicActiveInput,
 } from "./clinic";
 
 export {

@@ -32,7 +32,7 @@ export function AppointmentCreateModal({
 }: AppointmentCreateModalProps) {
   const isEditing = Boolean(editingAppointment);
 
-  const patientsQuery = useQuery({ queryKey: ["patients"], queryFn: patientsApi.list });
+  const patientsQuery = useQuery({ queryKey: ["patients"], queryFn: () => patientsApi.list() });
   const proceduresQuery = useQuery({ queryKey: ["procedures"], queryFn: proceduresApi.list });
 
   const [patientSearch, setPatientSearch] = useState(editingAppointment?.patientName ?? "");

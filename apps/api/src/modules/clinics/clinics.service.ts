@@ -1,5 +1,6 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { PALETTE_COLOR_TOKENS, type CreateClinicInput, type UpdateClinicInput } from "@dentist-system/shared-types";
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { PALETTE_COLOR_TOKENS, type CreateClinicInput, type ToggleClinicActiveInput, type UpdateClinicInput } from "@dentist-system/shared-types";
+import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 import { getTenantContext } from "../../prisma/tenant-context";
 
@@ -7,8 +8,12 @@ import { getTenantContext } from "../../prisma/tenant-context";
 export class ClinicsService {
   constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
 
-  list() {
-    return this.prisma.clinic.findMany({ orderBy: { name: "asc" } });
+  list(actor?: AuthenticatedUser, includeInactive?: boolean) {
+    const isAdmin = actor?.roles.includes("ADMIN");
+    return this.prisma.clinic.findMany({
+      where: isAdmin && includeInactive ? {} : { active: true },
+      orderBy: { name: "asc" },
+    });
   }
 
   async findOne(id: string) {
@@ -44,5 +49,27 @@ export class ClinicsService {
   async update(id: string, input: UpdateClinicInput) {
     await this.findOne(id);
     return this.prisma.clinic.update({ where: { id }, data: input });
+  }
+
+  async toggleActive(clinicId: string, input: ToggleClinicActiveInput, actor: AuthenticatedUser) {
+    const { organizationId } = getTenantContext();
+    await this.findOne(clinicId);
+
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { type: true, foundingAdminUserId: true },
+    });
+    if (org?.type === "FREELANCER" && org.foundingAdminUserId !== actor.id) {
+      throw new ForbiddenException("Em org FREELANCER apenas o dono pode alterar consultórios");
+    }
+
+    if (input.active === false) {
+      const activeCount = await this.prisma.clinic.count({ where: { organizationId, active: true } });
+      if (activeCount <= 1) {
+        throw new ConflictException("Não é possível desativar o último consultório ativo da organização");
+      }
+    }
+
+    return this.prisma.clinic.update({ where: { id: clinicId }, data: { active: input.active } });
   }
 }

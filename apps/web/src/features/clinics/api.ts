@@ -7,10 +7,15 @@ export interface Clinic {
   type: "OWN" | "RENTED";
   dailyRentValue: number | null;
   colorToken: PaletteColorToken | null;
+  active: boolean;
 }
 
 export const clinicsApi = {
-  list: () => apiClient.get<Clinic[]>("/clinics"),
+  list: (params?: { includeInactive?: boolean }) => {
+    const qs = params?.includeInactive ? "?includeInactive=true" : "";
+    return apiClient.get<Clinic[]>(`/clinics${qs}`);
+  },
   create: (input: CreateClinicInput) => apiClient.post<Clinic>("/clinics", input),
   update: (id: string, input: UpdateClinicInput) => apiClient.patch<Clinic>(`/clinics/${id}`, input),
+  toggleActive: (id: string, active: boolean) => apiClient.patch<Clinic>(`/clinics/${id}/active`, { active }),
 };

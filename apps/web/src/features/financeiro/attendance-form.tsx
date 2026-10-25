@@ -10,8 +10,8 @@ import { materialsApi } from "@/features/materials/api";
 
 export function AttendanceForm() {
   const queryClient = useQueryClient();
-  const patientsQuery = useQuery({ queryKey: ["patients"], queryFn: patientsApi.list });
-  const clinicsQuery = useQuery({ queryKey: ["clinics"], queryFn: clinicsApi.list });
+  const patientsQuery = useQuery({ queryKey: ["patients"], queryFn: () => patientsApi.list() });
+  const clinicsQuery = useQuery({ queryKey: ["clinics"], queryFn: () => clinicsApi.list() });
   const proceduresQuery = useQuery({ queryKey: ["procedures"], queryFn: proceduresApi.list });
   const materialsQuery = useQuery({ queryKey: ["materials"], queryFn: materialsApi.list });
 

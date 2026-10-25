@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 import type { CreateBudgetInput, UpdateBudgetStatusInput } from "@dentist-system/shared-types";
 import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
@@ -41,7 +41,10 @@ export class BudgetsService {
   }
 
   async create(input: CreateBudgetInput, actor: AuthenticatedUser) {
-    await this.patientAccess.assertPatientAccess(input.patientId, actor, "registry");
+    const patient = await this.patientAccess.assertPatientAccess(input.patientId, actor, "registry");
+    if (!patient.active) {
+      throw new UnprocessableEntityException("Paciente inativo");
+    }
     for (const item of input.items) {
       await this.proceduresService.findOne(item.procedureId);
     }

@@ -16,6 +16,11 @@ export const createClinicSchema = z
   });
 export type CreateClinicInput = z.infer<typeof createClinicSchema>;
 
+export const toggleClinicActiveSchema = z.object({
+  active: z.boolean(),
+});
+export type ToggleClinicActiveInput = z.infer<typeof toggleClinicActiveSchema>;
+
 export const updateClinicSchema = z.object({
   name: z.string().min(1).optional(),
   type: z.enum(CLINIC_TYPES).optional(),

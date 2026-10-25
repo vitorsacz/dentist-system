@@ -4,10 +4,12 @@ import {
   bulkReassignPatientsSchema,
   createPatientSchema,
   sharePatientSchema,
+  togglePatientActiveSchema,
   updatePatientSchema,
   type BulkReassignPatientsInput,
   type CreatePatientInput,
   type SharePatientInput,
+  type TogglePatientActiveInput,
   type UpdatePatientInput,
 } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
@@ -21,8 +23,12 @@ export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
   @Get()
-  list(@CurrentUser() user: AuthenticatedUser, @Query("ownerDentistId") ownerDentistId?: string) {
-    return this.patientsService.list(user, ownerDentistId);
+  list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query("ownerDentistId") ownerDentistId?: string,
+    @Query("includeInactive") includeInactive?: string,
+  ) {
+    return this.patientsService.list(user, ownerDentistId, includeInactive === "true");
   }
 
   // Deve vir ANTES de :id para não ser capturado como id="unassigned"
@@ -90,6 +96,16 @@ export class PatientsController {
   @Post(":id/claim")
   claim(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.patientsService.claim(id, user);
+  }
+
+  @Roles(...ACCESS["patients.write"])
+  @Patch(":id/active")
+  toggleActive(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(togglePatientActiveSchema)) body: TogglePatientActiveInput,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.patientsService.toggleActive(id, body, user);
   }
 
   @Roles(...ACCESS["users.manage"])

@@ -1,4 +1,4 @@
-import { Inject, BadRequestException, Injectable } from "@nestjs/common";
+import { Inject, BadRequestException, Injectable, UnprocessableEntityException } from "@nestjs/common";
 import type { CreateAttendanceInput } from "@dentist-system/shared-types";
 import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService, type TenantScopedTransactionClient } from "../../prisma/prisma.service";
@@ -35,8 +35,14 @@ export class AttendancesService {
 
   async create(input: CreateAttendanceInput, actor: AuthenticatedUser) {
     // clinicalWrite: paciente no escopo do actor
-    await this.patientAccess.assertPatientAccess(input.patientId, actor, "clinicalWrite");
-    await this.clinicsService.findOne(input.clinicId);
+    const patient = await this.patientAccess.assertPatientAccess(input.patientId, actor, "clinicalWrite");
+    if (!patient.active) {
+      throw new UnprocessableEntityException("Paciente inativo");
+    }
+    const clinic = await this.clinicsService.findOne(input.clinicId);
+    if (!clinic.active) {
+      throw new UnprocessableEntityException("Consultório inativo");
+    }
     await this.proceduresService.findOne(input.procedureId);
     if (input.appointmentId) {
       await this.appointmentsService.findOne(input.appointmentId);

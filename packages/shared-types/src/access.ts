@@ -57,6 +57,7 @@ export const ACCESS = {
   "organization.dentists": ["ADMIN", "RECEPTIONIST"],
 
   "users.manage": ["ADMIN"],
+  "clinics.manage": ["ADMIN"],
 
   // Só telas do front (sem rota de API equivalente).
   "agenda.view": ["ADMIN", "DENTIST", "RECEPTIONIST"],
