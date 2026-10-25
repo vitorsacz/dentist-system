@@ -19,6 +19,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public body?: unknown,
   ) {
     super(message);
   }
@@ -46,7 +47,7 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: res.statusText }));
-    throw new ApiError(res.status, body.message ?? "Erro na requisição");
+    throw new ApiError(res.status, body.message ?? "Erro na requisição", body);
   }
 
   if (res.status === 204) {

@@ -147,12 +147,16 @@ export {
 } from "./budget";
 
 export {
+  MAX_APPOINTMENT_DURATION_MS,
   createAppointmentSchema,
   updateAppointmentSchema,
+  cancelAppointmentSchema,
   listAppointmentsQuerySchema,
   type CreateAppointmentInput,
   type UpdateAppointmentInput,
+  type CancelAppointmentInput,
   type ListAppointmentsQuery,
+  type ConflictInfo,
 } from "./appointment";
 
 export {

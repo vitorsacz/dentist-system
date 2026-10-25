@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { patientsApi } from "@/features/patients/api";
 import { proceduresApi } from "@/features/procedures/api";
+import { ApiError } from "@/lib/api-client";
 import { LOCATION_COLOR_HEX } from "./location-colors";
-import type { MockAppointment, MockDentist, MockLocation } from "./mock-data";
+import type { ConflictInfo } from "./api";
+import { appointmentsApi, type AppointmentListItem } from "./api";
+import type { MockLocation, MockDentist } from "./mock-data";
 
 interface AppointmentCreateModalProps {
   locations: MockLocation[];
@@ -11,13 +14,23 @@ interface AppointmentCreateModalProps {
   initialDate: Date;
   initialStart?: Date;
   initialEnd?: Date;
-  editingAppointment?: MockAppointment | null;
+  editingAppointment?: AppointmentListItem | null;
+  actorRoles: string[];
   onClose: () => void;
-  onSave: (appointment: MockAppointment) => void;
+  onSuccess: () => void;
 }
 
 function toTimeInput(date: Date) {
   return date.toTimeString().slice(0, 5);
+}
+
+function buildDateTime(baseDate: Date, time: string): Date {
+  const parts = time.split(":");
+  const hours = Number(parts[0]);
+  const minutes = Number(parts[1]);
+  const result = new Date(baseDate);
+  result.setHours(hours, minutes, 0, 0);
+  return result;
 }
 
 export function AppointmentCreateModal({
@@ -27,62 +40,122 @@ export function AppointmentCreateModal({
   initialStart,
   initialEnd,
   editingAppointment,
+  actorRoles,
   onClose,
-  onSave,
+  onSuccess,
 }: AppointmentCreateModalProps) {
   const isEditing = Boolean(editingAppointment);
+  const queryClient = useQueryClient();
 
-  const patientsQuery = useQuery({ queryKey: ["patients"], queryFn: () => patientsApi.list() });
-  const proceduresQuery = useQuery({ queryKey: ["procedures"], queryFn: proceduresApi.list });
+  const canAllowOverlap =
+    actorRoles.includes("ADMIN") || actorRoles.includes("RECEPTIONIST");
 
-  const [patientSearch, setPatientSearch] = useState(editingAppointment?.patientName ?? "");
-  const [selectedPatient, setSelectedPatient] = useState<{ name: string; phone: string } | null>(
-    editingAppointment ? { name: editingAppointment.patientName, phone: editingAppointment.patientPhone } : null,
+  const patientsQuery = useQuery({
+    queryKey: ["patients"],
+    queryFn: () => patientsApi.list(),
+  });
+  const proceduresQuery = useQuery({
+    queryKey: ["procedures"],
+    queryFn: proceduresApi.list,
+  });
+
+  const [patientSearch, setPatientSearch] = useState(
+    editingAppointment?.patient.name ?? "",
   );
-  const [locationId, setLocationId] = useState(editingAppointment?.locationId ?? locations[0]?.id ?? "");
-  const [dentistId, setDentistId] = useState(editingAppointment?.dentistUserId ?? dentists[0]?.id ?? "");
-  const [procedureName, setProcedureName] = useState(editingAppointment?.procedureName ?? "");
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(
+    editingAppointment?.patientId ?? null,
+  );
+  const [locationId, setLocationId] = useState(
+    editingAppointment?.clinicId ?? locations[0]?.id ?? "",
+  );
+  const [dentistId, setDentistId] = useState(
+    editingAppointment?.dentistUserId ?? dentists[0]?.id ?? "",
+  );
+  const [procedureName, setProcedureName] = useState(
+    editingAppointment?.notes ?? "",
+  );
+  const editStart = editingAppointment ? new Date(editingAppointment.startsAt) : null;
+  const editEnd = editingAppointment ? new Date(editingAppointment.endsAt) : null;
   const [startTime, setStartTime] = useState(
-    editingAppointment ? toTimeInput(editingAppointment.start) : initialStart ? toTimeInput(initialStart) : "09:00",
+    editStart ? toTimeInput(editStart) : initialStart ? toTimeInput(initialStart) : "09:00",
   );
   const [endTime, setEndTime] = useState(
-    editingAppointment ? toTimeInput(editingAppointment.end) : initialEnd ? toTimeInput(initialEnd) : "09:30",
+    editEnd ? toTimeInput(editEnd) : initialEnd ? toTimeInput(initialEnd) : "09:30",
   );
 
+  const [conflicts, setConflicts] = useState<ConflictInfo[] | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // patientsApi.list() returns only active patients by default
   const filteredPatients = useMemo(() => {
-    if (!patientSearch || selectedPatient) return [];
+    if (!patientSearch || selectedPatientId) return [];
     const term = patientSearch.toLowerCase();
     return (patientsQuery.data ?? []).filter((p) => p.name.toLowerCase().includes(term)).slice(0, 6);
-  }, [patientSearch, selectedPatient, patientsQuery.data]);
+  }, [patientSearch, selectedPatientId, patientsQuery.data]);
 
-  function buildDateTime(baseDate: Date, time: string) {
-    const parts = time.split(":");
-    const hours = Number(parts[0]);
-    const minutes = Number(parts[1]);
-    const result = new Date(baseDate);
-    result.setHours(hours, minutes, 0, 0);
-    return result;
+  const saveMutation = useMutation({
+    mutationFn: (body: Parameters<typeof appointmentsApi.create>[0]) =>
+      isEditing && editingAppointment
+        ? appointmentsApi.update(editingAppointment.id, body)
+        : appointmentsApi.create(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      onSuccess();
+    },
+    onError: (err: unknown) => {
+      setConflicts(null);
+      if (err instanceof ApiError && err.status === 409) {
+        const body = err.body as { code?: string; conflicts?: ConflictInfo[] };
+        if (body.code === "SCHEDULE_CONFLICT" && body.conflicts) {
+          setConflicts(body.conflicts);
+          return;
+        }
+      }
+      setSubmitError(err instanceof Error ? err.message : "Erro ao salvar agendamento");
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => appointmentsApi.cancel(editingAppointment!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      onSuccess();
+    },
+    onError: (err: unknown) => {
+      setSubmitError(err instanceof Error ? err.message : "Erro ao cancelar agendamento");
+    },
+  });
+
+  function buildBody(allowOverlap?: boolean) {
+    const baseDate = editStart ?? initialDate;
+    const startsAt = buildDateTime(baseDate, startTime).toISOString();
+    const endsAt = buildDateTime(baseDate, endTime).toISOString();
+    return {
+      patientId: selectedPatientId!,
+      clinicId: locationId,
+      dentistUserId: dentistId,
+      startsAt,
+      endsAt,
+      notes: procedureName || undefined,
+      ...(allowOverlap ? { allowOverlap: true as const } : {}),
+    };
   }
 
   function handleSubmit() {
-    if (!selectedPatient || !locationId || !procedureName) return;
-    const baseDate = editingAppointment?.start ?? initialDate;
-    const start = buildDateTime(baseDate, startTime);
-    const end = buildDateTime(baseDate, endTime);
-
-    onSave({
-      id: editingAppointment?.id ?? `appt-manual-${Date.now()}`,
-      calendarId: editingAppointment?.calendarId ?? `cal-${locationId}-manual-${dentistId || "self"}`,
-      locationId,
-      dentistUserId: dentistId || editingAppointment?.dentistUserId || "",
-      patientName: selectedPatient.name,
-      patientPhone: selectedPatient.phone,
-      procedureName,
-      start,
-      end,
-      status: editingAppointment?.status ?? "SCHEDULED",
-    });
+    if (!selectedPatientId || !locationId) return;
+    setConflicts(null);
+    setSubmitError(null);
+    saveMutation.mutate(buildBody());
   }
+
+  function handleForceOverlap() {
+    if (!selectedPatientId || !locationId) return;
+    setConflicts(null);
+    setSubmitError(null);
+    saveMutation.mutate(buildBody(true));
+  }
+
+  const isLoading = saveMutation.isPending || cancelMutation.isPending;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4">
@@ -92,6 +165,7 @@ export function AppointmentCreateModal({
         </h2>
 
         <div className="space-y-4">
+          {/* Patient search */}
           <div className="relative">
             <label className="mb-1.5 block text-sm font-medium text-ink">Paciente</label>
             <input
@@ -99,7 +173,7 @@ export function AppointmentCreateModal({
               value={patientSearch}
               onChange={(e) => {
                 setPatientSearch(e.target.value);
-                setSelectedPatient(null);
+                setSelectedPatientId(null);
               }}
               placeholder="Buscar paciente..."
               className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink placeholder:text-muted"
@@ -111,7 +185,7 @@ export function AppointmentCreateModal({
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedPatient({ name: patient.name, phone: patient.phone });
+                        setSelectedPatientId(patient.id);
                         setPatientSearch(patient.name);
                       }}
                       className="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-gray-100"
@@ -124,6 +198,7 @@ export function AppointmentCreateModal({
             )}
           </div>
 
+          {/* Clinic */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink">Consultório</label>
             <div className="flex items-center gap-2">
@@ -150,6 +225,7 @@ export function AppointmentCreateModal({
             </div>
           </div>
 
+          {/* Dentist */}
           {dentists.length > 0 && (
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink">Dentista</label>
@@ -178,6 +254,7 @@ export function AppointmentCreateModal({
             </div>
           )}
 
+          {/* Time */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink">Início</label>
@@ -199,6 +276,7 @@ export function AppointmentCreateModal({
             </div>
           </div>
 
+          {/* Procedure */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink">Procedimento</label>
             <select
@@ -214,23 +292,79 @@ export function AppointmentCreateModal({
               ))}
             </select>
           </div>
+
+          {/* Conflict warning */}
+          {conflicts !== null && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+              <p className="mb-2 text-sm font-medium text-amber-800">
+                Conflito de horário com {conflicts.length}{" "}
+                agendamento{conflicts.length > 1 ? "s" : ""}:
+              </p>
+              <ul className="mb-3 space-y-1">
+                {conflicts.map((c) => (
+                  <li key={c.id} className="text-xs text-amber-700">
+                    {new Date(c.startsAt).toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                    {" – "}
+                    {new Date(c.endsAt).toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                    {c.patientName ? ` — ${c.patientName}` : ""}
+                  </li>
+                ))}
+              </ul>
+              {canAllowOverlap && (
+                <button
+                  type="button"
+                  onClick={handleForceOverlap}
+                  disabled={isLoading}
+                  className="w-full rounded-lg border border-amber-400 bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-200 disabled:opacity-60"
+                >
+                  Agendar mesmo assim
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Generic error */}
+          {submitError && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{submitError}</p>
+          )}
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
+          {isEditing && editingAppointment && (
+            <button
+              type="button"
+              onClick={() => cancelMutation.mutate()}
+              disabled={isLoading}
+              className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 disabled:opacity-60"
+            >
+              Cancelar agendamento
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink"
+            disabled={isLoading}
+            className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink disabled:opacity-60"
           >
-            Cancelar
+            Fechar
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={!selectedPatient || !locationId || !procedureName}
+            disabled={!selectedPatientId || !locationId || isLoading}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {isEditing ? "Salvar alterações" : "Adicionar agendamento"}
+            {isLoading
+              ? "Salvando…"
+              : isEditing
+                ? "Salvar alterações"
+                : "Adicionar agendamento"}
           </button>
         </div>
       </div>

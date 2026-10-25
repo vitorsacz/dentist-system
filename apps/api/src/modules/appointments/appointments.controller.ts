@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import {
   ACCESS,
   createAppointmentSchema,
@@ -45,9 +45,19 @@ export class AppointmentsController {
   @Patch(":id")
   update(
     @Param("id") id: string,
+    @Body() rawBody: unknown,
     @Body(new ZodValidationPipe(updateAppointmentSchema)) body: UpdateAppointmentInput,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    if (rawBody !== null && typeof rawBody === "object" && "patientId" in rawBody) {
+      throw new BadRequestException("patientId não pode ser alterado");
+    }
     return this.appointmentsService.update(id, body, user);
+  }
+
+  @Roles(...ACCESS["appointments.manage"])
+  @Patch(":id/cancel")
+  cancel(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.appointmentsService.cancel(id, user);
   }
 }
