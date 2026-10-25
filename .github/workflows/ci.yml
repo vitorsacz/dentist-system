@@ -57,6 +57,9 @@ jobs:
 
       - run: pnpm build
 
+      - name: Build de produção do web sem cache turbo (garante erros TS)
+        run: pnpm turbo run build --filter="@dentist-system/web" --force
+
       - name: Test (inclui suíte de isolamento multi-tenant)
         run: pnpm test
         env:
