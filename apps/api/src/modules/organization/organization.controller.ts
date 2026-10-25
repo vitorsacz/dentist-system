@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Query } from "@nestjs/common";
 import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.decorator";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { ACCESS } from "@dentist-system/shared-types";
@@ -23,10 +23,13 @@ export class OrganizationController {
   // OrganizationService.findDentists().
   @Roles(...ACCESS["organization.dentists"])
   @Get("dentists")
-  getDentists(@CurrentUser() user: AuthenticatedUser) {
+  getDentists(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query("includeInactive") includeInactive?: string,
+  ) {
     if (!user.organizationId) {
       throw new BadRequestException("Super Admin não pertence a nenhuma organização");
     }
-    return this.organizationService.findDentists(user.organizationId);
+    return this.organizationService.findDentists(user.organizationId, includeInactive === "true");
   }
 }

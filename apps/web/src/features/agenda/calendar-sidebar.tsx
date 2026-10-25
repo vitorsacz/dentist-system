@@ -6,7 +6,9 @@ import type { MockLocation } from "./mock-data";
 interface CalendarSidebarProps {
   locations: MockLocation[];
   hiddenLocationIds: Set<string>;
+  selectedClinicId: string | undefined;
   onToggle: (locationId: string) => void;
+  onSelectClinic: (id: string | undefined) => void;
   onAddLocation: (input: { name: string }) => void;
   onChangeColor: (locationId: string, colorToken: LocationColorToken) => void;
 }
@@ -18,7 +20,9 @@ interface CalendarSidebarProps {
 export function CalendarSidebar({
   locations,
   hiddenLocationIds,
+  selectedClinicId,
   onToggle,
+  onSelectClinic,
   onAddLocation,
   onChangeColor,
 }: CalendarSidebarProps) {
@@ -43,26 +47,27 @@ export function CalendarSidebar({
           return (
             <li key={location.id} className="relative">
               <div className="flex items-center gap-2.5 text-sm text-ink">
-                <label className="flex flex-1 cursor-pointer items-center gap-2.5 min-w-0">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => onToggle(location.id)}
-                    className="h-4 w-4 shrink-0 rounded"
-                    style={{ accentColor: color.solid }}
-                  />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setColorPickerFor((prev) => (prev === location.id ? null : location.id));
-                    }}
-                    className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                    style={{ backgroundColor: color.solid }}
-                    aria-label={`Trocar cor de ${location.name}`}
-                  />
-                  <span className="min-w-0 truncate">{location.name}</span>
-                </label>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => onToggle(location.id)}
+                  className="h-4 w-4 shrink-0 rounded cursor-pointer"
+                  style={{ accentColor: color.solid }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setColorPickerFor((prev) => (prev === location.id ? null : location.id))}
+                  className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                  style={{ backgroundColor: color.solid }}
+                  aria-label={`Trocar cor de ${location.name}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => onSelectClinic(selectedClinicId === location.id ? undefined : location.id)}
+                  className={`min-w-0 truncate text-left text-sm ${selectedClinicId === location.id ? "font-semibold text-accent" : "text-ink hover:text-accent"}`}
+                >
+                  {location.name}
+                </button>
               </div>
               {colorPickerFor === location.id && (
                 <div className="absolute left-0 top-full z-10 mt-1 flex gap-1.5 rounded-lg border border-line bg-surface p-2 shadow-lg">

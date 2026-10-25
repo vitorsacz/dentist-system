@@ -211,7 +211,7 @@ describe("Isolamento cross-tenant", () => {
   it("GET organization/dentists: admin vê o roster da própria org, dentista recebe 403 (RBAC real, não só filtro de UI)", async () => {
     const asAdmin = await as(orgA.adminToken).get("/organization/dentists");
     expect(asAdmin.status).toBe(200);
-    expect(asAdmin.body.some((d: { userId: string }) => d.userId === orgA.dentistUserId)).toBe(true);
+    expect(asAdmin.body.some((d: { id: string }) => d.id === orgA.dentistUserId)).toBe(true);
 
     const asDentist = await as(orgA.dentistToken).get("/organization/dentists");
     expect(asDentist.status).toBe(403);
@@ -220,7 +220,7 @@ describe("Isolamento cross-tenant", () => {
   it("GET organization/dentists: isolamento cross-tenant — admin de B não vê dentista de A", async () => {
     const asAdminB = await as(orgB.adminToken).get("/organization/dentists");
     expect(asAdminB.status).toBe(200);
-    expect(asAdminB.body.some((d: { userId: string }) => d.userId === orgA.dentistUserId)).toBe(false);
+    expect(asAdminB.body.some((d: { id: string }) => d.id === orgA.dentistUserId)).toBe(false);
   });
 
   it("GET organization/dentists: dentista inativo some do roster", async () => {
@@ -230,12 +230,12 @@ describe("Isolamento cross-tenant", () => {
     });
 
     const beforeDeactivation = await as(org.adminToken).get("/organization/dentists");
-    expect(beforeDeactivation.body.some((d: { userId: string }) => d.userId === dentistUser.id)).toBe(true);
+    expect(beforeDeactivation.body.some((d: { id: string }) => d.id === dentistUser.id)).toBe(true);
 
     await rawPrisma.user.update({ where: { id: dentistUser.id }, data: { active: false } });
 
     const afterDeactivation = await as(org.adminToken).get("/organization/dentists");
-    expect(afterDeactivation.body.some((d: { userId: string }) => d.userId === dentistUser.id)).toBe(false);
+    expect(afterDeactivation.body.some((d: { id: string }) => d.id === dentistUser.id)).toBe(false);
   });
 
   it("POST /clinics e POST /users: colorToken omitido cicla a paleta por índice; informado é respeitado", async () => {

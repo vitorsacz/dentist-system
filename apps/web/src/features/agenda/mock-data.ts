@@ -5,6 +5,7 @@ import { can } from "@/lib/access";
 import { clinicsApi, type Clinic } from "@/features/clinics/api";
 import { myClinicApi } from "@/features/my-clinic/api";
 import { fromApiColorToken, locationColorForIndex, type LocationColorToken } from "./location-colors";
+import { appointmentsApi } from "./api";
 
 export interface MockLocation {
   id: string;
@@ -56,144 +57,7 @@ export function resolveCalendarAxis(organizationType: TenantType, canListDentist
   return canListDentists ? "dentist" : "none";
 }
 
-const FAKE_PATIENTS = [
-  { name: "Carlos Eduardo Ferreira", phone: "(11) 98765-4321" },
-  { name: "Marina Souza", phone: "(11) 91234-5678" },
-  { name: "João Pedro Lima", phone: "(11) 99887-6655" },
-  { name: "Ana Beatriz Costa", phone: "(11) 98123-4567" },
-  { name: "Roberta Alves", phone: "(11) 97654-3210" },
-  { name: "Felipe Torres", phone: "(11) 96543-2109" },
-];
-const FAKE_PROCEDURES = [
-  "Consulta / avaliação",
-  "Limpeza (profilaxia)",
-  "Restauração (resina)",
-  "Extração simples",
-  "Canal (endodontia)",
-  "Clareamento dental",
-];
-const FAKE_STATUSES: AppointmentStatus[] = ["SCHEDULED", "SCHEDULED", "SCHEDULED", "DONE", "CANCELED", "NO_SHOW"];
-
-function startOfWeek(date: Date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day; // segunda-feira
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-// Calendários continuam mockados nesta rodada (só o roster — consultório e
-// dentista — virou real, ver hook abaixo). Pra "dentist" (clínica, admin/
-// recepcionista): todo par (consultório real, dentista real). Pra
-// "location" (freelancer) e "none" (dentista de clínica, só a própria
-// agenda): um calendário por consultório, sempre do usuário logado.
-function buildCalendars(
-  axis: CalendarAxis,
-  locations: MockLocation[],
-  dentists: MockDentist[],
-  currentUser: Pick<CurrentUser, "id" | "name"> | null,
-): MockCalendar[] {
-  if (axis === "dentist") {
-    const calendars: MockCalendar[] = [];
-    locations.forEach((location) => {
-      dentists.forEach((dentist) => {
-        calendars.push({
-          id: `cal-${location.id}-${dentist.id}`,
-          locationId: location.id,
-          dentistUserId: dentist.id,
-          dentistName: dentist.name,
-        });
-      });
-    });
-    return calendars;
-  }
-
-  return locations.map((location) => ({
-    id: `cal-${location.id}-self`,
-    locationId: location.id,
-    dentistUserId: currentUser?.id ?? "self",
-    dentistName: currentUser?.name ?? "",
-  }));
-}
-
-function buildAppointments(calendars: MockCalendar[]): MockAppointment[] {
-  const weekStart = startOfWeek(new Date());
-  const appointments: MockAppointment[] = [];
-  let seed = 0;
-
-  calendars.forEach((calendar) => {
-    const count = 4 + (seed % 3);
-    for (let i = 0; i < count; i++) {
-      const dayOffset = seed % 5; // seg a sex
-      const hour = 8 + (seed % 9); // 08h-16h
-      const durationMinutes = 30 + (seed % 3) * 15;
-
-      const start = new Date(weekStart);
-      start.setDate(start.getDate() + dayOffset);
-      start.setHours(hour, seed % 2 === 0 ? 0 : 30, 0, 0);
-      const end = new Date(start.getTime() + durationMinutes * 60_000);
-
-      const patient = FAKE_PATIENTS[seed % FAKE_PATIENTS.length]!;
-
-      appointments.push({
-        id: `appt-${calendar.id}-${i}`,
-        calendarId: calendar.id,
-        locationId: calendar.locationId,
-        dentistUserId: calendar.dentistUserId,
-        patientName: patient.name,
-        patientPhone: patient.phone,
-        procedureName: FAKE_PROCEDURES[seed % FAKE_PROCEDURES.length]!,
-        start,
-        end,
-        status: FAKE_STATUSES[seed % FAKE_STATUSES.length]!,
-      });
-      seed++;
-    }
-  });
-
-  // Overlap proposital entre dois dentistas diferentes, mesmo consultório
-  // e mesmo horário — só pra dar pra ver de verdade o layout lado a lado
-  // (slotEventOverlap=false) na visão admin/recepcionista.
-  const first = calendars[0];
-  const second = calendars[1];
-  if (first && second && first.locationId === second.locationId) {
-    const overlapStart = new Date(weekStart);
-    overlapStart.setDate(overlapStart.getDate() + 2);
-    overlapStart.setHours(10, 0, 0, 0);
-    const overlapEnd = new Date(overlapStart.getTime() + 45 * 60_000);
-    appointments.push(
-      {
-        id: `appt-overlap-${first.id}`,
-        calendarId: first.id,
-        locationId: first.locationId,
-        dentistUserId: first.dentistUserId,
-        patientName: "Renata Xavier",
-        patientPhone: "(11) 95555-1010",
-        procedureName: "Consulta / avaliação",
-        start: overlapStart,
-        end: overlapEnd,
-        status: "SCHEDULED",
-      },
-      {
-        id: `appt-overlap-${second.id}`,
-        calendarId: second.id,
-        locationId: second.locationId,
-        dentistUserId: second.dentistUserId,
-        patientName: "Igor Menezes",
-        patientPhone: "(11) 95555-2020",
-        procedureName: "Limpeza (profilaxia)",
-        start: overlapStart,
-        end: overlapEnd,
-        status: "SCHEDULED",
-      },
-    );
-  }
-
-  return appointments;
-}
-
-export function useAgendaData(currentUser: CurrentUser | null) {
+export function useAgendaData(currentUser: CurrentUser | null, from: Date, to: Date, clinicId?: string) {
   const orgQuery = useQuery({ queryKey: ["my-clinic"], queryFn: myClinicApi.get });
   const clinicsQuery = useQuery({ queryKey: ["clinics"], queryFn: () => clinicsApi.list() });
 
@@ -203,10 +67,17 @@ export function useAgendaData(currentUser: CurrentUser | null) {
     ? resolveCalendarAxis(orgQuery.data.type, can(currentUser, "organization.dentists"))
     : "none";
 
+  // includeInactive: true para resolver nome e cor de dentistas desativados
+  // em agendamentos passados que ainda aparecem na janela carregada.
   const dentistsQuery = useQuery({
-    queryKey: ["organization", "dentists"],
-    queryFn: myClinicApi.dentists,
+    queryKey: ["organization", "dentists", "includeInactive"],
+    queryFn: () => myClinicApi.dentists(true),
     enabled: axis === "dentist",
+  });
+
+  const appointmentsQuery = useQuery({
+    queryKey: ["appointments", from.toISOString(), to.toISOString(), clinicId],
+    queryFn: () => appointmentsApi.list({ from, to, clinicId }),
   });
 
   const locations: MockLocation[] = useMemo(() => {
@@ -222,25 +93,35 @@ export function useAgendaData(currentUser: CurrentUser | null) {
     if (axis !== "dentist") return [];
     const roster = dentistsQuery.data ?? [];
     return roster.map((dentist, index) => ({
-      id: dentist.userId,
+      id: dentist.id,
       name: dentist.name,
       colorToken: fromApiColorToken(dentist.colorToken) ?? locationColorForIndex(index),
     }));
   }, [axis, dentistsQuery.data]);
 
-  const calendars = useMemo(
-    () => buildCalendars(axis, locations, dentists, currentUser),
-    [axis, locations, dentists, currentUser],
+  const appointments: MockAppointment[] = useMemo(
+    () =>
+      (appointmentsQuery.data ?? []).map((appt) => ({
+        id: appt.id,
+        calendarId: appt.id,
+        locationId: appt.clinicId,
+        dentistUserId: appt.dentistUserId,
+        patientName: appt.patient.name,
+        patientPhone: appt.patient.phone ?? "",
+        procedureName: appt.notes ?? "",
+        start: new Date(appt.startsAt),
+        end: new Date(appt.endsAt),
+        status: appt.status,
+      })),
+    [appointmentsQuery.data],
   );
-
-  const appointments = useMemo(() => buildAppointments(calendars), [calendars]);
 
   return {
     axis,
     locations,
     dentists,
-    calendars,
     appointments,
+    appointmentsQuery,
     isLoading: orgQuery.isLoading || clinicsQuery.isLoading || (axis === "dentist" && dentistsQuery.isLoading),
   };
 }

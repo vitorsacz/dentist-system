@@ -20,22 +20,30 @@ export class AppointmentsService {
   ) {}
 
   list(query: ListAppointmentsQuery, actor: AuthenticatedUser) {
-    const dentistOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN");
-    const baseWhere = {
+    const windowMs = query.to.getTime() - query.from.getTime();
+    if (windowMs > 42 * 24 * 60 * 60 * 1000) {
+      throw new UnprocessableEntityException("Janela máxima de 42 dias");
+    }
+
+    // DENTIST-only: ignore the query param, always scope to own appointments.
+    const dentistOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN") && !actor.roles.includes("RECEPTIONIST");
+    const effectiveDentistId = dentistOnly ? actor.id : query.dentistUserId;
+
+    const where = {
       startsAt: { gte: query.from, lte: query.to },
       ...(query.clinicId ? { clinicId: query.clinicId } : {}),
-      ...(dentistOnly ? { dentistUserId: actor.id } : {}),
+      ...(effectiveDentistId ? { dentistUserId: effectiveDentistId } : {}),
     };
 
     if (dentistOnly) {
       return this.prisma.appointment.findMany({
-        where: baseWhere,
+        where,
         include: { patient: { select: { id: true, name: true, phone: true, active: true } }, clinic: true },
         orderBy: { startsAt: "asc" },
       });
     }
     return this.prisma.appointment.findMany({
-      where: baseWhere,
+      where,
       include: { patient: true, clinic: true },
       orderBy: { startsAt: "asc" },
     });
