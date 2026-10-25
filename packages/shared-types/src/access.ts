@@ -29,7 +29,7 @@ export const ACCESS = {
 
   // Leitura inclui ADMIN (vê agenda completa). Escrita: DENTIST e RECEPTIONIST only.
   "appointments.read": ["ADMIN", "DENTIST", "RECEPTIONIST"],
-  "appointments.manage": ["DENTIST", "RECEPTIONIST"],
+  "appointments.manage": ["ADMIN", "DENTIST", "RECEPTIONIST"],
 
   // Atendimento financeiro (lançamento com baixa de estoque).
   "attendances.read": ["DENTIST"],

@@ -27,8 +27,10 @@ const VIEW_LABEL: Record<ViewKey, string> = {
   dayGridMonth: "Mês",
 };
 
+import type { AppointmentListItem } from "./api";
+
 interface ModalState {
-  editingAppointment: MockAppointment | null;
+  editingAppointment: AppointmentListItem | null;
   initialDate: Date;
   initialStart?: Date;
   initialEnd?: Date;
@@ -64,6 +66,11 @@ export function AgendaPage() {
   const [rangeLabel, setRangeLabel] = useState("");
   const [modalState, setModalState] = useState<ModalState | null>(null);
   const [detailAppointment, setDetailAppointment] = useState<MockAppointment | null>(null);
+  // Map from appointment id to AppointmentListItem for editing
+  const appointmentItemById = useMemo(
+    () => new Map((mock.appointmentsQuery.data ?? []).map((a) => [a.id, a])),
+    [mock.appointmentsQuery.data],
+  );
 
   // Eixo decidido centralizadamente no hook (organization.type + papel) —
   // ver useAgendaData/resolveCalendarAxis. "dentist" = clínica, admin/
@@ -111,11 +118,8 @@ export function AgendaPage() {
     setDetailAppointment(appt);
   }
 
-  function handleSaveAppointment(appointment: MockAppointment) {
-    setAppointments((prev) => {
-      const exists = prev.some((a) => a.id === appointment.id);
-      return exists ? prev.map((a) => (a.id === appointment.id ? appointment : a)) : [...prev, appointment];
-    });
+  function handleModalSuccess() {
+    queryClient.invalidateQueries({ queryKey: ["appointments"] });
     setModalState(null);
   }
 
@@ -321,8 +325,9 @@ export function AgendaPage() {
           initialStart={modalState.initialStart}
           initialEnd={modalState.initialEnd}
           editingAppointment={modalState.editingAppointment}
+          actorRoles={user?.roles ?? []}
           onClose={() => setModalState(null)}
-          onSave={handleSaveAppointment}
+          onSuccess={handleModalSuccess}
         />
       )}
 
@@ -333,8 +338,9 @@ export function AgendaPage() {
           dentist={dentistById.get(detailAppointment.dentistUserId)}
           onClose={() => setDetailAppointment(null)}
           onReschedule={() => {
+            const item = appointmentItemById.get(detailAppointment.id) ?? null;
             setModalState({
-              editingAppointment: detailAppointment,
+              editingAppointment: item,
               initialDate: detailAppointment.start,
               initialStart: detailAppointment.start,
               initialEnd: detailAppointment.end,
