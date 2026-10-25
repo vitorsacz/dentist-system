@@ -153,9 +153,44 @@ describe("GET /organization/dentists (e2e)", () => {
     expect(ids).toContain(dentistBId);
   });
 
-  it("lista só inclui dentistas ativos", async () => {
+  it("lista só inclui dentistas ativos (default)", async () => {
     const res = await as(adminToken).get("/organization/dentists");
     expect(res.status).toBe(200);
     expect(res.body.every((d: { active: boolean }) => d.active === true)).toBe(true);
+  });
+
+  it("?includeInactive=true devolve ativos e inativos; sem o param o inativo some", async () => {
+    const ts2 = Date.now() + 1;
+    const hash = await import("bcrypt").then((b) => b.hash(TEST_PASSWORD, 10));
+    const orgC = await rawPrisma.organization.create({ data: { name: `OrgDentists C ${ts2}` } });
+    const adminC = await rawPrisma.user.create({
+      data: {
+        organizationId: orgC.id,
+        email: `od-admin-c-${ts2}@test.com`,
+        passwordHash: hash,
+        name: "Admin C",
+        roles: ["ADMIN"],
+      },
+    });
+    await rawPrisma.organization.update({ where: { id: orgC.id }, data: { foundingAdminUserId: adminC.id } });
+    const inactiveDentist = await rawPrisma.user.create({
+      data: {
+        organizationId: orgC.id,
+        email: `od-inactive-${ts2}@test.com`,
+        passwordHash: hash,
+        name: "Inativo OrgC",
+        roles: ["DENTIST"],
+        active: false,
+      },
+    });
+    const adminCToken = await loginAs(adminC.email);
+
+    const withInactive = await as(adminCToken).get("/organization/dentists?includeInactive=true");
+    expect(withInactive.status).toBe(200);
+    expect(withInactive.body.some((d: { id: string }) => d.id === inactiveDentist.id)).toBe(true);
+
+    const withoutInactive = await as(adminCToken).get("/organization/dentists");
+    expect(withoutInactive.status).toBe(200);
+    expect(withoutInactive.body.some((d: { id: string }) => d.id === inactiveDentist.id)).toBe(false);
   });
 });

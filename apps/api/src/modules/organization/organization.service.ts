@@ -34,9 +34,9 @@ export class OrganizationService {
   // ADMIN/RECEPTIONIST only, ver OrganizationController. Só dentista ativo
   // — inativo some do roster (histórico de agendamentos passados, quando
   // existir de verdade, continua vinculado a ele mesmo assim).
-  async findDentists(organizationId: string): Promise<OrganizationDentist[]> {
+  async findDentists(organizationId: string, includeInactive = false): Promise<OrganizationDentist[]> {
     const dentists = await this.prisma.user.findMany({
-      where: { organizationId, roles: { has: "DENTIST" }, active: true },
+      where: { organizationId, roles: { has: "DENTIST" }, ...(includeInactive ? {} : { active: true }) },
       select: { id: true, name: true, nickname: true, colorToken: true, active: true },
       orderBy: { name: "asc" },
     });

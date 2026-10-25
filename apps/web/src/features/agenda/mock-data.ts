@@ -67,9 +67,11 @@ export function useAgendaData(currentUser: CurrentUser | null, from: Date, to: D
     ? resolveCalendarAxis(orgQuery.data.type, can(currentUser, "organization.dentists"))
     : "none";
 
+  // includeInactive: true para resolver nome e cor de dentistas desativados
+  // em agendamentos passados que ainda aparecem na janela carregada.
   const dentistsQuery = useQuery({
-    queryKey: ["organization", "dentists"],
-    queryFn: myClinicApi.dentists,
+    queryKey: ["organization", "dentists", "includeInactive"],
+    queryFn: () => myClinicApi.dentists(true),
     enabled: axis === "dentist",
   });
 
