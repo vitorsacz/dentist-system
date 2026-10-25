@@ -1,7 +1,18 @@
 import { PrismaClient, type Role } from "@prisma/client";
 import * as bcrypt from "bcrypt";
+import { seedHmlPersonas } from "./scripts/seed-test-personas";
 
 const prisma = new PrismaClient();
+
+const APP_ENV = process.env.APP_ENV ?? "dev";
+
+// Proteção explícita: seed nunca deve rodar em produção. Em produção os
+// usuários iniciais são criados manualmente ou via SEED_* vars durante o
+// primeiro deploy controlado, não via este script.
+if (APP_ENV === "prod") {
+  console.error("seed bloqueado: APP_ENV=prod. Execute apenas em dev ou hml.");
+  process.exit(1);
+}
 
 const DEFAULT_ORG_NAME = "Consultório Padrão";
 
@@ -69,7 +80,7 @@ async function seedTenantUser(
   return user;
 }
 
-async function main() {
+async function seedDev() {
   await seedSuperAdmin();
 
   let org = await prisma.organization.findFirst({ where: { name: DEFAULT_ORG_NAME } });
@@ -93,6 +104,14 @@ async function main() {
     if (!existingProcedure) {
       await prisma.procedureCatalog.create({ data: { ...procedure, organizationId: org.id } });
     }
+  }
+}
+
+async function main() {
+  if (APP_ENV === "hml") {
+    await seedHmlPersonas(prisma);
+  } else {
+    await seedDev();
   }
 }
 

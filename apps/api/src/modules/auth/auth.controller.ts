@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UnauthorizedException } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { Throttle } from "@nestjs/throttler";
+import { ConfigService } from "@nestjs/config";
 import { loginSchema, type LoginInput, type LoginResult } from "@dentist-system/shared-types";
 import {
   LOGIN_RATE_LIMIT,
@@ -13,12 +14,17 @@ import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { REFRESH_SESSION_TTL_MS, type SessionClientInfo } from "../sessions/refresh-sessions.service";
 import { AuthService } from "./auth.service";
+import { refreshCookieOptions } from "../../config/cookie-policy";
+import type { Env } from "../../config/env.validation";
 
 const REFRESH_COOKIE = "refresh_token";
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService<Env, true>,
+  ) {}
 
   // Único ponto público que recebe um identifier. Não existe mais rota que
   // diga se um e-mail existe ou em quais organizações está (o antigo
@@ -100,15 +106,10 @@ export class AuthController {
   }
 
   private getRefreshCookieOptions() {
-    // Vercel (front) e Render (back) são domínios diferentes: cookie precisa de
-    // SameSite=None (+ Secure) pra ser enviado em fetch cross-site com credentials:"include".
-    // Em dev local (http://localhost) Secure quebraria o cookie, por isso o fallback abaixo.
-    const isProd = process.env.NODE_ENV === "production";
-    return {
-      httpOnly: true,
-      sameSite: (isProd ? "none" : "lax") as "none" | "lax",
-      secure: isProd,
-    };
+    return refreshCookieOptions({
+      COOKIE_SAMESITE: this.config.get("COOKIE_SAMESITE", { infer: true }),
+      COOKIE_SECURE: this.config.get("COOKIE_SECURE", { infer: true }),
+    });
   }
 
   private setRefreshCookie(res: Response, refreshToken: string) {

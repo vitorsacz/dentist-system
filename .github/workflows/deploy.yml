@@ -1,0 +1,107 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+# Um deploy por vez por ambiente. cancel-in-progress: false garante que um
+# deploy já aprovado para prod não seja cancelado por um novo trigger.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-hml:
+    name: Deploy → hml
+    runs-on: ubuntu-latest
+    environment: hml
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.15.1
+
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Migrate hml
+        # DATABASE_URL aponta para pooler (runtime); DIRECT_URL para conexão
+        # direta (migrations). Prisma exige conexão direta — nunca PgBouncer.
+        run: pnpm --filter @dentist-system/api exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.HML_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.HML_DIRECT_URL }}
+
+      - name: Trigger Render deploy hml
+        # A URL do hook já é o segredo; --output /dev/null evita que a resposta
+        # ou qualquer eco da URL apareça nos logs.
+        run: >
+          curl --fail --silent --show-error --output /dev/null
+          -X POST "${{ secrets.RENDER_HML_DEPLOY_HOOK }}"
+
+      - name: Wait for hml to come up
+        run: sleep 90
+
+      - name: Smoke test hml
+        # Falha aqui impede que deploy-prod seja iniciado (needs: deploy-hml).
+        run: |
+          STATUS=$(curl --fail --silent "${{ secrets.HML_API_URL }}/health" | jq -r '.status')
+          if [ "$STATUS" != "ok" ]; then
+            echo "Smoke test failed: /health returned status=$STATUS"
+            exit 1
+          fi
+          echo "Smoke test passed: hml /health ok"
+
+  deploy-prod:
+    name: Deploy → prod
+    needs: deploy-hml
+    runs-on: ubuntu-latest
+    # Requer aprovação manual configurada em Settings → Environments → prod
+    # → Required reviewers. O job só avança após aprovação explícita.
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.15.1
+
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Migrate prod
+        run: pnpm --filter @dentist-system/api exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+
+      - name: Trigger Render deploy prod
+        run: >
+          curl --fail --silent --show-error --output /dev/null
+          -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"

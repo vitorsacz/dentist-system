@@ -12,6 +12,14 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: APP_ENV
+        value: prod
+      - key: COOKIE_SAMESITE
+        value: none
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COMMIT_SHA
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
