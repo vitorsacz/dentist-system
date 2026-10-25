@@ -1,6 +1,6 @@
 import { PrismaClient, type Role } from "@prisma/client";
 import * as bcrypt from "bcrypt";
-import { seedHmlPersonas } from "./scripts/seed-test-personas";
+import { seedHmlPersonas } from "./scripts/seed-hml-personas";
 import { chooseSeed } from "./seed-dispatch";
 
 const prisma = new PrismaClient();
