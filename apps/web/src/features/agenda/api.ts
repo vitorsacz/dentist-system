@@ -10,8 +10,8 @@ export interface AppointmentListItem {
   endsAt: string;
   status: AppointmentStatus;
   notes: string | null;
-  patient: { id: string; name: string; phone: string | null };
-  clinic: { id: string; name: string };
+  patient: { id: string; name: string; phone: string | null; active: boolean };
+  clinic: { id: string; name: string; colorToken: string | null };
 }
 
 export interface ListAppointmentsParams {

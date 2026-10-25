@@ -14,10 +14,10 @@ import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/cur
 import { AppointmentsService } from "./appointments.service";
 
 @Controller("appointments")
-@Roles(...ACCESS["appointments.manage"])
 export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
+  @Roles(...ACCESS["appointments.read"])
   @Get()
   list(
     @Query(new ZodValidationPipe(listAppointmentsQuerySchema)) query: ListAppointmentsQuery,
@@ -26,11 +26,13 @@ export class AppointmentsController {
     return this.appointmentsService.list(query, user);
   }
 
+  @Roles(...ACCESS["appointments.read"])
   @Get(":id")
   findOne(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.appointmentsService.findOne(id, user);
   }
 
+  @Roles(...ACCESS["appointments.manage"])
   @Post()
   create(
     @Body(new ZodValidationPipe(createAppointmentSchema)) body: CreateAppointmentInput,
@@ -39,6 +41,7 @@ export class AppointmentsController {
     return this.appointmentsService.create(body, user);
   }
 
+  @Roles(...ACCESS["appointments.manage"])
   @Patch(":id")
   update(
     @Param("id") id: string,
