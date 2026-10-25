@@ -524,6 +524,7 @@ describe("PatientAccess (e2e)", () => {
   describe("DENTIST deactivation", () => {
     let dentistDId: string;
     let deactivatePatientId: string;
+    let deactivateInactivePatientId: string;
     let deactivateApptId: string;
     let dentistDRefreshCookie: string;
 
@@ -548,6 +549,12 @@ describe("PatientAccess (e2e)", () => {
         data: { organizationId: orgId, name: "Paciente D", phone: `119${ts}`.slice(0, 11), createdByUserId: uD.id, ownerDentistId: uD.id },
       });
       deactivatePatientId = p.id;
+
+      // Inactive patient owned by D — must be reassigned even when active=false
+      const pInactive = await rawPrisma.patient.create({
+        data: { organizationId: orgId, name: "Paciente D Inativo", phone: `118${ts}`.slice(0, 11), createdByUserId: uD.id, ownerDentistId: uD.id, active: false },
+      });
+      deactivateInactivePatientId = pInactive.id;
 
       // Create a share from D with A
       await rawPrisma.patientShare.create({
@@ -598,6 +605,10 @@ describe("PatientAccess (e2e)", () => {
 
       const patient = await rawPrisma.patient.findUnique({ where: { id: deactivatePatientId } });
       expect(patient?.ownerDentistId).toBe(userAId);
+
+      // Inactive patient must also be reassigned (no active filter in deactivation)
+      const inactivePatient = await rawPrisma.patient.findUnique({ where: { id: deactivateInactivePatientId } });
+      expect(inactivePatient?.ownerDentistId).toBe(userAId);
 
       const appt = await rawPrisma.appointment.findUnique({ where: { id: deactivateApptId } });
       expect(appt?.dentistUserId).toBe(userAId);

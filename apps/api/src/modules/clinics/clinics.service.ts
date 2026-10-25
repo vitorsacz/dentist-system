@@ -64,6 +64,7 @@ export class ClinicsService {
     }
 
     if (input.active === false) {
+      // TODO: registrar auditoria de desativação/reativação de consultório — aguardando AuditLog genérico.
       const activeCount = await this.prisma.clinic.count({ where: { organizationId, active: true } });
       if (activeCount <= 1) {
         throw new ConflictException("Não é possível desativar o último consultório ativo da organização");

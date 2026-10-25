@@ -36,6 +36,7 @@ export interface MockAppointment {
   start: Date;
   end: Date;
   status: AppointmentStatus;
+  patientActive?: boolean;
 }
 
 // Qual eixo a sidebar de calendários mostra — decisão centralizada aqui

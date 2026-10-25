@@ -30,7 +30,7 @@ export class AppointmentsService {
     if (dentistOnly) {
       return this.prisma.appointment.findMany({
         where: baseWhere,
-        include: { patient: { select: { id: true, name: true, phone: true } }, clinic: true },
+        include: { patient: { select: { id: true, name: true, phone: true, active: true } }, clinic: true },
         orderBy: { startsAt: "asc" },
       });
     }
