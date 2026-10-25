@@ -7,6 +7,7 @@ import { PrismaClient } from "@prisma/client";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.setup";
 import { TEST_DATABASE_URL } from "./test-db";
+import { teardownAll } from "./helpers/teardown";
 
 // Refresh token revogável com rotação (S3). Cada login num "navegador" abre
 // uma família de sessões; o refresh troca o token a cada uso; reuso de um
@@ -60,8 +61,7 @@ describe("Sessões de refresh revogáveis", () => {
     configureApp(app);
     await app.init();
 
-    await rawPrisma.organization.deleteMany({});
-    await rawPrisma.user.deleteMany({});
+    await teardownAll(rawPrisma);
     const org = await rawPrisma.organization.create({ data: { name: "Clínica (teste sessões)" } });
     organizationId = org.id;
     const admin = await createUser("ADMIN");
@@ -70,8 +70,7 @@ describe("Sessões de refresh revogáveis", () => {
   }, 30000);
 
   afterAll(async () => {
-    await rawPrisma.organization.deleteMany({});
-    await rawPrisma.user.deleteMany({});
+    await teardownAll(rawPrisma);
     await rawPrisma.$disconnect();
     await app.close();
   });
