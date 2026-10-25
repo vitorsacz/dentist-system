@@ -30,5 +30,6 @@ export const listAppointmentsQuerySchema = z.object({
   from: z.coerce.date(),
   to: z.coerce.date(),
   clinicId: z.string().optional(),
+  dentistUserId: z.string().optional(),
 });
 export type ListAppointmentsQuery = z.infer<typeof listAppointmentsQuerySchema>;

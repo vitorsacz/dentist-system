@@ -17,6 +17,7 @@ import { AppointmentCreateModal } from "./appointment-create-modal";
 import { AppointmentDetailPanel } from "./appointment-detail-panel";
 import { useAgendaData, type MockAppointment } from "./mock-data";
 import { LOCATION_COLOR_HEX, toApiColorToken, type LocationColorToken } from "./location-colors";
+import { QueryStateWrapper } from "@/lib/use-query-state";
 import "./agenda.css";
 
 type ViewKey = "timeGridDay" | "timeGridWeek" | "dayGridMonth";
@@ -33,16 +34,27 @@ interface ModalState {
   initialEnd?: Date;
 }
 
+function initialWeekRange(): { from: Date; to: Date } {
+  const d = new Date();
+  const diff = d.getDay() === 0 ? -6 : 1 - d.getDay();
+  const from = new Date(d);
+  from.setDate(d.getDate() + diff);
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(from.getTime() + 7 * 24 * 60 * 60 * 1000);
+  return { from, to };
+}
+
 export function AgendaPage() {
   const { user } = useAuth();
-  const mock = useAgendaData(user);
+  const [visibleRange, setVisibleRange] = useState(initialWeekRange);
+  const mock = useAgendaData(user, visibleRange.from, visibleRange.to);
   const queryClient = useQueryClient();
   const calendarRef = useRef<FullCalendar>(null);
 
   const [appointments, setAppointments] = useState<MockAppointment[]>([]);
   useEffect(() => {
-    if (!mock.isLoading) setAppointments(mock.appointments);
-  }, [mock.isLoading, mock.appointments]);
+    setAppointments(mock.appointments);
+  }, [mock.appointments]);
 
   const [hiddenLocationIds, setHiddenLocationIds] = useState<Set<string>>(new Set());
   const [hiddenDentistIds, setHiddenDentistIds] = useState<Set<string>>(new Set());
@@ -247,47 +259,54 @@ export function AgendaPage() {
         {/* axis === "none": dentista de clínica, sem sidebar — só a própria agenda */}
 
         <div className="agenda-calendar min-w-0 flex-1 rounded-2xl border border-line bg-surface p-3">
-          <FullCalendar
-            ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView={view}
-            headerToolbar={false}
-            height="75vh"
-            nowIndicator
-            selectable
-            selectMirror
-            slotEventOverlap={!viewByDentist}
-            slotMinTime="07:00:00"
-            slotMaxTime="20:00:00"
-            locale="pt-br"
-            firstDay={1}
-            events={events}
-            select={handleSelect}
-            eventClick={handleEventClick}
-            datesSet={(arg: DatesSetArg) => setRangeLabel(arg.view.title)}
-            eventContent={(arg: EventContentArg) => {
-              const appt = arg.event.extendedProps.appointment as MockAppointment | undefined;
-              // O preview de seleção (selectMirror, enquanto o usuário arrasta
-              // pra criar um agendamento) dispara eventContent sem
-              // extendedProps.appointment — não é um evento de verdade.
-              if (!appt) return null;
-              const color = viewByDentist
-                ? LOCATION_COLOR_HEX[dentistById.get(appt.dentistUserId)?.colorToken ?? "brand"]
-                : LOCATION_COLOR_HEX[locationById.get(appt.locationId)?.colorToken ?? "brand"];
-              return (
-                <div
-                  className="flex h-full items-stretch gap-1.5 overflow-hidden rounded-lg px-1.5 py-1 text-xs"
-                  style={{ backgroundColor: color.light }}
-                >
-                  <span className="w-1 shrink-0 rounded-full" style={{ backgroundColor: color.solid }} />
-                  <div className="min-w-0 truncate text-ink">
-                    <p className="truncate font-medium">{appt.patientName}</p>
-                    <p className="truncate text-[11px] text-muted">{appt.procedureName}</p>
-                  </div>
-                </div>
-              );
-            }}
-          />
+          <QueryStateWrapper query={mock.appointmentsQuery}>
+            {() => (
+              <FullCalendar
+                ref={calendarRef}
+                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                initialView={view}
+                headerToolbar={false}
+                height="75vh"
+                nowIndicator
+                selectable
+                selectMirror
+                slotEventOverlap={!viewByDentist}
+                slotMinTime="07:00:00"
+                slotMaxTime="20:00:00"
+                locale="pt-br"
+                firstDay={1}
+                events={events}
+                select={handleSelect}
+                eventClick={handleEventClick}
+                datesSet={(arg: DatesSetArg) => {
+                  setRangeLabel(arg.view.title);
+                  setVisibleRange({ from: arg.start, to: arg.end });
+                }}
+                eventContent={(arg: EventContentArg) => {
+                  const appt = arg.event.extendedProps.appointment as MockAppointment | undefined;
+                  // O preview de seleção (selectMirror, enquanto o usuário arrasta
+                  // pra criar um agendamento) dispara eventContent sem
+                  // extendedProps.appointment — não é um evento de verdade.
+                  if (!appt) return null;
+                  const color = viewByDentist
+                    ? LOCATION_COLOR_HEX[dentistById.get(appt.dentistUserId)?.colorToken ?? "brand"]
+                    : LOCATION_COLOR_HEX[locationById.get(appt.locationId)?.colorToken ?? "brand"];
+                  return (
+                    <div
+                      className="flex h-full items-stretch gap-1.5 overflow-hidden rounded-lg px-1.5 py-1 text-xs"
+                      style={{ backgroundColor: color.light }}
+                    >
+                      <span className="w-1 shrink-0 rounded-full" style={{ backgroundColor: color.solid }} />
+                      <div className="min-w-0 truncate text-ink">
+                        <p className="truncate font-medium">{appt.patientName}</p>
+                        <p className="truncate text-[11px] text-muted">{appt.procedureName}</p>
+                      </div>
+                    </div>
+                  );
+                }}
+              />
+            )}
+          </QueryStateWrapper>
         </div>
       </div>
 
