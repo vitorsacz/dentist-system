@@ -63,7 +63,7 @@ export function PatientDetailPage() {
 
   const dentistsQuery = useQuery({
     queryKey: ["organization", "dentists"],
-    queryFn: myClinicApi.dentists,
+    queryFn: () => myClinicApi.dentists(),
     enabled: canEditOwner && editMode,
   });
 

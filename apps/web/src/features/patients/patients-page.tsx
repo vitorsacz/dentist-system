@@ -49,7 +49,7 @@ export function PatientsPage() {
   });
   const dentistsQuery = useQuery({
     queryKey: ["organization", "dentists"],
-    queryFn: myClinicApi.dentists,
+    queryFn: () => myClinicApi.dentists(),
     enabled: needsDentistSelect,
   });
   const orgQuery = useQuery<MyClinic>({
