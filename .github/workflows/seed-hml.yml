@@ -34,7 +34,7 @@ jobs:
       - name: Gerar Prisma Client
         run: pnpm --filter @dentist-system/api prisma generate
 
-      - name: Executar seed HML
+      - name: Executar seed HML (sempre apaga e recria orgs [SEED-HML])
         run: pnpm --filter @dentist-system/api db:seed
         env:
           APP_ENV: hml
