@@ -11,7 +11,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest --config test/jest-unit.config.js && jest --config test/jest-e2e.config.js --runInBand",
     "prisma": "prisma",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed:dev": "cross-env APP_ENV=dev tsx prisma/seed.ts",
+    "db:migrate:test": "cross-env DATABASE_URL=postgresql://postgres:postgres@localhost:5433/dentist_test DIRECT_URL=postgresql://postgres:postgres@localhost:5433/dentist_test prisma migrate deploy"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -53,6 +56,7 @@
     "prisma": "^5.22.0",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.12",
+    "cross-env": "^7.0.3",
     "tsx": "^4.19.2",
     "typescript": "^5.7.0"
   }
