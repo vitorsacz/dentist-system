@@ -1,7 +1,9 @@
 import { execSync } from "node:child_process";
+import { assertTestDatabase } from "./db-guard";
 import { TEST_DATABASE_URL } from "./test-db";
 
 export default async function globalSetup() {
+  assertTestDatabase(TEST_DATABASE_URL);
   execSync("pnpm prisma migrate deploy", {
     cwd: __dirname + "/..",
     stdio: "inherit",

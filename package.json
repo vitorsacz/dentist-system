@@ -13,9 +13,15 @@
     "test": "turbo run test",
     "db:migrate": "pnpm --filter @dentist-system/api prisma migrate dev",
     "db:generate": "pnpm --filter @dentist-system/api prisma generate",
-    "db:seed": "pnpm --filter @dentist-system/api db:seed"
+    "db:seed": "pnpm --filter @dentist-system/api db:seed",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d postgres",
+    "db:seed:dev": "pnpm --filter @dentist-system/api db:seed:dev",
+    "db:migrate:test": "pnpm --filter @dentist-system/api db:migrate:test"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "turbo": "^2.3.0",
     "typescript": "^5.7.0"
   }
