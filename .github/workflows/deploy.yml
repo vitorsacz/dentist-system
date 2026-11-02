@@ -1,107 +1,177 @@
-name: Deploy
+name: Promote to Production
 
 on:
   workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit SHA to promote (default: HEAD of main)'
+        required: false
+        default: ''
+      rollback:
+        description: 'Move production to an OLDER commit (ancestor of current production)'
+        type: boolean
+        required: false
+        default: false
 
-# Um deploy por vez por ambiente. cancel-in-progress: false garante que um
-# deploy já aprovado para prod não seja cancelado por um novo trigger.
+# Um único gate de promoção por vez; não cancela em andamento.
 concurrency:
-  group: deploy
+  group: deploy-prod
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
-  deploy-hml:
-    name: Deploy → hml
+  promote:
+    name: Promote → production
     runs-on: ubuntu-latest
-    environment: hml
+    # Pausa aqui para aprovação do environment "prod".
+    environment: prod
+
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.13.0
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.15.1
-
-      - name: Get pnpm store directory
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Migrate hml
-        # DATABASE_URL aponta para pooler (runtime); DIRECT_URL para conexão
-        # direta (migrations). Prisma exige conexão direta — nunca PgBouncer.
-        run: pnpm --filter @dentist-system/api exec prisma migrate deploy
+      - name: Resolve SHA
+        id: sha
         env:
-          DATABASE_URL: ${{ secrets.HML_DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.HML_DIRECT_URL }}
-
-      - name: Trigger Render deploy hml
-        # A URL do hook já é o segredo; --output /dev/null evita que a resposta
-        # ou qualquer eco da URL apareça nos logs.
-        run: >
-          curl --fail --silent --show-error --output /dev/null
-          -X POST "${{ secrets.RENDER_HML_DEPLOY_HOOK }}"
-
-      - name: Wait for hml to come up
-        run: sleep 90
-
-      - name: Smoke test hml
-        # Falha aqui impede que deploy-prod seja iniciado (needs: deploy-hml).
+          GH_TOKEN: ${{ github.token }}
         run: |
-          STATUS=$(curl --fail --silent "${{ secrets.HML_API_URL }}/health" | jq -r '.status')
-          if [ "$STATUS" != "ok" ]; then
-            echo "Smoke test failed: /health returned status=$STATUS"
+          if [ -n "${{ inputs.sha }}" ]; then
+            SHA="${{ inputs.sha }}"
+          else
+            SHA=$(gh api "repos/${{ github.repository }}/git/ref/heads/main" --jq '.object.sha')
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "SHA: $SHA"
+
+      - name: Verify CI check 'build' is green
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ steps.sha.outputs.sha }}"
+          CONCLUSION=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs" \
+            --jq '[.check_runs[] | select(.name == "build")] | .[0].conclusion')
+          echo "build: $CONCLUSION"
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "ERROR: check 'build' not green for $SHA (got: $CONCLUSION)"
             exit 1
           fi
-          echo "Smoke test passed: hml /health ok"
 
-  deploy-prod:
-    name: Deploy → prod
-    needs: deploy-hml
-    runs-on: ubuntu-latest
-    # Requer aprovação manual configurada em Settings → Environments → prod
-    # → Required reviewers. O job só avança após aprovação explícita.
-    environment: prod
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.13.0
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.15.1
-
-      - name: Get pnpm store directory
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Migrate prod
-        run: pnpm --filter @dentist-system/api exec prisma migrate deploy
+      - name: Verify Vercel status checks are green
         env:
-          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ steps.sha.outputs.sha }}"
+          for CTX in "Vercel – dentist-system-web" "Vercel – dentist-system-web-hml"; do
+            STATE=$(gh api "repos/${{ github.repository }}/commits/$SHA/status" \
+              --jq --arg c "$CTX" '.statuses[] | select(.context == $c) | .state' | head -1)
+            echo "$CTX: $STATE"
+            if [ "$STATE" != "success" ]; then
+              echo "ERROR: Vercel check '$CTX' not green for $SHA (got: $STATE)"
+              exit 1
+            fi
+          done
 
-      - name: Trigger Render deploy prod
-        run: >
-          curl --fail --silent --show-error --output /dev/null
-          -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
+      - name: Smoke HML — wait for version==SHA and appEnv==hml
+        run: |
+          SHA="${{ steps.sha.outputs.sha }}"
+          HML_URL="${{ vars.HML_API_URL }}"
+          DEADLINE=$((SECONDS + 600))
+          WAIT=10
+          while true; do
+            RESP=$(curl --silent --max-time 10 "$HML_URL/health" 2>/dev/null || echo '{}')
+            VERSION=$(echo "$RESP" | jq -r '.version // empty')
+            APPENV=$(echo "$RESP" | jq -r '.appEnv // empty')
+            echo "$(date -u +%T)  version=$VERSION  appEnv=$APPENV"
+            if [ "$VERSION" = "$SHA" ] && [ "$APPENV" = "hml" ]; then
+              echo "HML smoke test passed."
+              break
+            fi
+            if [ $SECONDS -ge $DEADLINE ]; then
+              echo "ERROR: HML smoke test timed out after 10 min. Last response: $RESP"
+              exit 1
+            fi
+            sleep $WAIT
+            # Backoff exponencial até 60 s (serviço free do Render pode hibernar).
+            WAIT=$(( WAIT < 60 ? WAIT * 2 : 60 ))
+          done
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Advance production branch
+        id: advance
+        run: |
+          SHA="${{ steps.sha.outputs.sha }}"
+          ROLLBACK="${{ inputs.rollback }}"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          PREV_SHA=$(git ls-remote origin refs/heads/production | cut -f1)
+          echo "prev_sha=${PREV_SHA:-none}" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$PREV_SHA" ]; then
+            if [ "$ROLLBACK" = "true" ]; then
+              # SHA deve ser ancestral de production (voltando no histórico).
+              if ! git merge-base --is-ancestor "$SHA" "$PREV_SHA"; then
+                echo "ERROR: rollback=true mas $SHA não é ancestral de production ($PREV_SHA)"
+                exit 1
+              fi
+              git push --force origin "$SHA:refs/heads/production"
+            else
+              # Normal: SHA deve ser descendente de production (fast-forward).
+              if ! git merge-base --is-ancestor "$PREV_SHA" "$SHA"; then
+                echo "ERROR: $SHA não é descendente de production ($PREV_SHA). Re-execute com rollback=true para retroceder."
+                exit 1
+              fi
+              git push origin "$SHA:refs/heads/production"
+            fi
+          else
+            git push origin "$SHA:refs/heads/production"
+          fi
+
+          echo "production → $SHA (era: ${PREV_SHA:-none})"
+
+      - name: Wait for prod — version==SHA and appEnv==prod
+        run: |
+          SHA="${{ steps.sha.outputs.sha }}"
+          PROD_URL="${{ vars.PROD_API_URL }}"
+          DEADLINE=$((SECONDS + 600))
+          WAIT=15
+          while true; do
+            RESP=$(curl --silent --max-time 10 "$PROD_URL/health" 2>/dev/null || echo '{}')
+            VERSION=$(echo "$RESP" | jq -r '.version // empty')
+            APPENV=$(echo "$RESP" | jq -r '.appEnv // empty')
+            echo "$(date -u +%T)  version=$VERSION  appEnv=$APPENV"
+            if [ "$VERSION" = "$SHA" ] && [ "$APPENV" = "prod" ]; then
+              echo "Prod health check passed."
+              break
+            fi
+            if [ $SECONDS -ge $DEADLINE ]; then
+              echo "ERROR: prod health check timed out after 10 min. Last response: $RESP"
+              exit 1
+            fi
+            sleep $WAIT
+            WAIT=$(( WAIT < 60 ? WAIT * 2 : 60 ))
+          done
+
+      - name: Job summary
+        if: always()
+        run: |
+          SHA="${{ steps.sha.outputs.sha }}"
+          PREV="${{ steps.advance.outputs.prev_sha }}"
+          ROLLBACK="${{ inputs.rollback }}"
+          {
+            if [ "$ROLLBACK" = "true" ]; then
+              echo "## ROLLBACK"
+            else
+              echo "## Promoção"
+            fi
+            echo ""
+            echo "| | SHA |"
+            echo "|---|---|"
+            echo "| **Promovido para** | \`$SHA\` |"
+            echo "| **Anterior (rollback ref)** | \`$PREV\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
