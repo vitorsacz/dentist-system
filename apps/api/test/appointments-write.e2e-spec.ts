@@ -58,6 +58,9 @@ describe("Appointments — escrita (e2e)", () => {
   let clinicId: string;
   let clinicInactiveId: string;
 
+  let dentistRecepToken: string;
+  let dentistRecepId: string;
+
   // Org 2
   let adminBToken: string;
 
@@ -132,6 +135,11 @@ describe("Appointments — escrita (e2e)", () => {
       data: { organizationId: orgId, email: `wr-rec-${ts}@t.com`, passwordHash: hash, name: "Rec WR", roles: ["RECEPTIONIST"] },
     });
 
+    const dentistRecepUser = await rawPrisma.user.create({
+      data: { organizationId: orgId, email: `wr-drecep-${ts}@t.com`, passwordHash: hash, name: "DentistRecep WR", roles: ["DENTIST", "RECEPTIONIST"] },
+    });
+    dentistRecepId = dentistRecepUser.id;
+
     const patientActive = await rawPrisma.patient.create({
       data: { organizationId: orgId, name: "Patient WR", phone: "11999999001", createdByUserId: dentistAId, ownerDentistId: dentistAId },
     });
@@ -172,6 +180,7 @@ describe("Appointments — escrita (e2e)", () => {
       data: [
         { patientId, dentistId: adminDentistId, organizationId: orgId, sharedById: adminId },
         { patientId, dentistId: dentistBId, organizationId: orgId, sharedById: adminId },
+        { patientId, dentistId: dentistRecepId, organizationId: orgId, sharedById: adminId },
       ],
     });
     // Share patient with adminUser doesn't make sense (not DENTIST), but for
@@ -184,6 +193,7 @@ describe("Appointments — escrita (e2e)", () => {
     dentistAToken = await loginAs(dentistA.email);
     await loginAs(dentistB.email); // login establishes session; token unused in tests
     receptionistToken = await loginAs(receptionistUser.email);
+    dentistRecepToken = await loginAs(dentistRecepUser.email);
     adminBToken = await loginAs(adminB.email);
   }, 60000);
 
@@ -579,6 +589,160 @@ describe("Appointments — escrita (e2e)", () => {
       const id = await makeAppt(dentistAId, 27);
       const res = await as(adminBToken).patch(`/appointments/${id}/cancel`);
       expect(res.status).toBe(404);
+    });
+  });
+
+  // ── GET /appointments/:id — findOne scope (Adjustment B) ──────────────────
+  describe("GET /appointments/:id — escopo por papel", () => {
+    let apptByA: string;
+    let apptByB: string;
+
+    beforeAll(async () => {
+      const slot1 = futureSlot(30 * DAY);
+      const r1 = await as(adminToken).post("/appointments", apptBody({ ...slot1, dentistUserId: dentistAId }));
+      expect(r1.status).toBe(201);
+      apptByA = r1.body.id;
+
+      const slot2 = futureSlot(31 * DAY);
+      const r2 = await as(adminToken).post("/appointments", apptBody({ ...slot2, dentistUserId: dentistBId }));
+      expect(r2.status).toBe(201);
+      apptByB = r2.body.id;
+    });
+
+    it("DENTIST_A acessa próprio agendamento → 200", async () => {
+      const res = await as(dentistAToken).get(`/appointments/${apptByA}`);
+      expect(res.status).toBe(200);
+    });
+
+    it("DENTIST_A acessa agendamento de DENTIST_B → 404", async () => {
+      const res = await as(dentistAToken).get(`/appointments/${apptByB}`);
+      expect(res.status).toBe(404);
+    });
+
+    it("DENTIST+RECEPTIONIST acessa agendamento de outro dentista → 200", async () => {
+      const res = await as(dentistRecepToken).get(`/appointments/${apptByA}`);
+      expect(res.status).toBe(200);
+    });
+
+    it("DENTIST+RECEPTIONIST cancela agendamento de outro dentista → 200", async () => {
+      const slot = futureSlot(32 * DAY);
+      const created = await as(adminToken).post("/appointments", apptBody({ ...slot, dentistUserId: dentistAId }));
+      expect(created.status).toBe(201);
+      const res = await as(dentistRecepToken).patch(`/appointments/${created.body.id}/cancel`);
+      expect(res.status).toBe(200);
+    });
+
+    it("DENTIST+ADMIN acessa agendamento de outro dentista → 200", async () => {
+      const res = await as(adminDentistToken).get(`/appointments/${apptByB}`);
+      expect(res.status).toBe(200);
+    });
+  });
+
+  // ── DENTIST_RECEP — permissões de recepção ────────────────────────────────
+  describe("DENTIST+RECEPTIONIST — permissões efetivas", () => {
+    it("agenda para outro dentista → 201", async () => {
+      const res = await as(dentistRecepToken).post("/appointments", apptBody({ dentistUserId: dentistAId }));
+      expect(res.status).toBe(201);
+    });
+
+    it("agenda para si mesmo → 201", async () => {
+      const res = await as(dentistRecepToken).post("/appointments", apptBody({ dentistUserId: dentistRecepId }));
+      expect(res.status).toBe(201);
+    });
+
+    it("allowOverlap: true → 201", async () => {
+      const slot = futureSlot(33 * DAY);
+      await as(adminToken).post("/appointments", apptBody({ ...slot, dentistUserId: dentistAId }));
+      const res = await as(dentistRecepToken).post("/appointments", {
+        ...apptBody({ ...slot, dentistUserId: dentistAId }),
+        allowOverlap: true,
+      });
+      expect(res.status).toBe(201);
+    });
+  });
+
+  // ── PATCH — regras de tempo com "mudou" (Adjustment A) ───────────────────
+  describe("PATCH — regras de tempo só quando valor muda", () => {
+    it("DENTIST move startsAt para o passado via PATCH → 422", async () => {
+      const slot = futureSlot(34 * DAY);
+      const created = await as(adminToken).post("/appointments", apptBody({ ...slot, dentistUserId: dentistAId }));
+      expect(created.status).toBe(201);
+      const past = pastSlot();
+      const res = await as(dentistAToken).patch(`/appointments/${created.body.id}`, { startsAt: past.startsAt });
+      expect(res.status).toBe(422);
+    });
+
+    it("PATCH só notes em agendamento legado >8h criado direto no DB → 200", async () => {
+      const base = new Date(Date.now() + 35 * DAY);
+      const legacyAppt = await rawPrisma.appointment.create({
+        data: {
+          organizationId: (await rawPrisma.organization.findFirst({ where: { name: "Escrita Org" } }))!.id,
+          patientId,
+          clinicId,
+          dentistUserId: dentistAId,
+          startsAt: base,
+          endsAt: new Date(base.getTime() + 9 * HOUR),
+          status: "SCHEDULED",
+        },
+      });
+      const res = await as(adminToken).patch(`/appointments/${legacyAppt.id}`, { notes: "nota legada" });
+      expect(res.status).toBe(200);
+    });
+
+    it("PATCH com startsAt/endsAt iguais aos atuais + notes em agendamento passado → 200", async () => {
+      const pastBase = new Date(Date.now() - 2 * DAY);
+      const pastAppt = await rawPrisma.appointment.create({
+        data: {
+          organizationId: (await rawPrisma.organization.findFirst({ where: { name: "Escrita Org" } }))!.id,
+          patientId,
+          clinicId,
+          dentistUserId: dentistAId,
+          startsAt: pastBase,
+          endsAt: new Date(pastBase.getTime() + 30 * 60 * 1000),
+          status: "SCHEDULED",
+        },
+      });
+      const res = await as(adminToken).patch(`/appointments/${pastAppt.id}`, {
+        startsAt: pastBase.toISOString(),
+        endsAt: new Date(pastBase.getTime() + 30 * 60 * 1000).toISOString(),
+        notes: "sem mudança de horário",
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it("PATCH próprio agendamento mudando horário sem conflito → 200 (excludeId funciona)", async () => {
+      const slot = futureSlot(36 * DAY);
+      const created = await as(adminToken).post("/appointments", apptBody({ ...slot, dentistUserId: dentistAId }));
+      expect(created.status).toBe(201);
+      const newSlot = futureSlot(37 * DAY);
+      const res = await as(dentistAToken).patch(`/appointments/${created.body.id}`, {
+        startsAt: newSlot.startsAt,
+        endsAt: newSlot.endsAt,
+      });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  // ── Concorrência PATCH (Adjustment C) ────────────────────────────────────
+  describe("PATCH concorrência — dois agendamentos diferentes para mesmo horário", () => {
+    it("dois PATCHes de agendamentos diferentes do mesmo dentista para mesmo horário → [200, 409]", async () => {
+      const slotA = futureSlot(38 * DAY);
+      const slotB = futureSlot(39 * DAY);
+      const target = futureSlot(40 * DAY);
+
+      const [r1, r2] = await Promise.all([
+        as(adminToken).post("/appointments", apptBody({ ...slotA, dentistUserId: dentistAId })),
+        as(adminToken).post("/appointments", apptBody({ ...slotB, dentistUserId: dentistAId })),
+      ]);
+      expect(r1.status).toBe(201);
+      expect(r2.status).toBe(201);
+
+      const [p1, p2] = await Promise.all([
+        as(adminToken).patch(`/appointments/${r1.body.id}`, { startsAt: target.startsAt, endsAt: target.endsAt }),
+        as(adminToken).patch(`/appointments/${r2.body.id}`, { startsAt: target.startsAt, endsAt: target.endsAt }),
+      ]);
+      const statuses = [p1.status, p2.status].sort();
+      expect(statuses).toEqual([200, 409]);
     });
   });
 });

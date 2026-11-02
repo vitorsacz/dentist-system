@@ -78,7 +78,7 @@ export class AppointmentsService {
     if (!appointment) throw new NotFoundException("Agendamento não encontrado");
 
     if (actor) {
-      const dentistScopedOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN");
+      const dentistScopedOnly = isDentistOnly(actor);
       if (dentistScopedOnly && appointment.dentistUserId !== actor.id) {
         throw new NotFoundException("Agendamento não encontrado");
       }
@@ -145,7 +145,7 @@ export class AppointmentsService {
     const existing = await this.findOne(id, actor);
 
     if (input.dentistUserId !== undefined) {
-      const dentistScopedOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN");
+      const dentistScopedOnly = isDentistOnly(actor);
       if (dentistScopedOnly && input.dentistUserId !== actor.id) {
         throw new ForbiddenException("DENTIST não pode alterar dentistUserId para outro dentista");
       }
@@ -168,11 +168,20 @@ export class AppointmentsService {
 
     const effectiveStartsAt = input.startsAt ?? existing.startsAt;
     const effectiveEndsAt = input.endsAt ?? existing.endsAt;
-    if (effectiveEndsAt <= effectiveStartsAt) {
-      throw new BadRequestException("endsAt deve ser posterior a startsAt");
+    const startsAtChanged = input.startsAt !== undefined && input.startsAt.getTime() !== existing.startsAt.getTime();
+    const endsAtChanged = input.endsAt !== undefined && input.endsAt.getTime() !== existing.endsAt.getTime();
+
+    if (isDentistOnly(actor) && startsAtChanged && input.startsAt! < new Date()) {
+      throw new UnprocessableEntityException("DENTIST não pode agendar no passado");
     }
-    if (effectiveEndsAt.getTime() - effectiveStartsAt.getTime() > MAX_DURATION_MS) {
-      throw new BadRequestException("Duração máxima de 8 horas");
+
+    if (startsAtChanged || endsAtChanged) {
+      if (effectiveEndsAt <= effectiveStartsAt) {
+        throw new BadRequestException("endsAt deve ser posterior a startsAt");
+      }
+      if (effectiveEndsAt.getTime() - effectiveStartsAt.getTime() > MAX_DURATION_MS) {
+        throw new BadRequestException("Duração máxima de 8 horas");
+      }
     }
 
     const { allowOverlap, ...data } = input;
@@ -183,8 +192,8 @@ export class AppointmentsService {
       input.status !== undefined && existing.status === "CANCELED" && input.status !== "CANCELED";
     const needsConflictCheck =
       !allowOverlap &&
-      (input.startsAt !== undefined ||
-        input.endsAt !== undefined ||
+      (startsAtChanged ||
+        endsAtChanged ||
         input.dentistUserId !== undefined ||
         restoringFromCanceled);
 
@@ -244,7 +253,7 @@ export class AppointmentsService {
     organizationId: string,
     actor: AuthenticatedUser,
   ): Promise<void> {
-    const dentistScopedOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN");
+    const dentistScopedOnly = isDentistOnly(actor);
     if (dentistScopedOnly && dentistUserId !== actor.id) {
       throw new ForbiddenException("DENTIST não pode designar outro dentista");
     }
