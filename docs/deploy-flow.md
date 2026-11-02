@@ -104,15 +104,13 @@ git push origin origin/main:refs/heads/production
 
 ### 2. Proteger a branch `production`
 
-Via GitHub → Settings → Branches (ou Rulesets). Configuração necessária:
+Use **GitHub Rulesets** (Settings → Rules → Rulesets → New ruleset → Branch):
 
-- Proibir force push: **sim**
-- Proibir deleção: **sim**
-- Exigir PR antes de merge: **não** (o workflow faz push direto)
-- Bypass para GitHub Actions: **sim** — sem isso o `git push` do workflow falhará com 403
-
-Se usar **Rulesets** (recomendado): adicione um bypass actor "GitHub Actions" (tipo: Integration).
-Se usar **Branch Protection clássica**: marque "Allow force pushes" apenas para o workflow via `GITHUB_TOKEN` não é possível diretamente — use Ruleset nesse caso.
+- Target: `production`
+- Block force pushes: **sim**
+- Block deletions: **sim**
+- Require a pull request before merging: **não** — o workflow faz push direto
+- Bypass actors: adicione **GitHub Actions** (tipo: Integration) — cobre push regular e force push (rollback)
 
 ### 3. Criar o environment `prod`
 

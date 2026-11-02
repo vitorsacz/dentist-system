@@ -29,18 +29,39 @@ jobs:
     environment: prod
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Resolve SHA
         id: sha
         env:
           GH_TOKEN: ${{ github.token }}
+          INPUT_SHA: ${{ inputs.sha }}
         run: |
-          if [ -n "${{ inputs.sha }}" ]; then
-            SHA="${{ inputs.sha }}"
+          if [ -n "$INPUT_SHA" ]; then
+            if ! echo "$INPUT_SHA" | grep -qE '^[0-9a-f]{40}$'; then
+              echo "ERROR: sha deve ser um hash hexadecimal de 40 caracteres (got: $INPUT_SHA)"
+              exit 1
+            fi
+            SHA="$INPUT_SHA"
           else
             SHA=$(gh api "repos/${{ github.repository }}/git/ref/heads/main" --jq '.object.sha')
           fi
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "SHA: $SHA"
+
+      - name: Verify SHA is ancestor of origin/main
+        run: |
+          SHA="${{ steps.sha.outputs.sha }}"
+          git fetch origin main --quiet
+          if ! git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "ERROR: $SHA não é ancestral de origin/main — só SHAs da main podem ser promovidos"
+            exit 1
+          fi
+          echo "$SHA é ancestral de origin/main — OK"
 
       - name: Verify CI check 'build' is green
         env:
@@ -62,7 +83,7 @@ jobs:
           SHA="${{ steps.sha.outputs.sha }}"
           for CTX in "Vercel – dentist-system-web" "Vercel – dentist-system-web-hml"; do
             STATE=$(gh api "repos/${{ github.repository }}/commits/$SHA/status" \
-              --jq --arg c "$CTX" '.statuses[] | select(.context == $c) | .state' | head -1)
+              | jq -r --arg c "$CTX" '.statuses[] | select(.context == $c) | .state' | head -1)
             echo "$CTX: $STATE"
             if [ "$STATE" != "success" ]; then
               echo "ERROR: Vercel check '$CTX' not green for $SHA (got: $STATE)"
@@ -70,7 +91,7 @@ jobs:
             fi
           done
 
-      - name: Smoke HML — wait for version==SHA and appEnv==hml
+      - name: Smoke HML — wait for version prefix==SHA and appEnv==hml
         run: |
           SHA="${{ steps.sha.outputs.sha }}"
           HML_URL="${{ vars.HML_API_URL }}"
@@ -81,7 +102,7 @@ jobs:
             VERSION=$(echo "$RESP" | jq -r '.version // empty')
             APPENV=$(echo "$RESP" | jq -r '.appEnv // empty')
             echo "$(date -u +%T)  version=$VERSION  appEnv=$APPENV"
-            if [ "$VERSION" = "$SHA" ] && [ "$APPENV" = "hml" ]; then
+            if [ -n "$VERSION" ] && [[ "$SHA" == "$VERSION"* ]] && [ "$APPENV" = "hml" ]; then
               echo "HML smoke test passed."
               break
             fi
@@ -94,17 +115,12 @@ jobs:
             WAIT=$(( WAIT < 60 ? WAIT * 2 : 60 ))
           done
 
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Advance production branch
         id: advance
+        env:
+          INPUT_ROLLBACK: ${{ inputs.rollback }}
         run: |
           SHA="${{ steps.sha.outputs.sha }}"
-          ROLLBACK="${{ inputs.rollback }}"
 
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -113,7 +129,7 @@ jobs:
           echo "prev_sha=${PREV_SHA:-none}" >> "$GITHUB_OUTPUT"
 
           if [ -n "$PREV_SHA" ]; then
-            if [ "$ROLLBACK" = "true" ]; then
+            if [ "$INPUT_ROLLBACK" = "true" ]; then
               # SHA deve ser ancestral de production (voltando no histórico).
               if ! git merge-base --is-ancestor "$SHA" "$PREV_SHA"; then
                 echo "ERROR: rollback=true mas $SHA não é ancestral de production ($PREV_SHA)"
@@ -134,7 +150,7 @@ jobs:
 
           echo "production → $SHA (era: ${PREV_SHA:-none})"
 
-      - name: Wait for prod — version==SHA and appEnv==prod
+      - name: Wait for prod — version prefix==SHA and appEnv==prod
         run: |
           SHA="${{ steps.sha.outputs.sha }}"
           PROD_URL="${{ vars.PROD_API_URL }}"
@@ -145,7 +161,7 @@ jobs:
             VERSION=$(echo "$RESP" | jq -r '.version // empty')
             APPENV=$(echo "$RESP" | jq -r '.appEnv // empty')
             echo "$(date -u +%T)  version=$VERSION  appEnv=$APPENV"
-            if [ "$VERSION" = "$SHA" ] && [ "$APPENV" = "prod" ]; then
+            if [ -n "$VERSION" ] && [[ "$SHA" == "$VERSION"* ]] && [ "$APPENV" = "prod" ]; then
               echo "Prod health check passed."
               break
             fi
@@ -159,12 +175,13 @@ jobs:
 
       - name: Job summary
         if: always()
+        env:
+          INPUT_ROLLBACK: ${{ inputs.rollback }}
         run: |
           SHA="${{ steps.sha.outputs.sha }}"
           PREV="${{ steps.advance.outputs.prev_sha }}"
-          ROLLBACK="${{ inputs.rollback }}"
           {
-            if [ "$ROLLBACK" = "true" ]; then
+            if [ "$INPUT_ROLLBACK" = "true" ]; then
               echo "## ROLLBACK"
             else
               echo "## Promoção"
