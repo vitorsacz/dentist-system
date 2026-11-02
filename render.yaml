@@ -4,6 +4,8 @@ services:
     runtime: node
     plan: free
     region: oregon
+    branch: production
+    autoDeployTrigger: commit
     buildCommand: pnpm install --frozen-lockfile && pnpm turbo run build --filter=@dentist-system/api && pnpm --filter @dentist-system/api exec prisma migrate deploy
     startCommand: node apps/api/dist/main.js
     healthCheckPath: /health
