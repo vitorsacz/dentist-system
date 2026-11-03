@@ -6,6 +6,7 @@ import {
 } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { AuditAction } from "../../common/decorators/audit-action.decorator";
 import { ClinicFinancialTermsService } from "./clinic-financial-terms.service";
 
 // Mesmo escopo de acesso de attendances/reports/financial (dado financeiro
@@ -20,6 +21,7 @@ export class ClinicFinancialTermsController {
     return this.clinicFinancialTermsService.findByClinic(clinicId);
   }
 
+  @AuditAction("CLINIC_FINANCIAL_TERMS_UPSERT", "ClinicFinancialTerms")
   @Put()
   upsert(
     @Param("clinicId") clinicId: string,

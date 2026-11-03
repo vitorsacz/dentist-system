@@ -12,6 +12,7 @@ import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Public } from "../../common/decorators/public.decorator";
 import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.decorator";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
+import { AuditAction } from "../../common/decorators/audit-action.decorator";
 import { REFRESH_SESSION_TTL_MS, type SessionClientInfo } from "../sessions/refresh-sessions.service";
 import { AuthService } from "./auth.service";
 import { refreshCookieOptions } from "../../config/cookie-policy";
@@ -73,6 +74,7 @@ export class AuthController {
   // Revoga no servidor a família da sessão deste navegador (o token deixa de
   // valer mesmo que alguém tenha copiado o cookie) e apaga o cookie.
   @AllowAuthenticated()
+  @AuditAction("LOGOUT")
   @Post("logout")
   async logout(
     @CurrentUser() user: AuthenticatedUser,
