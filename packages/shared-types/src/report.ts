@@ -29,5 +29,7 @@ export const financialReportSchema = z.object({
     rentCost: z.number(),
     netResult: z.number(),
   }),
+  // Nomes dos consultórios sem termos definidos (só relevante pra FREELANCER).
+  clinicsWithoutTerms: z.array(z.string()),
 });
 export type FinancialReport = z.infer<typeof financialReportSchema>;
