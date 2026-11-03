@@ -15,7 +15,7 @@ import { CalendarSidebar } from "./calendar-sidebar";
 import { DentistSidebar } from "./dentist-sidebar";
 import { AppointmentCreateModal } from "./appointment-create-modal";
 import { AppointmentDetailPanel } from "./appointment-detail-panel";
-import { useAgendaData, type MockAppointment } from "./mock-data";
+import { useAgendaData, type AgendaAppointment } from "./mock-data";
 import { LOCATION_COLOR_HEX, toApiColorToken, type LocationColorToken } from "./location-colors";
 import { QueryStateWrapper } from "@/lib/use-query-state";
 import "./agenda.css";
@@ -54,7 +54,7 @@ export function AgendaPage() {
   const queryClient = useQueryClient();
   const calendarRef = useRef<FullCalendar>(null);
 
-  const [appointments, setAppointments] = useState<MockAppointment[]>([]);
+  const [appointments, setAppointments] = useState<AgendaAppointment[]>([]);
   useEffect(() => {
     setAppointments(mock.appointments);
   }, [mock.appointments]);
@@ -65,7 +65,7 @@ export function AgendaPage() {
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const [rangeLabel, setRangeLabel] = useState("");
   const [modalState, setModalState] = useState<ModalState | null>(null);
-  const [detailAppointment, setDetailAppointment] = useState<MockAppointment | null>(null);
+  const [detailAppointment, setDetailAppointment] = useState<AgendaAppointment | null>(null);
   // Map from appointment id to AppointmentListItem for editing
   const appointmentItemById = useMemo(
     () => new Map((mock.appointmentsQuery.data ?? []).map((a) => [a.id, a])),
@@ -114,7 +114,7 @@ export function AgendaPage() {
   }
 
   function handleEventClick(arg: EventClickArg) {
-    const appt = arg.event.extendedProps.appointment as MockAppointment;
+    const appt = arg.event.extendedProps.appointment as AgendaAppointment;
     setDetailAppointment(appt);
   }
 
@@ -290,7 +290,7 @@ export function AgendaPage() {
                   setVisibleRange({ from: arg.start, to: arg.end });
                 }}
                 eventContent={(arg: EventContentArg) => {
-                  const appt = arg.event.extendedProps.appointment as MockAppointment | undefined;
+                  const appt = arg.event.extendedProps.appointment as AgendaAppointment | undefined;
                   // O preview de seleção (selectMirror, enquanto o usuário arrasta
                   // pra criar um agendamento) dispara eventContent sem
                   // extendedProps.appointment — não é um evento de verdade.

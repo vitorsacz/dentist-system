@@ -6,11 +6,11 @@ import { ApiError } from "@/lib/api-client";
 import { LOCATION_COLOR_HEX } from "./location-colors";
 import type { ConflictInfo } from "./api";
 import { appointmentsApi, type AppointmentListItem } from "./api";
-import type { MockLocation, MockDentist } from "./mock-data";
+import type { AgendaLocation, AgendaDentist } from "./mock-data";
 
 interface AppointmentCreateModalProps {
-  locations: MockLocation[];
-  dentists: MockDentist[];
+  locations: AgendaLocation[];
+  dentists: AgendaDentist[];
   initialDate: Date;
   initialStart?: Date;
   initialEnd?: Date;

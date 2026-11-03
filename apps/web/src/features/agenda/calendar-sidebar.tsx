@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { LOCATION_COLOR_HEX, LOCATION_COLOR_TOKENS, type LocationColorToken } from "./location-colors";
-import type { MockLocation } from "./mock-data";
+import type { AgendaLocation } from "./mock-data";
 
 interface CalendarSidebarProps {
-  locations: MockLocation[];
+  locations: AgendaLocation[];
   hiddenLocationIds: Set<string>;
   selectedClinicId: string | undefined;
   onToggle: (locationId: string) => void;

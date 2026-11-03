@@ -2,7 +2,7 @@ import { X } from "lucide-react";
 import type { AppointmentStatus } from "@dentist-system/shared-types";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { LOCATION_COLOR_HEX } from "./location-colors";
-import type { MockAppointment, MockDentist, MockLocation } from "./mock-data";
+import type { AgendaAppointment, AgendaDentist, AgendaLocation } from "./mock-data";
 
 const STATUS_LABEL: Record<AppointmentStatus, string> = {
   SCHEDULED: "Agendado",
@@ -19,9 +19,9 @@ const STATUS_TONE: Record<AppointmentStatus, BadgeTone> = {
 };
 
 interface AppointmentDetailPanelProps {
-  appointment: MockAppointment;
-  location: MockLocation | undefined;
-  dentist?: MockDentist;
+  appointment: AgendaAppointment;
+  location: AgendaLocation | undefined;
+  dentist?: AgendaDentist;
   onClose: () => void;
   onReschedule: () => void;
   onChangeStatus: (status: AppointmentStatus) => void;

@@ -7,26 +7,26 @@ import { myClinicApi } from "@/features/my-clinic/api";
 import { fromApiColorToken, locationColorForIndex, type LocationColorToken } from "./location-colors";
 import { appointmentsApi } from "./api";
 
-export interface MockLocation {
+export interface AgendaLocation {
   id: string;
   name: string;
   colorToken: LocationColorToken;
 }
 
-export interface MockDentist {
+export interface AgendaDentist {
   id: string;
   name: string;
   colorToken: LocationColorToken;
 }
 
-export interface MockCalendar {
+export interface AgendaCalendar {
   id: string;
   locationId: string;
   dentistUserId: string;
   dentistName: string;
 }
 
-export interface MockAppointment {
+export interface AgendaAppointment {
   id: string;
   calendarId: string;
   locationId: string;
@@ -80,7 +80,7 @@ export function useAgendaData(currentUser: CurrentUser | null, from: Date, to: D
     queryFn: () => appointmentsApi.list({ from, to, clinicId }),
   });
 
-  const locations: MockLocation[] = useMemo(() => {
+  const locations: AgendaLocation[] = useMemo(() => {
     const clinics: Clinic[] = clinicsQuery.data ?? [];
     return clinics.map((clinic, index) => ({
       id: clinic.id,
@@ -89,7 +89,7 @@ export function useAgendaData(currentUser: CurrentUser | null, from: Date, to: D
     }));
   }, [clinicsQuery.data]);
 
-  const dentists: MockDentist[] = useMemo(() => {
+  const dentists: AgendaDentist[] = useMemo(() => {
     if (axis !== "dentist") return [];
     const roster = dentistsQuery.data ?? [];
     return roster.map((dentist, index) => ({
@@ -99,7 +99,7 @@ export function useAgendaData(currentUser: CurrentUser | null, from: Date, to: D
     }));
   }, [axis, dentistsQuery.data]);
 
-  const appointments: MockAppointment[] = useMemo(
+  const appointments: AgendaAppointment[] = useMemo(
     () =>
       (appointmentsQuery.data ?? []).map((appt) => ({
         id: appt.id,
