@@ -3,6 +3,7 @@ import { ACCESS, upsertAnamnesisSchema, type UpsertAnamnesisInput } from "@denti
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
+import { AuditAction } from "../../common/decorators/audit-action.decorator";
 import { AnamnesisService } from "./anamnesis.service";
 
 @Controller("patients/:patientId/anamnesis")
@@ -10,6 +11,7 @@ export class AnamnesisController {
   constructor(private readonly anamnesisService: AnamnesisService) {}
 
   @Roles(...ACCESS["clinical.read"])
+  @AuditAction("ANAMNESIS_READ", "Anamnesis")
   @Get()
   findByPatient(
     @Param("patientId") patientId: string,
@@ -19,6 +21,7 @@ export class AnamnesisController {
   }
 
   @Roles(...ACCESS["clinical.write"])
+  @AuditAction("ANAMNESIS_UPSERT", "Anamnesis")
   @Put()
   upsert(
     @Param("patientId") patientId: string,

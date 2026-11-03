@@ -11,6 +11,7 @@ import {
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
+import { AuditAction } from "../../common/decorators/audit-action.decorator";
 import { UsersService } from "./users.service";
 
 @Controller("users")
@@ -31,6 +32,7 @@ export class UsersController {
     return this.usersService.list(currentUser.organizationId as string);
   }
 
+  @AuditAction("USER_UPDATE", "User")
   @Patch(":id")
   update(
     @Param("id") userId: string,

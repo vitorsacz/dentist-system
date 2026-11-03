@@ -7,6 +7,7 @@ import {
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
+import { AuditAction } from "../../common/decorators/audit-action.decorator";
 import { ClinicalRecordsService } from "./clinical-records.service";
 
 @Controller("patients/:patientId/clinical-records")
@@ -14,6 +15,7 @@ export class ClinicalRecordsController {
   constructor(private readonly clinicalRecordsService: ClinicalRecordsService) {}
 
   @Roles(...ACCESS["clinical.read"])
+  @AuditAction("CLINICAL_RECORD_READ", "ClinicalRecord")
   @Get()
   listByPatient(
     @Param("patientId") patientId: string,
@@ -23,6 +25,7 @@ export class ClinicalRecordsController {
   }
 
   @Roles(...ACCESS["clinical.write"])
+  @AuditAction("CLINICAL_RECORD_CREATE", "ClinicalRecord")
   @Post()
   create(
     @Param("patientId") patientId: string,

@@ -3,6 +3,7 @@ import { ACCESS, createAttendanceSchema, type CreateAttendanceInput } from "@den
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { AuditAction } from "../../common/decorators/audit-action.decorator";
 import { AttendancesService } from "./attendances.service";
 
 @Controller("attendances")
@@ -19,6 +20,7 @@ export class AttendancesController {
   }
 
   @Roles(...ACCESS["attendances.write"])
+  @AuditAction("ATTENDANCE_CREATE", "Attendance")
   @Post()
   create(
     @Body(new ZodValidationPipe(createAttendanceSchema)) body: CreateAttendanceInput,
