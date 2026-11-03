@@ -540,3 +540,32 @@ model Recall {
   @@index([patientId])
   @@index([organizationId])
 }
+
+// Tabela imutável de auditoria (somente leitura após inserção).
+// Sem FK para Organization/User intencionalmente: o log deve sobreviver à
+// deleção da entidade auditada. Dados sensíveis (senha, token, conteúdo
+// clínico completo) nunca devem ser gravados em before/after.
+model AuditLog {
+  id             String   @id @default(cuid())
+  // null para ações do Super Admin (sem tenant) ou eventos de sistema.
+  organizationId String?
+  // null para eventos não autenticados (falha de login antes do JWT validar).
+  userId         String?
+  // Ação auditada: ex. "LOGIN", "PATIENT_CREATE", "ROLE_CHANGE". String livre
+  // para não exigir migration a cada ação nova.
+  action         String
+  // Entidade afetada: ex. "Patient", "User", "Attendance".
+  entity         String?
+  entityId       String?
+  // Instantâneos sanitizados do estado antes e depois da mudança.
+  before         Json?
+  after          Json?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action])
+  @@index([entity, entityId])
+}
