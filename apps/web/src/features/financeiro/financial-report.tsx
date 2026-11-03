@@ -88,6 +88,14 @@ export function FinancialReport() {
           <p className="p-4 text-sm text-muted">Nenhum atendimento no período selecionado.</p>
         )}
       </div>
+
+      {reportQuery.data && reportQuery.data.clinicsWithoutTerms.length > 0 && (
+        <div className="rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <strong>Atenção:</strong> os seguintes consultórios não têm termos financeiros cadastrados — valores de aluguel podem estar incorretos:{" "}
+          {reportQuery.data.clinicsWithoutTerms.join(", ")}. Acesse{" "}
+          <strong>Termos por consultório</strong> para configurar.
+        </div>
+      )}
     </div>
   );
 }
