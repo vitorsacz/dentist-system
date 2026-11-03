@@ -49,21 +49,27 @@ O serviço `dentist-system-api-hml` foi criado via API e **não é gerenciado pe
 
 ## Rollback
 
-O SHA anterior está no job summary de cada execução do workflow.
+O SHA anterior está no job summary de cada execução do workflow (`Anterior (rollback ref)`).
 
-**Opção 1 — Rollback via workflow (recomendada):**
+O workflow só faz fast-forward da branch `production`. Para retroceder, use uma das opções abaixo.
+
+**Opção 1 — Rollback no Render + Promote na Vercel (mais rápido):**
+
+- **API:** Render dashboard → `dentist-system-api` → Deploys → localize o deploy anterior com status `Live` → **Rollback to this deploy**. O Render reinicia o serviço com a imagem anterior sem alterar a branch.
+- **Front:** Vercel dashboard → `dentist-system-web` → Deployments → localize o deployment de produção anterior → menu `…` → **Promote to Production**. A Vercel reaponta o alias de produção para aquele build sem novo push.
+
+As duas plataformas são independentes; você pode reverter só a API, só o front, ou ambas.
+
+**Opção 2 — Revert commit na main (histórico limpo, reverte ambos juntos):**
+
+Crie um revert commit na `main`, aguarde o deploy no HML, verifique, e promova normalmente:
 
 ```
-gh workflow run deploy.yml \
-  --field sha=<PREV_SHA> \
-  --field rollback=true
+git revert <SHA_PROBLEMA> --no-edit
+git push origin main
+# aguarde deploy HML, valide
+gh workflow run deploy.yml --field sha=<SHA_REVERT>
 ```
-
-O workflow exige aprovação do environment `prod`, verifica que o SHA é ancestral da `production` atual e faz o push com `--force`. O Render e a Vercel redeployam automaticamente ao detectar o push na branch `production`.
-
-**Opção 2 — Revert commit (histórico limpo):**
-
-Crie um revert commit na `main`, aguarde o deploy no HML, verifique, e promova normalmente (sem `rollback=true`).
 
 **Rollback de código NÃO desfaz migration.** Se uma migration já rodou em prod, o schema do banco já foi alterado. Para desfazer o schema é necessário uma migration de rollback explícita. Ver Política Expand/Contract abaixo.
 
@@ -110,7 +116,7 @@ Use **GitHub Rulesets** (Settings → Rules → Rulesets → New ruleset → Bra
 - Block force pushes: **sim**
 - Block deletions: **sim**
 - Require a pull request before merging: **não** — o workflow faz push direto
-- Bypass actors: adicione **GitHub Actions** (tipo: Integration) — cobre push regular e force push (rollback)
+- Bypass actors: adicione **GitHub Actions** (tipo: Integration) — necessário para o workflow fazer push direto na branch protegida
 
 ### 3. Criar o environment `prod`
 

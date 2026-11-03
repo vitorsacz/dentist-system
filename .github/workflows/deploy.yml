@@ -7,11 +7,6 @@ on:
         description: 'Commit SHA to promote (default: HEAD of main)'
         required: false
         default: ''
-      rollback:
-        description: 'Move production to an OLDER commit (ancestor of current production)'
-        type: boolean
-        required: false
-        default: false
 
 # Um único gate de promoção por vez; não cancela em andamento.
 concurrency:
@@ -30,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -117,8 +112,6 @@ jobs:
 
       - name: Advance production branch
         id: advance
-        env:
-          INPUT_ROLLBACK: ${{ inputs.rollback }}
         run: |
           SHA="${{ steps.sha.outputs.sha }}"
 
@@ -129,25 +122,14 @@ jobs:
           echo "prev_sha=${PREV_SHA:-none}" >> "$GITHUB_OUTPUT"
 
           if [ -n "$PREV_SHA" ]; then
-            if [ "$INPUT_ROLLBACK" = "true" ]; then
-              # SHA deve ser ancestral de production (voltando no histórico).
-              if ! git merge-base --is-ancestor "$SHA" "$PREV_SHA"; then
-                echo "ERROR: rollback=true mas $SHA não é ancestral de production ($PREV_SHA)"
-                exit 1
-              fi
-              git push --force origin "$SHA:refs/heads/production"
-            else
-              # Normal: SHA deve ser descendente de production (fast-forward).
-              if ! git merge-base --is-ancestor "$PREV_SHA" "$SHA"; then
-                echo "ERROR: $SHA não é descendente de production ($PREV_SHA). Re-execute com rollback=true para retroceder."
-                exit 1
-              fi
-              git push origin "$SHA:refs/heads/production"
+            # SHA deve ser descendente de production (fast-forward obrigatório).
+            if ! git merge-base --is-ancestor "$PREV_SHA" "$SHA"; then
+              echo "ERROR: $SHA não é descendente de production ($PREV_SHA). Para rollback use o painel do Render/Vercel ou crie um revert commit na main."
+              exit 1
             fi
-          else
-            git push origin "$SHA:refs/heads/production"
           fi
 
+          git push origin "$SHA:refs/heads/production"
           echo "production → $SHA (era: ${PREV_SHA:-none})"
 
       - name: Wait for prod — version prefix==SHA and appEnv==prod
@@ -175,17 +157,11 @@ jobs:
 
       - name: Job summary
         if: always()
-        env:
-          INPUT_ROLLBACK: ${{ inputs.rollback }}
         run: |
           SHA="${{ steps.sha.outputs.sha }}"
           PREV="${{ steps.advance.outputs.prev_sha }}"
           {
-            if [ "$INPUT_ROLLBACK" = "true" ]; then
-              echo "## ROLLBACK"
-            else
-              echo "## Promoção"
-            fi
+            echo "## Promoção"
             echo ""
             echo "| | SHA |"
             echo "|---|---|"
