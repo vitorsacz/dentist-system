@@ -40,15 +40,22 @@ export const ACCESS = {
   "budgets.status": ["DENTIST", "RECEPTIONIST"],
 
   // Catálogo de procedimentos e preços. Leitura inclui ADMIN pra Agenda.
-  // Escrita: ADMIN (clínica) e FREELANCER (que tem papel ADMIN+DENTIST).
+  // P1: ADMIN gere o catálogo (clínica e freelancer). Em org FREELANCER o
+  // dentista fundador tem ADMIN, então continua passando.
+  // P2: DENTIST sem ADMIN (clínica) não gerencia catálogo — é poder de dono.
   "procedures.read": ["ADMIN", "DENTIST", "RECEPTIONIST"],
   "procedures.write": ["ADMIN"],
 
   // Consultórios. Leitura inclui ADMIN pra Agenda.
   "clinics.read": ["ADMIN", "DENTIST", "RECEPTIONIST"],
-  "clinics.write": ["DENTIST"],
+  // P1: ADMIN gere consultórios. Em org FREELANCER o dentista fundador tem ADMIN.
+  // P2: DENTIST sem ADMIN (clínica) não cria/edita consultórios.
+  //     ClinicsService.create já bloqueia CLINIC org no service layer também.
+  "clinics.write": ["ADMIN"],
 
-  "clinicFinancialTerms.manage": ["DENTIST"],
+  // P1: só ADMIN gere termos financeiros. Em org FREELANCER o fundador tem ADMIN+DENTIST, passa.
+  // DENTIST de org CLINIC não tem ADMIN — fica bloqueado no guard (403).
+  "clinicFinancialTerms.manage": ["ADMIN"],
   "materials.manage": ["DENTIST", "RECEPTIONIST"],
   "recalls.manage": ["DENTIST", "RECEPTIONIST"],
   "reports.financial": ["DENTIST"],
