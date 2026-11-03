@@ -84,6 +84,7 @@ describe("Isolamento cross-tenant", () => {
         request(server()).patch(path).set("Authorization", `Bearer ${token}`).send(body),
       put: (path: string, body: Record<string, unknown>) =>
         request(server()).put(path).set("Authorization", `Bearer ${token}`).send(body),
+      delete: (path: string) => request(server()).delete(path).set("Authorization", `Bearer ${token}`),
     };
   }
 
@@ -264,10 +265,11 @@ describe("Isolamento cross-tenant", () => {
     expect(listB.body.some((p: { id: string }) => p.id === patientId)).toBe(false);
   });
 
-  it("ProcedureCatalog: create em A, PATCH por id em B dá 404; list de B não vaza", async () => {
-    const procedureId = await createProcedure(orgA.dentistToken, "Procedimento A");
+  it("ProcedureCatalog: create em A, PATCH/DELETE por id em B dá 404; list de B não vaza", async () => {
+    const procedureId = await createProcedure(orgA.adminToken, "Procedimento A");
 
-    expect((await as(orgB.dentistToken).patch(`/procedures/${procedureId}`, { name: "Hackeado" })).status).toBe(404);
+    expect((await as(orgB.adminToken).patch(`/procedures/${procedureId}`, { name: "Hackeado" })).status).toBe(404);
+    expect((await as(orgB.adminToken).delete(`/procedures/${procedureId}`)).status).toBe(404);
 
     const listB = await as(orgB.dentistToken).get("/procedures");
     expect(listB.body.some((p: { id: string }) => p.id === procedureId)).toBe(false);
@@ -305,7 +307,7 @@ describe("Isolamento cross-tenant", () => {
 
   it("Budget: create em A, GET por id em B dá 404; nested items ficam escopados; criar em B com patient/procedure de A dá 404", async () => {
     const patientIdA = await createPatient(orgA.dentistToken, "Paciente Orçamento A");
-    const procedureIdA = await createProcedure(orgA.dentistToken, "Procedimento Orçamento A");
+    const procedureIdA = await createProcedure(orgA.adminToken, "Procedimento Orçamento A");
 
     const created = await as(orgA.dentistToken).post("/budgets", {
       patientId: patientIdA,
@@ -333,7 +335,7 @@ describe("Isolamento cross-tenant", () => {
   it("Attendance: criar em B referenciando patient/clinic/procedure de A dá 404 (FK cross-tenant + propagação em transação)", async () => {
     const patientIdA = await createPatient(orgA.dentistToken, "Paciente Atendimento A");
     const clinicIdA = await createClinic(orgA.organizationId, "Clínica Atendimento A");
-    const procedureIdA = await createProcedure(orgA.dentistToken, "Procedimento Atendimento A");
+    const procedureIdA = await createProcedure(orgA.adminToken, "Procedimento Atendimento A");
 
     const okAsA = await as(orgA.dentistToken).post("/attendances", {
       patientId: patientIdA,

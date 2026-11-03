@@ -40,8 +40,9 @@ export const ACCESS = {
   "budgets.status": ["DENTIST", "RECEPTIONIST"],
 
   // Catálogo de procedimentos e preços. Leitura inclui ADMIN pra Agenda.
+  // Escrita: ADMIN (clínica) e FREELANCER (que tem papel ADMIN+DENTIST).
   "procedures.read": ["ADMIN", "DENTIST", "RECEPTIONIST"],
-  "procedures.write": ["DENTIST"],
+  "procedures.write": ["ADMIN"],
 
   // Consultórios. Leitura inclui ADMIN pra Agenda.
   "clinics.read": ["ADMIN", "DENTIST", "RECEPTIONIST"],
@@ -63,7 +64,7 @@ export const ACCESS = {
 
   // Só telas do front (sem rota de API equivalente).
   "agenda.view": ["ADMIN", "DENTIST", "RECEPTIONIST"],
-  "dashboard.view": ["DENTIST", "RECEPTIONIST"],
+  "dashboard.view": ["ADMIN", "DENTIST", "RECEPTIONIST"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Capability = keyof typeof ACCESS;
