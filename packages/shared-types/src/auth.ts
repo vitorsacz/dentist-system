@@ -32,8 +32,23 @@ export const organizationSelectionSchema = z.object({
 });
 export type OrganizationSelection = z.infer<typeof organizationSelectionSchema>;
 
-export const loginResultSchema = z.union([authTokensSchema, organizationSelectionSchema]);
+// R3/R5: usuário novo ou com senha resetada pelo Super Admin precisa trocar a
+// senha antes de receber tokens completos. O changeToken é um JWT de uso único
+// (TTL 1h) aceito SOMENTE por POST /auth/set-initial-password.
+export const mustChangePasswordSchema = z.object({
+  requiresPasswordChange: z.literal(true),
+  changeToken: z.string(),
+});
+export type MustChangePassword = z.infer<typeof mustChangePasswordSchema>;
+
+export const loginResultSchema = z.union([authTokensSchema, organizationSelectionSchema, mustChangePasswordSchema]);
 export type LoginResult = z.infer<typeof loginResultSchema>;
+
+export const setInitialPasswordSchema = z.object({
+  changeToken: z.string().min(1),
+  newPassword: z.string().min(8, "Senha deve ter ao menos 8 caracteres"),
+});
+export type SetInitialPasswordInput = z.infer<typeof setInitialPasswordSchema>;
 
 export const currentUserSchema = z.object({
   id: z.string(),

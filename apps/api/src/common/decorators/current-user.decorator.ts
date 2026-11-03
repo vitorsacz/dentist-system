@@ -9,6 +9,7 @@ export interface AuthenticatedUser {
   // Papéis na organização (pode ter mais de um). Vazio só pro Super Admin.
   roles: Role[];
   isSuperAdmin: boolean;
+  mustChangePassword: boolean;
 }
 
 export const CurrentUser = createParamDecorator(

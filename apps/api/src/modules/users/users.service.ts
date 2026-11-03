@@ -59,6 +59,7 @@ export class UsersService {
     }
 
     const passwordHash = await bcrypt.hash(input.password, 10);
+    // Todo novo usuário precisa trocar a senha no primeiro login (R3).
     const user = await this.prisma.user.create({
       data: {
         organizationId,
@@ -67,6 +68,7 @@ export class UsersService {
         name: input.name,
         roles: input.roles,
         colorToken,
+        mustChangePassword: true,
       },
     });
     return toManagedTenantUser(user);

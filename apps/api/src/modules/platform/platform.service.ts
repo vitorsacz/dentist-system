@@ -8,6 +8,7 @@ import type {
 import { PALETTE_COLOR_TOKENS } from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
 import { Role } from "@prisma/client";
+import { RefreshSessionsService } from "../sessions/refresh-sessions.service";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
 interface OrganizationRecord {
@@ -32,7 +33,10 @@ function toPlatformOrganization(organization: OrganizationRecord): PlatformOrgan
 
 @Injectable()
 export class PlatformService {
-  constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PRISMA_SERVICE) private readonly prisma: PrismaService,
+    private readonly refreshSessions: RefreshSessionsService,
+  ) {}
 
   async createOrganization(input: CreateOrganizationInput): Promise<PlatformOrganization> {
     const passwordHash = await bcrypt.hash(input.foundingAdminPassword, 10);
@@ -43,6 +47,7 @@ export class PlatformService {
 
     const organization = await this.prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({ data: { name: input.name, type: orgType } });
+      // R3: novo admin fundador precisa trocar a senha no primeiro login.
       const admin = await tx.user.create({
         data: {
           organizationId: org.id,
@@ -51,6 +56,7 @@ export class PlatformService {
           name: input.foundingAdminName,
           roles: foundingRoles,
           colorToken: foundingColorToken,
+          mustChangePassword: true,
         },
       });
       return tx.organization.update({
@@ -113,6 +119,22 @@ export class PlatformService {
     });
 
     return toPlatformOrganization(updated);
+  }
+
+  // R5: Super Admin recupera acesso do admin/dono — força troca de senha no
+  // primeiro login após o reset. Revoga todas as sessões do usuário.
+  async superAdminResetPassword(organizationId: string, userId: string, newPassword: string) {
+    const user = await this.prisma.user.findFirst({ where: { id: userId, organizationId } });
+    if (!user) {
+      throw new NotFoundException("Usuário não encontrado nesta organização");
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, mustChangePassword: true },
+    });
+    await this.refreshSessions.revokeAllForUser(userId);
+    return { success: true };
   }
 
   // Transferência de capitania nunca é self-service — só o Super Admin,

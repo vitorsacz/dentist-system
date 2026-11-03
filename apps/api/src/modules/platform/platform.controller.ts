@@ -3,9 +3,11 @@ import {
   createOrganizationSchema,
   transferFoundingAdminSchema,
   updateOrganizationStatusSchema,
+  resetPasswordSchema,
   type CreateOrganizationInput,
   type TransferFoundingAdminInput,
   type UpdateOrganizationStatusInput,
+  type ResetPasswordInput,
 } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.decorator";
@@ -60,5 +62,16 @@ export class PlatformController {
     @Body(new ZodValidationPipe(transferFoundingAdminSchema)) body: TransferFoundingAdminInput,
   ) {
     return this.platformService.transferFoundingAdmin(organizationId, body.userId);
+  }
+
+  // R5: Super Admin recupera acesso do admin/dono da organização.
+  // Nova senha temporária + troca obrigatória no primeiro login.
+  @Patch("organizations/:orgId/users/:userId/reset-password")
+  superAdminResetPassword(
+    @Param("orgId") organizationId: string,
+    @Param("userId") userId: string,
+    @Body(new ZodValidationPipe(resetPasswordSchema)) body: ResetPasswordInput,
+  ) {
+    return this.platformService.superAdminResetPassword(organizationId, userId, body.password);
   }
 }

@@ -17,9 +17,15 @@ const DUMMY_PASSWORD_HASH = bcrypt.hashSync("conta-inexistente-comparacao-de-tem
 
 const INVALID_CREDENTIALS = "Credenciais inválidas";
 
+const CHANGE_PASSWORD_TOKEN_TTL = "1h";
+// Separado do ACCESS_TOKEN_TTL para distinguir tokens de troca de senha de
+// tokens de acesso normais no validate() do JwtStrategy.
+const CHANGE_PASSWORD_KIND = "must-change-password" as const;
+
 export type LoginOutcome =
   | { kind: "tokens"; accessToken: string; refreshToken: string }
-  | { kind: "organization-selection"; accounts: AccountOption[] };
+  | { kind: "organization-selection"; accounts: AccountOption[] }
+  | { kind: "must-change-password"; changeToken: string };
 
 interface JwtPayload {
   sub: string;
@@ -36,6 +42,12 @@ interface AuthenticatedUserRecord {
   roles: Role[];
   isSuperAdmin: boolean;
   passwordHash: string;
+  mustChangePassword: boolean;
+}
+
+interface ChangePasswordPayload {
+  sub: string;
+  kind: typeof CHANGE_PASSWORD_KIND;
 }
 
 @Injectable()
@@ -82,7 +94,7 @@ export class AuthService {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
     if (validAccounts.length === 1) {
-      return { kind: "tokens", ...(await this.issueTokens(onlyAccount, client)) };
+      return this.issueTokens(onlyAccount, client);
     }
 
     // Senha confere em mais de uma conta: o usuário escolhe a organização e
@@ -122,10 +134,56 @@ export class AuthService {
   }
 
   private async issueTokens(user: AuthenticatedUserRecord, client: SessionClientInfo) {
+    // R3/R5: usuário novo ou com senha resetada deve trocar a senha antes de
+    // receber tokens de acesso completos.
+    if (user.mustChangePassword) {
+      return { kind: "must-change-password" as const, changeToken: this.signChangePasswordToken(user.id) };
+    }
     return {
+      kind: "tokens" as const,
       accessToken: this.signAccessToken(user),
       refreshToken: await this.refreshSessions.start(user.id, client),
     };
+  }
+
+  // R3/R5: troca obrigatória de senha. Aceita o changeToken emitido no login
+  // e emite tokens de acesso completos após atualizar a senha.
+  async setInitialPassword(changeToken: string, newPassword: string, client: SessionClientInfo) {
+    let payload: ChangePasswordPayload;
+    try {
+      payload = this.jwtService.verify<ChangePasswordPayload>(changeToken, {
+        secret: this.configService.getOrThrow<string>("JWT_ACCESS_SECRET"),
+      });
+    } catch {
+      throw new UnauthorizedException("Token de troca de senha inválido ou expirado");
+    }
+    if (payload.kind !== CHANGE_PASSWORD_KIND) {
+      throw new UnauthorizedException("Token de troca de senha inválido");
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || !user.active) {
+      throw new UnauthorizedException("Usuário não encontrado ou inativo");
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    const updated = await this.prisma.user.update({
+      where: { id: payload.sub },
+      data: { passwordHash, mustChangePassword: false },
+    });
+
+    return {
+      accessToken: this.signAccessToken(updated),
+      refreshToken: await this.refreshSessions.start(updated.id, client),
+    };
+  }
+
+  private signChangePasswordToken(userId: string): string {
+    const payload: ChangePasswordPayload = { sub: userId, kind: CHANGE_PASSWORD_KIND };
+    return this.jwtService.sign(payload, {
+      secret: this.configService.getOrThrow<string>("JWT_ACCESS_SECRET"),
+      expiresIn: CHANGE_PASSWORD_TOKEN_TTL,
+    });
   }
 
   // Access token continua JWT de 15 min, sem estado no servidor. O refresh
