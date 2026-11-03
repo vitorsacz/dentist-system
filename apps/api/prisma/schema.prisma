@@ -110,10 +110,11 @@ model User {
   // DENTIST). Vazio só pro Super Admin, que não pertence a organização.
   roles          Role[]             @default([])
   colorToken     PaletteColorToken?
-  isSuperAdmin   Boolean            @default(false)
-  active         Boolean            @default(true)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  isSuperAdmin        Boolean            @default(false)
+  active              Boolean            @default(true)
+  mustChangePassword  Boolean            @default(false)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   foundingOfOrganization  Organization?    @relation("OrganizationFoundingAdmin")
   createdPatients         Patient[]        @relation("PatientCreatedBy")
@@ -539,4 +540,25 @@ model Recall {
 
   @@index([patientId])
   @@index([organizationId])
+}
+
+// Trilha de auditoria imutável — INSERT only, sem UPDATE nem DELETE.
+// actorType: "USER" | "SUPER_ADMIN" | "SYSTEM".
+// targetType: nome do modelo Prisma (ex.: "User", "Organization").
+// meta: payload livre por ação (ex.: campos alterados, IP, motivo).
+// Sem FK p/ evitar cascata; referências ficam em targetId/actorId como strings.
+model AuditLog {
+  id             String   @id @default(cuid())
+  action         String
+  actorId        String?
+  actorType      String
+  targetId       String?
+  targetType     String?
+  organizationId String?
+  meta           Json?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([actorId])
+  @@index([targetType, targetId])
 }
