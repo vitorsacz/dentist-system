@@ -9,24 +9,17 @@ Execute na ordem abaixo. Cada seção pressupõe que a seção anterior foi conc
 ## 1. Pré-requisitos
 
 - Deploy de prod concluído e health check verde (`PROD_API_URL/health` retorna `appEnv == "prod"`).
-- Acesso ao painel Super Admin de prod (URL de prod + rota `/admin` ou equivalente).
-- Acesso ao painel do Supabase de prod para disparar backup manual antes de qualquer alteração de dados.
+- Acesso ao painel Super Admin de prod (URL de prod + rota `/platform`).
+- Acesso ao painel do Supabase de prod (backup depende de plano — ver seção 2).
 
 ---
 
-## 2. Backup manual pré-bootstrap
+## 2. Backup pré-bootstrap
 
-Antes de criar qualquer organização em prod, tire um snapshot do banco.
+O backup automático diário e o backup manual são recursos do plano **Pro** do Supabase. No plano gratuito não existem.
 
-**Supabase dashboard:**
-
-1. Acesse o projeto de prod no [Supabase dashboard](https://supabase.com/dashboard).
-2. Vá em **Database → Backups**.
-3. Clique em **Create a new backup** (ou **Trigger a manual backup**, dependendo do plano).
-4. Aguarde o status mudar para `Completed`.
-5. Anote o timestamp do backup — útil como ponto de restauração de referência.
-
-> O Supabase faz backups diários automáticos; o manual garante um ponto limpo imediatamente antes das criações.
+- Se o projeto de prod estiver no plano Pro: Supabase dashboard → **Database → Backups → Trigger a manual backup**. Aguarde `Completed` e anote o timestamp.
+- Se estiver no plano gratuito: o backup depende de upgrade para Pro antes do go-live. Avalie o risco de prosseguir sem ponto de restauração.
 
 ---
 
@@ -34,8 +27,8 @@ Antes de criar qualquer organização em prod, tire um snapshot do banco.
 
 Troque a senha do Super Admin antes de criar as organizações, para garantir que nenhuma credencial temporária persiste.
 
-1. Faça login no painel de prod com a credencial atual.
-2. Vá em **Configurações de conta** (ou perfil do Super Admin).
+1. Faça login em `/platform` com a credencial atual.
+2. Acesse as configurações do Super Admin. *(Localização exata a confirmar com o roteiro de onboarding do CAP.)*
 3. Altere a senha para uma senha forte e única, não usada em nenhum outro serviço.
 4. Encerre todas as sessões ativas após a troca.
 5. Guarde a nova senha em um gerenciador de senhas — **não registre em commits, issues, PRs, chats ou docs do repositório**.
@@ -44,14 +37,14 @@ Troque a senha do Super Admin antes de criar as organizações, para garantir qu
 
 ## 4. Bootstrap — Organização FREELANCER
 
-O dentista freelancer opera sozinho, sem recepcionista ou sócios.
+O dentista freelancer opera sozinho. A organização é do tipo `FREELANCER`; o usuário fundador tem role `ADMIN`.
 
-**No painel Super Admin:**
+**No painel `/platform`:**
 
-1. Crie uma nova organização com `type = FREELANCER` (ou equivalente no schema).
+1. Crie uma nova organização com `type = FREELANCER`.
 2. Preencha os dados cadastrais: nome do profissional, CRO, e-mail de contato.
-3. Crie o usuário proprietário da organização com role `OWNER`.
-4. Envie as credenciais de primeiro acesso por canal seguro (não por e-mail em texto plano se possível — prefira link de definição de senha).
+3. Crie o usuário fundador com role `ADMIN`.
+4. Envie as credenciais de primeiro acesso por canal seguro. *(Fluxo de envio e link de definição de senha a confirmar com o roteiro de onboarding do CAP.)*
 5. Anote o `organizationId` gerado — útil para suporte.
 
 **Validar:**
@@ -64,26 +57,25 @@ O dentista freelancer opera sozinho, sem recepcionista ou sócios.
 
 ## 5. Bootstrap — Organização CLÍNICA
 
-A clínica pode ter múltiplos dentistas e recepcionistas.
+A clínica pode ter múltiplos dentistas e recepcionistas. Roles disponíveis: `ADMIN`, `DENTIST`, `RECEPTIONIST`.
 
-**No painel Super Admin:**
+**No painel `/platform`:**
 
-1. Crie uma nova organização com `type = CLINIC` (ou equivalente).
+1. Crie uma nova organização com `type = CLINIC`.
 2. Preencha os dados cadastrais: razão social, CNPJ, e-mail administrativo.
-3. Crie o usuário administrador da clínica com role `OWNER` ou `ADMIN`.
-4. Envie as credenciais de primeiro acesso por canal seguro.
+3. Crie o usuário fundador com role `ADMIN`.
+4. Envie as credenciais de primeiro acesso por canal seguro. *(Fluxo de envio a confirmar com o roteiro de onboarding do CAP.)*
 5. Anote o `organizationId` gerado.
 
 **O administrador da clínica deve:**
 
 - Trocar a senha no primeiro login.
-- Convidar os demais profissionais (dentistas, recepcionistas) pelos roles corretos.
+- Adicionar os demais profissionais (`DENTIST`, `RECEPTIONIST`) pelos roles corretos. *(Fluxo de adição de usuários adicionais a confirmar com o roteiro de onboarding do CAP.)*
 
 **Validar:**
 
 - Login do admin da clínica funciona.
-- O admin consegue criar usuários adicionais dentro da própria organização.
-- Os usuários adicionais veem apenas dados da clínica deles.
+- Os usuários adicionados veem apenas dados da clínica deles.
 
 ---
 
@@ -94,8 +86,8 @@ Execute após criar as duas organizações.
 | Verificação | Esperado |
 |---|---|
 | `GET PROD_API_URL/health` | `appEnv == "prod"`, `version` == SHA promovido |
-| Login freelancer | 200, token retornado |
-| Login clínica (admin) | 200, token retornado |
+| Login freelancer | 200, sessão criada (refresh em cookie) |
+| Login clínica (admin) | 200, sessão criada (refresh em cookie) |
 | Listagem de pacientes (freelancer) | Retorna apenas dados do freelancer |
 | Listagem de pacientes (clínica) | Retorna apenas dados da clínica |
 | Login freelancer com credencial da clínica | 401 / erro de autenticação |
@@ -109,4 +101,4 @@ Qualquer falha no isolamento multi-tenant é **bloqueante** — não ative os cl
 
 - Comunique os clientes que o acesso está disponível.
 - Monitore os logs do Render (dentist-system-api) nas primeiras 24h.
-- O próximo backup automático do Supabase ocorrerá em até 24h; confirme no dashboard que ele completou com sucesso.
+- Se o projeto estiver no plano Pro: confirme no Supabase dashboard que o próximo backup automático (diário) completou com sucesso.
