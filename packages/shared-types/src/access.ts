@@ -69,6 +69,12 @@ export const ACCESS = {
   "users.manage": ["ADMIN"],
   "clinics.manage": ["ADMIN"],
 
+  // Auditoria: ADMIN de clínica. Fundador FREELANCER (DENTIST) também tem
+  // acesso via AuditAccessGuard na API — verificação depende de DB, não cabe
+  // aqui. No front, a rota /audit é aberta para autenticados; a API nega 403
+  // para quem não tem acesso.
+  "audit.read": ["ADMIN"],
+
   // Só telas do front (sem rota de API equivalente).
   "agenda.view": ["ADMIN", "DENTIST", "RECEPTIONIST"],
   "dashboard.view": ["ADMIN", "DENTIST", "RECEPTIONIST"],

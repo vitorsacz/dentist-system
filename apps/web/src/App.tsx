@@ -8,6 +8,7 @@ import { MaterialsPage } from "@/features/materials/materials-page";
 import { ProceduresPage } from "@/features/procedures/procedures-page";
 import { ClinicsPage } from "@/features/clinics/clinics-page";
 import { AdminUsersPage } from "@/features/admin/admin-users-page";
+import { AuditPage } from "@/features/audit/audit-page";
 import { MyClinicPage } from "@/features/my-clinic/my-clinic-page";
 import { PlatformPage } from "@/features/platform/platform-page";
 import { OrganizationDetailPage } from "@/features/platform/organization-detail-page";
@@ -36,6 +37,11 @@ export function App() {
             <Route element={<ProtectedRoute capability="users.manage" />}>
               <Route path="/admin/users" element={<AdminUsersPage />} />
             </Route>
+
+            {/* Rota aberta para qualquer autenticado; API nega 403 para quem
+                não é ADMIN, fundador FREELANCER ou Super Admin. */}
+            <Route path="/audit" element={<AuditPage />} />
+
 
             <Route element={<ProtectedRoute capability="agenda.view" />}>
               <Route path="/agenda" element={<AgendaPage />} />
