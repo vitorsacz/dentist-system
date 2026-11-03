@@ -29,9 +29,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   // sempre o estado atual, não o que estava no token (um access token antigo,
   // de antes do R1, com `role` no payload, continua funcionando).
   async validate(payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: { organization: { select: { status: true } } },
+    });
     if (!user || !user.active) {
       throw new UnauthorizedException();
+    }
+    // R4: organização suspensa bloqueia todos os seus usuários imediatamente.
+    if (user.organization?.status === "SUSPENDED") {
+      throw new UnauthorizedException("Organização suspensa. Contate o administrador da plataforma.");
     }
 
     return {
@@ -41,6 +48,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       organizationId: user.organizationId,
       roles: user.roles,
       isSuperAdmin: user.isSuperAdmin,
+      mustChangePassword: user.mustChangePassword,
     };
   }
 }

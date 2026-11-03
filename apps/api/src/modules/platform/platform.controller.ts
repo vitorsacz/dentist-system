@@ -2,8 +2,10 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/co
 import {
   createOrganizationSchema,
   transferFoundingAdminSchema,
+  updateOrganizationStatusSchema,
   type CreateOrganizationInput,
   type TransferFoundingAdminInput,
+  type UpdateOrganizationStatusInput,
 } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.decorator";
@@ -41,6 +43,15 @@ export class PlatformController {
   @Get("organizations/:id")
   getOrganizationDetail(@Param("id") organizationId: string) {
     return this.platformService.getOrganizationDetail(organizationId);
+  }
+
+  // R4: suspender ou reativar organização.
+  @Patch("organizations/:id/status")
+  updateOrganizationStatus(
+    @Param("id") organizationId: string,
+    @Body(new ZodValidationPipe(updateOrganizationStatusSchema)) body: UpdateOrganizationStatusInput,
+  ) {
+    return this.platformService.updateOrganizationStatus(organizationId, body);
   }
 
   @Patch("organizations/:id/founding-admin")
