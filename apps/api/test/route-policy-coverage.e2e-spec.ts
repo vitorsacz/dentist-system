@@ -90,6 +90,7 @@ describe("Cobertura de política de acesso (RBAC nega por padrão)", () => {
     expect(publicRoutes).toEqual([
       "AuthController.login (POST /auth/login)",
       "AuthController.refresh (POST /auth/refresh)",
+      "AuthController.setInitialPassword (POST /auth/set-initial-password)",
       "HealthController.check (GET /health)",
     ]);
   });

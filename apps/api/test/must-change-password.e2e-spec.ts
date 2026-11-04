@@ -3,6 +3,7 @@ import { Test } from "@nestjs/testing";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import * as bcrypt from "bcrypt";
 import { PrismaClient } from "@prisma/client";
+import { JwtService } from "@nestjs/jwt";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.setup";
 import { TEST_DATABASE_URL } from "./test-db";
@@ -177,6 +178,52 @@ describe("R3/R5 — mustChangePassword first-login flow", () => {
         .expect(200);
       expect(afterReset.body.requiresPasswordChange).toBe(true);
       expect(afterReset.body.changeToken).toBeDefined();
+    });
+  });
+
+  // changeToken tem escopo restrito: é um JWT válido, mas o JwtStrategy
+  // rejeita tokens com kind="must-change-password" para prevenir que o
+  // changeToken sirva como access token.
+  describe("changeToken scope e expiração", () => {
+    it("changeToken não pode ser usado como Bearer em endpoints protegidos", async () => {
+      const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);
+      const org = await rawPrisma.organization.create({ data: { name: "Org Scope Chg" } });
+      const user = await rawPrisma.user.create({
+        data: {
+          organizationId: org.id,
+          email: `scope-chg-${Date.now()}@test.com`,
+          passwordHash,
+          name: "Scope Chg User",
+          roles: ["ADMIN"],
+          mustChangePassword: true,
+        },
+      });
+      await rawPrisma.organization.update({ where: { id: org.id }, data: { foundingAdminUserId: user.id } });
+
+      const loginRes = await request(app.getHttpServer())
+        .post("/auth/login")
+        .send({ identifier: user.email, password: TEST_PASSWORD })
+        .expect(200);
+      const { changeToken } = loginRes.body as { changeToken: string };
+
+      // changeToken como Bearer em rota protegida → 401 (JwtStrategy bloqueia kind).
+      await request(app.getHttpServer())
+        .get("/users")
+        .set("Authorization", `Bearer ${changeToken}`)
+        .expect(401);
+    });
+
+    it("changeToken expirado é rejeitado por set-initial-password", async () => {
+      // Usa o JwtService do app para assinar um token já expirado.
+      const jwtService = app.get(JwtService);
+      const expiredToken = jwtService.sign(
+        { sub: "00000000-0000-0000-0000-000000000000", kind: "must-change-password" },
+        { secret: process.env.JWT_ACCESS_SECRET ?? "change-me", expiresIn: "-1s" },
+      );
+      await request(app.getHttpServer())
+        .post("/auth/set-initial-password")
+        .send({ changeToken: expiredToken, newPassword: NEW_PASSWORD })
+        .expect(401);
     });
   });
 });
