@@ -1,8 +1,9 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 import type {
   CreateOrganizationInput,
   PlatformOrganization,
   PlatformOrganizationDetail,
+  UpdateOrganizationStatusInput,
 } from "@dentist-system/shared-types";
 import { PALETTE_COLOR_TOKENS } from "@dentist-system/shared-types";
 import * as bcrypt from "bcrypt";
@@ -78,6 +79,40 @@ export class PlatformService {
       ...toPlatformOrganization(organization),
       foundingAdmin: organization.foundingAdmin,
     };
+  }
+
+  // R4: suspende ou reativa organização. Revoga todas as sessões dos usuários
+  // ao suspender para que o bloqueio seja imediato (sem esperar expirar o
+  // access token de 15 min — o refresh é inviabilizado; o JwtStrategy já
+  // bloqueia o access token ao reler org.status do banco a cada request).
+  async updateOrganizationStatus(
+    organizationId: string,
+    input: UpdateOrganizationStatusInput,
+  ): Promise<PlatformOrganization> {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) {
+      throw new NotFoundException("Organização não encontrada");
+    }
+    if (org.status === "DELETED") {
+      throw new UnprocessableEntityException("Organização deletada não pode ser reativada ou suspensa");
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.organization.update({
+        where: { id: organizationId },
+        data: { status: input.status },
+      });
+      if (input.status === "SUSPENDED") {
+        // Revoga todas as sessões ativas da org para bloqueio imediato.
+        await tx.refreshSession.updateMany({
+          where: { user: { organizationId }, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+      return result;
+    });
+
+    return toPlatformOrganization(updated);
   }
 
   // Transferência de capitania nunca é self-service — só o Super Admin,

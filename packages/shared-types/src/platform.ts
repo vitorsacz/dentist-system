@@ -25,6 +25,13 @@ export const transferFoundingAdminSchema = z.object({
 });
 export type TransferFoundingAdminInput = z.infer<typeof transferFoundingAdminSchema>;
 
+// R4: Super Admin suspende ou reativa organização.
+// DELETED fica fora: é operação destrutiva não solicitada neste sprint.
+export const updateOrganizationStatusSchema = z.object({
+  status: z.enum(["ACTIVE", "SUSPENDED"] as const),
+});
+export type UpdateOrganizationStatusInput = z.infer<typeof updateOrganizationStatusSchema>;
+
 export const platformOrganizationDetailSchema = platformOrganizationSchema.extend({
   foundingAdmin: z.object({ name: z.string(), email: z.string() }).nullable(),
 });
