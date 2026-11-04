@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.decorator";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { AuditAccessGuard } from "./audit-access.guard";
@@ -21,11 +21,17 @@ export class AuditController {
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
   ) {
+    const parseDate = (value: string, field: string) => {
+      const d = new Date(value);
+      if (isNaN(d.getTime())) throw new BadRequestException(`${field} inválido`);
+      return d;
+    };
+
     const params = {
       actorId,
       action,
-      from: from ? new Date(from) : undefined,
-      to: to ? new Date(to) : undefined,
+      from: from ? parseDate(from, "from") : undefined,
+      to: to ? parseDate(to, "to") : undefined,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
     };
