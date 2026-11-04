@@ -95,6 +95,7 @@ export {
   bulkReassignPatientsSchema,
   togglePatientActiveSchema,
   upsertAnamnesisSchema,
+  structuredAnamnesisSchema,
   createClinicalRecordSchema,
   type Sex,
   type MaritalStatus,
@@ -106,6 +107,7 @@ export {
   type BulkReassignPatientsInput,
   type TogglePatientActiveInput,
   type UpsertAnamnesisInput,
+  type StructuredAnamnesis,
   type CreateClinicalRecordInput,
 } from "./patient";
 

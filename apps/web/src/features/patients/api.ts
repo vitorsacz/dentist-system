@@ -49,12 +49,39 @@ export interface PatientRevision {
   changedBy: { id: string; name: string };
 }
 
+export interface AnamnesisAnswer {
+  value: boolean | null;
+  detail?: string | null;
+}
+
+export interface StructuredAnamnesisAnswers {
+  hypertension?: AnamnesisAnswer;
+  diabetes?: AnamnesisAnswer;
+  heartDisease?: AnamnesisAnswer;
+  anticoagulant?: AnamnesisAnswer;
+  pregnantOrBreastfeeding?: AnamnesisAnswer;
+  smoker?: AnamnesisAnswer;
+  allergyAnesthetic?: AnamnesisAnswer;
+  allergyPenicillin?: AnamnesisAnswer;
+  allergyLatex?: AnamnesisAnswer;
+  previousSurgeries?: AnamnesisAnswer;
+  bleedingProblems?: AnamnesisAnswer;
+  bisphosphonate?: AnamnesisAnswer;
+  otherConditions?: AnamnesisAnswer;
+  asthma?: AnamnesisAnswer;
+  epilepsy?: AnamnesisAnswer;
+  kidneyLiverDisease?: AnamnesisAnswer;
+  underMedicalTreatment?: AnamnesisAnswer;
+}
+
 export interface Anamnesis {
   allergies: string | null;
   medications: string | null;
   healthConditions: string | null;
   dentalHistory: string | null;
   chiefComplaint: string | null;
+  structured: { version: number; answers: StructuredAnamnesisAnswers } | null;
+  updatedByUserId: string | null;
 }
 
 export interface ClinicalRecord {

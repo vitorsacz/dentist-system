@@ -20,10 +20,11 @@ export class AnamnesisService {
   async upsert(patientId: string, input: UpsertAnamnesisInput, actor: AuthenticatedUser) {
     await this.patientAccess.assertPatientAccess(patientId, actor, "clinicalWrite");
     const { organizationId } = getTenantContext();
+    const data = { ...input, updatedByUserId: actor.id };
     return this.prisma.anamnesis.upsert({
       where: { patientId },
-      create: { patientId, organizationId, ...input },
-      update: input,
+      create: { patientId, organizationId, ...data },
+      update: data,
     });
   }
 }
