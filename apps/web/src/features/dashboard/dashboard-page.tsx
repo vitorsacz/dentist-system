@@ -1,9 +1,11 @@
 import { Link } from "react-router-dom";
-import { CalendarCheck, CalendarDays, DollarSign, Users } from "lucide-react";
-import type { AppointmentStatus } from "@dentist-system/shared-types";
+import { CalendarCheck, CalendarDays, DollarSign, Package, Users } from "lucide-react";
+import type { AppointmentStatus, Role } from "@dentist-system/shared-types";
 import { useAuth } from "@/lib/auth-context";
+import { can } from "@/lib/access";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
+import { AlertBanner } from "@/components/ui/alert-banner";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
@@ -23,6 +25,12 @@ const STATUS_TONE: Record<AppointmentStatus, BadgeTone> = {
   NO_SHOW: "neutral",
 };
 
+const ROLE_LABEL: Record<Role, string> = {
+  ADMIN: "Admin",
+  DENTIST: "Dentista",
+  RECEPTIONIST: "Recepcionista",
+};
+
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -30,6 +38,7 @@ function formatCurrency(value: number) {
 export function DashboardPage() {
   const { user } = useAuth();
   const { data, isLoading } = useDashboardOverview();
+  const isAdmin = can(user, "users.manage");
 
   const showRevenue = data?.revenueThisMonth !== undefined;
   const statCount = showRevenue ? 4 : 3;
@@ -37,6 +46,15 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader breadcrumb="Início" title={`Olá, ${user?.name ?? ""}`} />
+
+      {data?.incompleteProfile && (
+        <AlertBanner>
+          Alguns dados da sua clínica ainda estão incompletos.{" "}
+          <Link to="/my-clinic" className="font-medium underline">
+            Completar cadastro
+          </Link>
+        </AlertBanner>
+      )}
 
       <div className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-${statCount}`}>
         {isLoading ? (
@@ -83,6 +101,35 @@ export function DashboardPage() {
         </Card>
       )}
 
+      {isAdmin && data?.stockAlerts && data.stockAlerts.length > 0 && (
+        <Card>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 font-medium text-ink">
+              <Package className="h-4 w-4" />
+              Alertas de estoque
+            </h2>
+            <Link to="/materials" className="text-sm text-accent">
+              Ver estoque
+            </Link>
+          </div>
+          <ul className="divide-y divide-line">
+            {data.stockAlerts.map((item) => (
+              <li key={item.id} className="flex items-center justify-between py-2.5 text-sm">
+                <div>
+                  <span className="font-medium text-ink">{item.name}</span>
+                  {item.nearExpiry && (
+                    <span className="ml-2 text-xs text-warning-text">vencimento próximo</span>
+                  )}
+                </div>
+                <span className="text-muted">
+                  {item.currentStock} / {item.minimumStock} {item.unit}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-medium text-ink">Hoje</h2>
@@ -113,6 +160,27 @@ export function DashboardPage() {
           </ul>
         )}
       </Card>
+
+      {isAdmin && data?.teamMembers && data.teamMembers.length > 0 && (
+        <Card>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-medium text-ink">Equipe</h2>
+            <Link to="/my-clinic" className="text-sm text-accent">
+              Ver equipe completa
+            </Link>
+          </div>
+          <ul className="divide-y divide-line">
+            {data.teamMembers.map((m) => (
+              <li key={m.name} className="flex items-center justify-between py-2.5 text-sm">
+                <span className="font-medium text-ink">{m.name}</span>
+                <span className="text-muted">
+                  {(m.roles as Role[]).map((r) => ROLE_LABEL[r] ?? r).join(" · ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
     </div>
   );
 }

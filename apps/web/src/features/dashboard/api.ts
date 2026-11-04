@@ -10,6 +10,21 @@ export interface DashboardAppointment {
   status: AppointmentStatus;
 }
 
+export interface DashboardTeamMember {
+  name: string;
+  roles: string[];
+  active: boolean;
+}
+
+export interface DashboardStockAlert {
+  id: string;
+  name: string;
+  unit: string;
+  currentStock: number;
+  minimumStock: number;
+  nearExpiry: boolean;
+}
+
 export interface DashboardOverview {
   appointmentsToday: DashboardAppointment[];
   appointmentsThisWeek: number;
@@ -17,6 +32,9 @@ export interface DashboardOverview {
   attendancesThisMonth: number;
   revenueThisMonth?: number;
   revenueByClinic?: { clinicId: string; clinicName: string; revenue: number }[];
+  incompleteProfile?: boolean;
+  teamMembers?: DashboardTeamMember[];
+  stockAlerts?: DashboardStockAlert[];
 }
 
 export function useDashboardOverview() {

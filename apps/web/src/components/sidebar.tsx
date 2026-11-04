@@ -47,10 +47,10 @@ const NAV_GROUPS: NavGroupDef[] = [
     ],
   },
   {
-    title: "Clínica",
+    title: "Configurações",
     items: [
       { to: "/clinics", label: "Consultórios", icon: Building2, capability: "clinics.write" },
-      { to: "/my-clinic", label: "Minha Clínica", icon: Landmark, capability: "organization.read" },
+      { to: "/my-clinic", label: "Equipe", icon: Landmark, capability: "organization.read" },
       { to: "/admin/users", label: "Usuários", icon: UserCog, capability: "users.manage" },
     ],
   },
