@@ -135,7 +135,7 @@ describe("Dashboard (e2e)", () => {
     await rawPrisma.$disconnect();
   });
 
-  it("ADMIN recebe overview com revenueThisMonth (200)", async () => {
+  it("ADMIN recebe overview com revenueThisMonth e campos admin (200)", async () => {
     const res = await as(tokenAdmin).get("/dashboard/overview");
     expect(res.status).toBe(200);
     expect(typeof res.body.appointmentsThisWeek).toBe("number");
@@ -143,6 +143,17 @@ describe("Dashboard (e2e)", () => {
     expect(typeof res.body.attendancesThisMonth).toBe("number");
     expect(typeof res.body.revenueThisMonth).toBe("number");
     expect(Array.isArray(res.body.appointmentsToday)).toBe(true);
+    // incompleteProfile: Org A tem clínica no seed → false
+    expect(res.body.incompleteProfile).toBe(false);
+    expect(Array.isArray(res.body.teamMembers)).toBe(true);
+    expect(Array.isArray(res.body.stockAlerts)).toBe(true);
+  });
+
+  it("ADMIN sem consultório recebe incompleteProfile=true", async () => {
+    // Org B não tem clínica criada no seed
+    const res = await as(tokenAdmin2).get("/dashboard/overview");
+    expect(res.status).toBe(200);
+    expect(res.body.incompleteProfile).toBe(true);
   });
 
   it("DENTIST recebe overview com revenueThisMonth (200)", async () => {
@@ -151,11 +162,22 @@ describe("Dashboard (e2e)", () => {
     expect(typeof res.body.revenueThisMonth).toBe("number");
   });
 
-  it("RECEPTIONIST recebe overview sem revenueThisMonth (200)", async () => {
+  it("RECEPTIONIST recebe overview sem revenueThisMonth nem campos admin (200)", async () => {
     const res = await as(tokenReceptionist).get("/dashboard/overview");
     expect(res.status).toBe(200);
     expect(res.body.revenueThisMonth).toBeUndefined();
     expect(res.body.revenueByClinic).toBeUndefined();
+    expect(res.body.incompleteProfile).toBeUndefined();
+    expect(res.body.teamMembers).toBeUndefined();
+    expect(res.body.stockAlerts).toBeUndefined();
+  });
+
+  it("DENTIST não recebe campos admin (200)", async () => {
+    const res = await as(tokenDentist).get("/dashboard/overview");
+    expect(res.status).toBe(200);
+    expect(res.body.incompleteProfile).toBeUndefined();
+    expect(res.body.teamMembers).toBeUndefined();
+    expect(res.body.stockAlerts).toBeUndefined();
   });
 
   it("FREELANCER recebe revenueByClinic (200)", async () => {

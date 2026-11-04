@@ -94,6 +94,37 @@ export class DashboardService {
       },
     });
 
+    // ADMIN-only: incompleteProfile, teamMembers, stockAlerts
+    let incompleteProfile: boolean | undefined;
+    let teamMembers: { name: string; roles: string[]; active: boolean }[] | undefined;
+    let stockAlerts: { id: string; name: string; unit: string; currentStock: number; minimumStock: number; nearExpiry: boolean }[] | undefined;
+
+    if (actor.roles.includes("ADMIN")) {
+      const activeClinicsCount = await this.prisma.clinic.count({ where: { active: true } });
+      incompleteProfile = activeClinicsCount === 0;
+
+      const users = await this.prisma.user.findMany({
+        select: { name: true, roles: true, active: true },
+        orderBy: { name: "asc" },
+        take: 10,
+      });
+      teamMembers = users.map((u) => ({ name: u.name, roles: u.roles as string[], active: u.active }));
+
+      const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 3600000);
+      const materials = await this.prisma.material.findMany({
+        include: { batches: { select: { quantity: true, expiryDate: true } } },
+      });
+      stockAlerts = materials
+        .map((m) => {
+          const currentStock = m.batches.reduce((sum, b) => sum + Number(b.quantity), 0);
+          const nearExpiry = m.batches.some(
+            (b) => b.expiryDate !== null && b.expiryDate <= thirtyDaysFromNow && Number(b.quantity) > 0,
+          );
+          return { id: m.id, name: m.name, unit: m.unit, currentStock, minimumStock: Number(m.minimumStock), nearExpiry };
+        })
+        .filter((m) => m.currentStock < m.minimumStock || m.nearExpiry);
+    }
+
     // Revenue (only for roles that can see it)
     let revenueThisMonth: number | undefined;
     let revenueByClinic: { clinicId: string; clinicName: string; revenue: number }[] | undefined;
@@ -138,6 +169,9 @@ export class DashboardService {
       attendancesThisMonth,
       revenueThisMonth,
       revenueByClinic,
+      incompleteProfile,
+      teamMembers,
+      stockAlerts,
     };
   }
 }
