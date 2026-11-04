@@ -53,7 +53,7 @@ describe("GET /patients/:id/appointments/summary (e2e)", () => {
       data: { organizationId: orgA.id, name: "Consultório Sum", type: "ODONTO" },
     });
     const patient = await rawPrisma.patient.create({
-      data: { organizationId: orgA.id, name: "Paciente Sum", phone: "11900000001", ownerDentistId: dentist.id },
+      data: { organizationId: orgA.id, name: "Paciente Sum", phone: "11900000001", ownerDentistId: dentist.id, createdByUserId: admin.id },
     });
     patientId = patient.id;
 
@@ -94,7 +94,7 @@ describe("GET /patients/:id/appointments/summary (e2e)", () => {
       data: { organizationId: orgB.id, email: `sum-dent-b-${ts}@test.com`, passwordHash: hash, name: "Dentista B Sum", roles: ["DENTIST"] },
     });
     const patientB = await rawPrisma.patient.create({
-      data: { organizationId: orgB.id, name: "Paciente B Sum", phone: "11900000002", ownerDentistId: dentistB.id },
+      data: { organizationId: orgB.id, name: "Paciente B Sum", phone: "11900000002", ownerDentistId: dentistB.id, createdByUserId: adminB.id },
     });
     orgBPatientId = patientB.id;
 
