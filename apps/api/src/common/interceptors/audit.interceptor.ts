@@ -8,7 +8,8 @@ import { AuditService } from "../../modules/audit/audit.service";
 
 // Interceptor global opcional: registra ações marcadas com @AuditAction.
 // Falha de log nunca propaga — auditoria não pode quebrar a requisição.
-// Para ações que precisam de before/after, o serviço chama AuditService.log() diretamente.
+// Para ações que precisam de meta detalhado (before/after), o serviço chama
+// AuditService.log() diretamente.
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
   constructor(
@@ -31,12 +32,15 @@ export class AuditInterceptor implements NestInterceptor {
         this.auditService
           .log({
             organizationId: user?.organizationId,
-            userId: user?.id,
+            actorId: user?.id,
+            actorType: user?.isSuperAdmin ? "SUPER_ADMIN" : "USER",
             action: meta.action,
-            entity: meta.entity,
-            entityId: req.params?.id as string | undefined,
-            ip: req.ip as string | undefined,
-            userAgent: req.headers?.["user-agent"] as string | undefined,
+            targetType: meta.entity,
+            targetId: req.params?.id as string | undefined,
+            meta: {
+              ip: req.ip as string | undefined,
+              userAgent: req.headers?.["user-agent"] as string | undefined,
+            },
           })
           .catch(() => {});
       }),

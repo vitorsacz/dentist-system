@@ -70,7 +70,7 @@ export class AuthService {
     if (candidates.length === 0) {
       await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
       this.auditService
-        .log({ action: "LOGIN_FAILURE", ip: client.ip, userAgent: client.userAgent })
+        .log({ actorType: "SYSTEM", action: "LOGIN_FAILURE", meta: { ip: client.ip, userAgent: client.userAgent } })
         .catch(() => {});
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
@@ -87,10 +87,10 @@ export class AuthService {
       this.auditService
         .log({
           organizationId: candidates[0]?.organizationId,
-          userId: candidates[0]?.id,
+          actorId: candidates[0]?.id,
+          actorType: "USER",
           action: "LOGIN_FAILURE",
-          ip: client.ip,
-          userAgent: client.userAgent,
+          meta: { ip: client.ip, userAgent: client.userAgent },
         })
         .catch(() => {});
       throw new UnauthorizedException(INVALID_CREDENTIALS);
@@ -100,10 +100,10 @@ export class AuthService {
       this.auditService
         .log({
           organizationId: onlyAccount.organizationId,
-          userId: onlyAccount.id,
+          actorId: onlyAccount.id,
+          actorType: onlyAccount.isSuperAdmin ? "SUPER_ADMIN" : "USER",
           action: "LOGIN",
-          ip: client.ip,
-          userAgent: client.userAgent,
+          meta: { ip: client.ip, userAgent: client.userAgent },
         })
         .catch(() => {});
       return { kind: "tokens", ...result };
