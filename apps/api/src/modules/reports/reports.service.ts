@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { FinancialReport, FinancialReportQuery } from "@dentist-system/shared-types";
 import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
+import { getTenantContext } from "../../prisma/tenant-context";
 
 function dayKey(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -12,15 +13,22 @@ export class ReportsService {
   constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
 
   async financialReport(query: FinancialReportQuery, actor: AuthenticatedUser): Promise<FinancialReport> {
+    const { organizationId } = getTenantContext();
     const dentistOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN");
-    const attendances = await this.prisma.attendance.findMany({
-      where: {
-        date: { gte: query.from, lte: query.to },
-        ...(query.clinicId ? { clinicId: query.clinicId } : {}),
-        ...(dentistOnly ? { dentistUserId: actor.id } : {}),
-      },
-      include: { clinic: true },
-    });
+
+    const [org, attendances] = await Promise.all([
+      this.prisma.organization.findUniqueOrThrow({ where: { id: organizationId } }),
+      this.prisma.attendance.findMany({
+        where: {
+          date: { gte: query.from, lte: query.to },
+          ...(query.clinicId ? { clinicId: query.clinicId } : {}),
+          ...(dentistOnly ? { dentistUserId: actor.id } : {}),
+        },
+        include: { clinic: { include: { financialTerms: true } } },
+      }),
+    ]);
+
+    const isFreelancer = org.type === "FREELANCER";
 
     type Acc = {
       clinicId: string;
@@ -29,8 +37,9 @@ export class ReportsService {
       dentistRepasse: number;
       materialCost: number;
       rentDays: Set<string>;
+      // Apenas FREELANCER + RENTED_FIXED + DAILY
       dailyRentValue: number;
-      isRented: boolean;
+      hasTerms: boolean;
     };
 
     const byClinic = new Map<string, Acc>();
@@ -43,6 +52,11 @@ export class ReportsService {
 
       let acc = byClinic.get(clinicId);
       if (!acc) {
+        const terms = attendance.clinic.financialTerms;
+        const isDailyRent =
+          isFreelancer &&
+          terms?.relationshipType === "RENTED_FIXED" &&
+          terms?.rentPeriodicity === "DAILY";
         acc = {
           clinicId,
           clinicName: attendance.clinic.name,
@@ -50,8 +64,8 @@ export class ReportsService {
           dentistRepasse: 0,
           materialCost: 0,
           rentDays: new Set<string>(),
-          dailyRentValue: attendance.clinic.dailyRentValue ? Number(attendance.clinic.dailyRentValue) : 0,
-          isRented: attendance.clinic.type === "RENTED",
+          dailyRentValue: isDailyRent && terms?.rentValue ? Number(terms.rentValue) : 0,
+          hasTerms: !isFreelancer || terms != null,
         };
         byClinic.set(clinicId, acc);
       }
@@ -59,13 +73,17 @@ export class ReportsService {
       acc.grossRevenue += gross;
       acc.dentistRepasse += repasse;
       acc.materialCost += materialCost;
-      if (acc.isRented) {
+      if (acc.dailyRentValue > 0) {
         acc.rentDays.add(dayKey(attendance.date));
       }
     }
 
+    const clinicsWithoutTerms: string[] = [];
     const clinics = Array.from(byClinic.values()).map((acc) => {
-      const rentCost = acc.isRented ? acc.rentDays.size * acc.dailyRentValue : 0;
+      if (!acc.hasTerms) {
+        clinicsWithoutTerms.push(acc.clinicName);
+      }
+      const rentCost = acc.rentDays.size * acc.dailyRentValue;
       const netResult = acc.dentistRepasse - acc.materialCost - rentCost;
       return {
         clinicId: acc.clinicId,
@@ -94,6 +112,7 @@ export class ReportsService {
       to: query.to.toISOString(),
       clinics,
       totals,
+      clinicsWithoutTerms,
     };
   }
 }

@@ -1,4 +1,4 @@
-import { Inject, BadRequestException, Injectable, UnprocessableEntityException } from "@nestjs/common";
+import { Inject, BadRequestException, ForbiddenException, Injectable, UnprocessableEntityException } from "@nestjs/common";
 import type { CreateAttendanceInput } from "@dentist-system/shared-types";
 import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { PRISMA_SERVICE, type PrismaService, type TenantScopedTransactionClient } from "../../prisma/prisma.service";
@@ -45,7 +45,11 @@ export class AttendancesService {
     }
     await this.proceduresService.findOne(input.procedureId);
     if (input.appointmentId) {
-      await this.appointmentsService.findOne(input.appointmentId);
+      const appt = await this.appointmentsService.findOne(input.appointmentId);
+      // A1: agendamento deve pertencer ao dentista que está registrando o atendimento.
+      if (appt.dentistUserId !== actor.id) {
+        throw new ForbiddenException("Agendamento pertence a outro dentista");
+      }
     }
 
     const { organizationId } = getTenantContext();
