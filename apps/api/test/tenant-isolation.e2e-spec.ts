@@ -31,13 +31,15 @@ async function seedOrgContext(
   const org = await rawPrisma.organization.create({ data: { name: `${label} (teste isolamento)`, type } });
   const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);
 
+  // Org FREELANCER: o dentista fundador tem ADMIN+DENTIST (mesmo comportamento
+  // do platform.service.ts createOrganization). Org CLINIC: só DENTIST.
   const dentistUser = await rawPrisma.user.create({
     data: {
       organizationId: org.id,
       email: `${label}-dentist-${Date.now()}-${Math.random()}@test.com`,
       passwordHash,
       name: `${label} Dentista`,
-      roles: ["DENTIST"],
+      roles: type === "FREELANCER" ? ["ADMIN", "DENTIST"] : ["DENTIST"],
     },
   });
 
