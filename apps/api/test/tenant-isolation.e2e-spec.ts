@@ -139,7 +139,8 @@ describe("Isolamento cross-tenant", () => {
     const clinicId = await createClinic(orgA.organizationId, "Clínica A");
 
     expect((await as(orgB.dentistToken).get(`/clinics/${clinicId}`)).status).toBe(404);
-    expect((await as(orgB.dentistToken).patch(`/clinics/${clinicId}`, { name: "Hackeado" })).status).toBe(404);
+    // clinics.write → ["ADMIN"] — usa adminToken para testar isolamento (404, não 403).
+    expect((await as(orgB.adminToken).patch(`/clinics/${clinicId}`, { name: "Hackeado" })).status).toBe(404);
 
     const listB = await as(orgB.dentistToken).get("/clinics");
     expect(listB.body.some((c: { id: string }) => c.id === clinicId)).toBe(false);
@@ -266,6 +267,7 @@ describe("Isolamento cross-tenant", () => {
   });
 
   it("ProcedureCatalog: create em A, PATCH/DELETE por id em B dá 404; list de B não vaza", async () => {
+    // procedures.write → ["ADMIN"] — usa adminToken para criar e testar isolamento.
     const procedureId = await createProcedure(orgA.adminToken, "Procedimento A");
 
     expect((await as(orgB.adminToken).patch(`/procedures/${procedureId}`, { name: "Hackeado" })).status).toBe(404);
