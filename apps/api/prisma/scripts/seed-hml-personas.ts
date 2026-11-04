@@ -66,6 +66,44 @@ const IDS = {
   P_F_02: "shhml_p_f_02",
   P_F_03: "shhml_p_f_03",
   P_F_04: "shhml_p_f_04",
+  // Extra patients Org A (13–24)
+  P_A_13: "shhml_p_a_13", P_A_14: "shhml_p_a_14", P_A_15: "shhml_p_a_15",
+  P_A_16: "shhml_p_a_16", P_A_17: "shhml_p_a_17", P_A_18: "shhml_p_a_18",
+  P_A_19: "shhml_p_a_19", P_A_20: "shhml_p_a_20", P_A_21: "shhml_p_a_21",
+  P_A_22: "shhml_p_a_22", P_A_23: "shhml_p_a_23", P_A_24: "shhml_p_a_24",
+  // Extra patients Org F (05–12)
+  P_F_05: "shhml_p_f_05", P_F_06: "shhml_p_f_06", P_F_07: "shhml_p_f_07",
+  P_F_08: "shhml_p_f_08", P_F_09: "shhml_p_f_09", P_F_10: "shhml_p_f_10",
+  P_F_11: "shhml_p_f_11", P_F_12: "shhml_p_f_12",
+  // Procedures Org A
+  PROC_A_01: "shhml_proc_a_01", PROC_A_02: "shhml_proc_a_02", PROC_A_03: "shhml_proc_a_03",
+  PROC_A_04: "shhml_proc_a_04", PROC_A_05: "shhml_proc_a_05", PROC_A_06: "shhml_proc_a_06",
+  PROC_A_07: "shhml_proc_a_07", PROC_A_08: "shhml_proc_a_08", PROC_A_09: "shhml_proc_a_09",
+  PROC_A_10: "shhml_proc_a_10",
+  // Procedures Org F
+  PROC_F_01: "shhml_proc_f_01", PROC_F_02: "shhml_proc_f_02", PROC_F_03: "shhml_proc_f_03",
+  PROC_F_04: "shhml_proc_f_04", PROC_F_05: "shhml_proc_f_05", PROC_F_06: "shhml_proc_f_06",
+  PROC_F_07: "shhml_proc_f_07", PROC_F_08: "shhml_proc_f_08", PROC_F_09: "shhml_proc_f_09",
+  PROC_F_10: "shhml_proc_f_10",
+  // Materials Org A
+  MAT_A_01: "shhml_mat_a_01", MAT_A_02: "shhml_mat_a_02", MAT_A_03: "shhml_mat_a_03",
+  MAT_A_04: "shhml_mat_a_04", MAT_A_05: "shhml_mat_a_05", MAT_A_06: "shhml_mat_a_06",
+  MAT_A_07: "shhml_mat_a_07", MAT_A_08: "shhml_mat_a_08", MAT_A_09: "shhml_mat_a_09",
+  MAT_A_10: "shhml_mat_a_10",
+  // Materials Org F
+  MAT_F_01: "shhml_mat_f_01", MAT_F_02: "shhml_mat_f_02", MAT_F_03: "shhml_mat_f_03",
+  MAT_F_04: "shhml_mat_f_04", MAT_F_05: "shhml_mat_f_05",
+  // Attendances Org A
+  ATT_A_01: "shhml_att_a_01", ATT_A_02: "shhml_att_a_02", ATT_A_03: "shhml_att_a_03",
+  ATT_A_04: "shhml_att_a_04", ATT_A_05: "shhml_att_a_05", ATT_A_06: "shhml_att_a_06",
+  ATT_A_07: "shhml_att_a_07", ATT_A_08: "shhml_att_a_08", ATT_A_09: "shhml_att_a_09",
+  ATT_A_10: "shhml_att_a_10",
+  // Attendances Org F
+  ATT_F_01: "shhml_att_f_01", ATT_F_02: "shhml_att_f_02", ATT_F_03: "shhml_att_f_03",
+  ATT_F_04: "shhml_att_f_04", ATT_F_05: "shhml_att_f_05",
+  // ClinicFinancialTerms Org F
+  CFT_BRAGANCA: "shhml_cft_braganca",
+  CFT_ATIBAIA: "shhml_cft_atibaia",
 } as const;
 
 function daysFromNow(days: number, hour = 9, minute = 0): Date {
@@ -890,13 +928,19 @@ export async function seedHmlPersonas(prisma: PrismaClient): Promise<void> {
     },
   });
 
+  await seedHmlAgendaExtras(prisma);
+
   // ── Resumo ─────────────────────────────────────────────────────────────────
-  const [orgCount, patientCount, appointmentCount, clinicCount] = await Promise.all([
-    prisma.organization.count({ where: { name: { startsWith: PREFIX } } }),
-    prisma.patient.count({ where: { organizationId: { in: [IDS.ORG_A, IDS.ORG_B, IDS.ORG_F] } } }),
-    prisma.appointment.count({ where: { organizationId: { in: [IDS.ORG_A, IDS.ORG_B, IDS.ORG_F] } } }),
-    prisma.clinic.count({ where: { organizationId: { in: [IDS.ORG_A, IDS.ORG_B, IDS.ORG_F] } } }),
-  ]);
+  const [orgCount, patientCount, appointmentCount, clinicCount, procedureCount, materialCount, attendanceCount] =
+    await Promise.all([
+      prisma.organization.count({ where: { name: { startsWith: PREFIX } } }),
+      prisma.patient.count({ where: { organizationId: { in: [IDS.ORG_A, IDS.ORG_B, IDS.ORG_F] } } }),
+      prisma.appointment.count({ where: { organizationId: { in: [IDS.ORG_A, IDS.ORG_B, IDS.ORG_F] } } }),
+      prisma.clinic.count({ where: { organizationId: { in: [IDS.ORG_A, IDS.ORG_B, IDS.ORG_F] } } }),
+      prisma.procedureCatalog.count({ where: { organizationId: { in: [IDS.ORG_A, IDS.ORG_B, IDS.ORG_F] } } }),
+      prisma.material.count({ where: { organizationId: { in: [IDS.ORG_A, IDS.ORG_B, IDS.ORG_F] } } }),
+      prisma.attendance.count({ where: { organizationId: { in: [IDS.ORG_A, IDS.ORG_B, IDS.ORG_F] } } }),
+    ]);
 
   const breakdown = await prisma.organization.findMany({
     where: { name: { startsWith: PREFIX } },
@@ -916,12 +960,567 @@ export async function seedHmlPersonas(prisma: PrismaClient): Promise<void> {
 
   console.log(`\n✔ Seed HML concluído. Senha: variável SEED_HML_PASSWORD do environment.`);
   console.log(`\n📊 Resumo do seed HML:`);
-  console.log(`  Orgs: ${orgCount}  Clínicas: ${clinicCount}  Pacientes: ${patientCount}  Agendamentos: ${appointmentCount}`);
+  console.log(
+    `  Orgs: ${orgCount}  Clínicas: ${clinicCount}  Pacientes: ${patientCount}  Agendamentos: ${appointmentCount}`,
+  );
+  console.log(
+    `  Procedimentos: ${procedureCount}  Materiais: ${materialCount}  Atendimentos: ${attendanceCount}`,
+  );
   for (const org of breakdown) {
     console.log(
       `  ${org.name}: ${org._count.users} usuários, ${org._count.clinics} clínicas, ${org._count.patients} pacientes, ${org._count.appointments} agendamentos`,
     );
   }
+}
+
+async function seedHmlAgendaExtras(prisma: PrismaClient): Promise<void> {
+  // ── Pacientes novos Org A (13–24) com anamnese ─────────────────────────────
+  await Promise.all([
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_13, organizationId: IDS.ORG_A, name: "Beatriz Carvalho",
+        phone: "11901300001", active: true,
+        ownerDentistId: IDS.U_DENT_A, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, chiefComplaint: "Dor ao mastigar" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_14, organizationId: IDS.ORG_A, name: "Carlos Medeiros",
+        phone: "11901400001", active: true,
+        ownerDentistId: IDS.U_DENT_A, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, healthConditions: "Hipertensão, tabagista", medications: "Losartana 50 mg" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_15, organizationId: IDS.ORG_A, name: "Daniela Ferreira",
+        phone: "11901500001", active: true,
+        ownerDentistId: IDS.U_DENT_A, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, allergies: "Penicilina", chiefComplaint: "Consulta de rotina" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_16, organizationId: IDS.ORG_A, name: "Eduardo Nunes",
+        phone: "11901600001", active: true,
+        ownerDentistId: IDS.U_ADMIN_DENT, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, healthConditions: "Diabetes tipo 2, hipertensão", medications: "Metformina, Enalapril" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_17, organizationId: IDS.ORG_A, name: "Fernanda Lima",
+        phone: "11901700001", active: true,
+        ownerDentistId: IDS.U_DENT_A, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, chiefComplaint: "Limpeza semestral" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_18, organizationId: IDS.ORG_A, name: "Gabriel Ramos",
+        phone: "11901800001", active: true,
+        ownerDentistId: IDS.U_ADMIN_DENT, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, allergies: "Dipirona", chiefComplaint: "Dor de dente" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_19, organizationId: IDS.ORG_A, name: "Helena Costa",
+        phone: "11901900001", active: true,
+        ownerDentistId: IDS.U_DENT_A, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, healthConditions: "Cardiopatia", medications: "AAS 100 mg, Atenolol" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_20, organizationId: IDS.ORG_A, name: "Igor Martins",
+        phone: "11902000001", active: true,
+        ownerDentistId: IDS.U_ADMIN_DENT, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, chiefComplaint: "Clareamento" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_21, organizationId: IDS.ORG_A, name: "Juliana Alves",
+        phone: "11902100001", active: true,
+        ownerDentistId: IDS.U_DENT_A, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, healthConditions: "Gestante (2º trimestre)", chiefComplaint: "Gengivite gestacional" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_22, organizationId: IDS.ORG_A, name: "Kevin Santos",
+        phone: "11902200001", active: true,
+        ownerDentistId: IDS.U_ADMIN_DENT, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, healthConditions: "Diabetes tipo 1", medications: "Insulina glargina" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_23, organizationId: IDS.ORG_A, name: "Laura Oliveira",
+        phone: "11902300001", active: true,
+        ownerDentistId: IDS.U_DENT_A, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, allergies: "Amoxicilina, sulfonamidas", chiefComplaint: "Restauração" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_A_24, organizationId: IDS.ORG_A, name: "Marco Souza",
+        phone: "11902400001", active: true,
+        ownerDentistId: IDS.U_ADMIN_DENT, createdByUserId: IDS.U_ADMIN_A,
+        anamnesis: { create: { organizationId: IDS.ORG_A, healthConditions: "Portador de marcapasso", medications: "Varfarina 5 mg" } },
+      },
+    }),
+  ]);
+
+  // ── Pacientes novos Org F (05–12) com anamnese ────────────────────────────
+  await Promise.all([
+    prisma.patient.create({
+      data: {
+        id: IDS.P_F_05, organizationId: IDS.ORG_F, name: "Natalia Pereira",
+        phone: "11902500001", active: true,
+        ownerDentistId: IDS.U_FREEL, createdByUserId: IDS.U_FREEL,
+        anamnesis: { create: { organizationId: IDS.ORG_F, allergies: "Látex", chiefComplaint: "Canal" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_F_06, organizationId: IDS.ORG_F, name: "Otávio Rodrigues",
+        phone: "11902600001", active: true,
+        ownerDentistId: IDS.U_FREEL, createdByUserId: IDS.U_FREEL,
+        anamnesis: { create: { organizationId: IDS.ORG_F, chiefComplaint: "Consulta inicial" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_F_07, organizationId: IDS.ORG_F, name: "Patricia Gomes",
+        phone: "11902700001", active: true,
+        ownerDentistId: IDS.U_FREEL, createdByUserId: IDS.U_FREEL,
+        anamnesis: { create: { organizationId: IDS.ORG_F, chiefComplaint: "Restauração" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_F_08, organizationId: IDS.ORG_F, name: "Ricardo Barbosa",
+        phone: "11902800001", active: true,
+        ownerDentistId: IDS.U_FREEL, createdByUserId: IDS.U_FREEL,
+        anamnesis: { create: { organizationId: IDS.ORG_F, healthConditions: "Hipertensão", medications: "Hidroclorotiazida 25 mg" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_F_09, organizationId: IDS.ORG_F, name: "Sandra Melo",
+        phone: "11902900001", active: true,
+        ownerDentistId: IDS.U_FREEL, createdByUserId: IDS.U_FREEL,
+        anamnesis: { create: { organizationId: IDS.ORG_F, healthConditions: "Portadora de marcapasso", chiefComplaint: "Limpeza" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_F_10, organizationId: IDS.ORG_F, name: "Thiago Dias",
+        phone: "11903000001", active: true,
+        ownerDentistId: IDS.U_FREEL, createdByUserId: IDS.U_FREEL,
+        anamnesis: { create: { organizationId: IDS.ORG_F, healthConditions: "Tabagista (20 cigarros/dia)", chiefComplaint: "Manchas nos dentes" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_F_11, organizationId: IDS.ORG_F, name: "Ursula Cardoso",
+        phone: "11903100001", active: true,
+        ownerDentistId: IDS.U_FREEL, createdByUserId: IDS.U_FREEL,
+        anamnesis: { create: { organizationId: IDS.ORG_F, chiefComplaint: "Dor aguda" } },
+      },
+    }),
+    prisma.patient.create({
+      data: {
+        id: IDS.P_F_12, organizationId: IDS.ORG_F, name: "Victor Freitas",
+        phone: "11903200001", active: true,
+        ownerDentistId: IDS.U_FREEL, createdByUserId: IDS.U_FREEL,
+        anamnesis: { create: { organizationId: IDS.ORG_F, medications: "Varfarina 5 mg", chiefComplaint: "Extração" } },
+      },
+    }),
+  ]);
+
+  // ── Procedimentos Org A (10) ───────────────────────────────────────────────
+  await prisma.procedureCatalog.createMany({
+    data: [
+      { id: IDS.PROC_A_01, name: "Consulta inicial", defaultValue: 150, active: true, organizationId: IDS.ORG_A },
+      { id: IDS.PROC_A_02, name: "Restauração composta (1 face)", defaultValue: 180, active: true, organizationId: IDS.ORG_A },
+      { id: IDS.PROC_A_03, name: "Restauração composta (2 faces)", defaultValue: 250, active: true, organizationId: IDS.ORG_A },
+      { id: IDS.PROC_A_04, name: "Extração simples", defaultValue: 200, active: true, organizationId: IDS.ORG_A },
+      { id: IDS.PROC_A_05, name: "Limpeza (profilaxia)", defaultValue: 120, active: true, organizationId: IDS.ORG_A },
+      { id: IDS.PROC_A_06, name: "Canal (dente anterior)", defaultValue: 600, active: true, organizationId: IDS.ORG_A },
+      { id: IDS.PROC_A_07, name: "Canal (dente posterior)", defaultValue: 850, active: true, organizationId: IDS.ORG_A },
+      { id: IDS.PROC_A_08, name: "Clareamento (sessão)", defaultValue: 300, active: true, organizationId: IDS.ORG_A },
+      { id: IDS.PROC_A_09, name: "Prótese parcial removível", defaultValue: 2500, active: true, organizationId: IDS.ORG_A },
+      { id: IDS.PROC_A_10, name: "Implante (consulta)", defaultValue: 400, active: true, organizationId: IDS.ORG_A },
+    ],
+  });
+
+  // ── Procedimentos Org F (10) ───────────────────────────────────────────────
+  await prisma.procedureCatalog.createMany({
+    data: [
+      { id: IDS.PROC_F_01, name: "Avaliação clínica", defaultValue: 100, active: true, organizationId: IDS.ORG_F },
+      { id: IDS.PROC_F_02, name: "Restauração resina (1 face)", defaultValue: 200, active: true, organizationId: IDS.ORG_F },
+      { id: IDS.PROC_F_03, name: "Restauração resina (2 faces)", defaultValue: 280, active: true, organizationId: IDS.ORG_F },
+      { id: IDS.PROC_F_04, name: "Extração dentária", defaultValue: 220, active: true, organizationId: IDS.ORG_F },
+      { id: IDS.PROC_F_05, name: "Profilaxia + aplicação de flúor", defaultValue: 130, active: true, organizationId: IDS.ORG_F },
+      { id: IDS.PROC_F_06, name: "Tratamento de canal", defaultValue: 700, active: true, organizationId: IDS.ORG_F },
+      { id: IDS.PROC_F_07, name: "Clareamento (sessão)", defaultValue: 320, active: true, organizationId: IDS.ORG_F },
+      { id: IDS.PROC_F_08, name: "Placa de bruxismo", defaultValue: 450, active: true, organizationId: IDS.ORG_F },
+      { id: IDS.PROC_F_09, name: "Ortodontia (manutenção)", defaultValue: 200, active: true, organizationId: IDS.ORG_F },
+      { id: IDS.PROC_F_10, name: "Consulta de urgência", defaultValue: 180, active: true, organizationId: IDS.ORG_F },
+    ],
+  });
+
+  // ── Termos financeiros Org F ──────────────────────────────────────────────
+  await prisma.clinicFinancialTerms.create({
+    data: {
+      id: IDS.CFT_BRAGANCA,
+      clinicId: IDS.C_BRAGANCA,
+      organizationId: IDS.ORG_F,
+      relationshipType: "COMMISSION",
+      commissionPercentage: 30,
+      ownerLabel: "Clínica parceira Bragança Demo",
+    },
+  });
+  await prisma.clinicFinancialTerms.create({
+    data: {
+      id: IDS.CFT_ATIBAIA,
+      clinicId: IDS.C_ATIBAIA,
+      organizationId: IDS.ORG_F,
+      relationshipType: "RENTED_FIXED",
+      rentValue: 500,
+      rentPeriodicity: "MONTHLY",
+      ownerLabel: "Proprietário Atibaia Demo",
+    },
+  });
+
+  // ── Materiais Org A (10) com lotes ──────────────────────────────────────────
+  // ⚠ MAT_A_02: qty 8 < min 10 + expira em +15 d
+  // ⚠ MAT_A_03: qty 30 < min 50
+  // ⚠ MAT_A_06: qty 50 < min 100 + expira em +20 d
+  // ⚠ MAT_A_08: expira em +25 d (qty ok)
+  await Promise.all([
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_A_01, name: "Resina composta A2", unit: "un",
+        minimumStock: 5, organizationId: IDS.ORG_A,
+        batches: { create: [{ quantity: 20, organizationId: IDS.ORG_A }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_A_02, name: "Anestésico lidocaína 2%", unit: "ampola",
+        minimumStock: 10, organizationId: IDS.ORG_A,
+        batches: { create: [{ quantity: 8, expiryDate: daysFromNow(15), organizationId: IDS.ORG_A }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_A_03, name: "Luvas de látex P", unit: "cx",
+        minimumStock: 50, organizationId: IDS.ORG_A,
+        batches: { create: [{ quantity: 30, organizationId: IDS.ORG_A }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_A_04, name: "Papel articular azul", unit: "cx",
+        minimumStock: 2, organizationId: IDS.ORG_A,
+        batches: { create: [{ quantity: 5, organizationId: IDS.ORG_A }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_A_05, name: "Dique de borracha", unit: "cx",
+        minimumStock: 2, organizationId: IDS.ORG_A,
+        batches: { create: [{ quantity: 4, organizationId: IDS.ORG_A }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_A_06, name: "Fio retrator #1", unit: "un",
+        minimumStock: 100, organizationId: IDS.ORG_A,
+        batches: { create: [{ quantity: 50, expiryDate: daysFromNow(20), organizationId: IDS.ORG_A }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_A_07, name: "Eugenol", unit: "ml",
+        minimumStock: 20, organizationId: IDS.ORG_A,
+        batches: { create: [{ quantity: 50, organizationId: IDS.ORG_A }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_A_08, name: "Gel de flúor", unit: "un",
+        minimumStock: 5, organizationId: IDS.ORG_A,
+        batches: { create: [{ quantity: 25, expiryDate: daysFromNow(25), organizationId: IDS.ORG_A }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_A_09, name: "Broca diamantada 1012", unit: "un",
+        minimumStock: 10, organizationId: IDS.ORG_A,
+        batches: { create: [{ quantity: 15, organizationId: IDS.ORG_A }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_A_10, name: "Luvas de vinil M", unit: "cx",
+        minimumStock: 10, organizationId: IDS.ORG_A,
+        batches: { create: [{ quantity: 20, organizationId: IDS.ORG_A }] },
+      },
+    }),
+  ]);
+
+  // ── Materiais Org F (5) com lotes ────────────────────────────────────────
+  // ⚠ MAT_F_01: qty 2 < min 5 + expira em +7 d
+  // ⚠ MAT_F_02: qty 12 < min 15
+  await Promise.all([
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_F_01, name: "Resina B1", unit: "un",
+        minimumStock: 5, organizationId: IDS.ORG_F,
+        batches: { create: [{ quantity: 2, expiryDate: daysFromNow(7), organizationId: IDS.ORG_F }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_F_02, name: "Articaína 4% (carpule)", unit: "caixa",
+        minimumStock: 15, organizationId: IDS.ORG_F,
+        batches: { create: [{ quantity: 12, organizationId: IDS.ORG_F }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_F_03, name: "Luvas procedimento M", unit: "cx",
+        minimumStock: 3, organizationId: IDS.ORG_F,
+        batches: { create: [{ quantity: 10, organizationId: IDS.ORG_F }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_F_04, name: "Ácido fosfórico 37%", unit: "ml",
+        minimumStock: 20, organizationId: IDS.ORG_F,
+        batches: { create: [{ quantity: 50, organizationId: IDS.ORG_F }] },
+      },
+    }),
+    prisma.material.create({
+      data: {
+        id: IDS.MAT_F_05, name: "Verniz fluoretado", unit: "un",
+        minimumStock: 5, organizationId: IDS.ORG_F,
+        batches: { create: [{ quantity: 8, organizationId: IDS.ORG_F }] },
+      },
+    }),
+  ]);
+
+  // ── Agendamentos Org A (20) dias +1..+14 ───────────────────────────────────
+  await prisma.appointment.createMany({
+    data: [
+      { id: "shhml_apt_ae_a_01", organizationId: IDS.ORG_A, patientId: IDS.P_A_13, clinicId: IDS.C_A1, dentistUserId: IDS.U_DENT_A, startsAt: daysFromNow(1, 8), endsAt: endOf(daysFromNow(1, 8), 60), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_02", organizationId: IDS.ORG_A, patientId: IDS.P_A_14, clinicId: IDS.C_A2, dentistUserId: IDS.U_ADMIN_DENT, startsAt: daysFromNow(1, 14), endsAt: endOf(daysFromNow(1, 14), 30), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_03", organizationId: IDS.ORG_A, patientId: IDS.P_A_15, clinicId: IDS.C_A1, dentistUserId: IDS.U_DENT_A, startsAt: daysFromNow(2, 9), endsAt: endOf(daysFromNow(2, 9), 45), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_04", organizationId: IDS.ORG_A, patientId: IDS.P_A_16, clinicId: IDS.C_A2, dentistUserId: IDS.U_ADMIN_DENT, startsAt: daysFromNow(2, 15), endsAt: endOf(daysFromNow(2, 15), 60), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_05", organizationId: IDS.ORG_A, patientId: IDS.P_A_17, clinicId: IDS.C_A1, dentistUserId: IDS.U_DENT_A, startsAt: daysFromNow(3, 8, 30), endsAt: endOf(daysFromNow(3, 8, 30), 30), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_06", organizationId: IDS.ORG_A, patientId: IDS.P_A_18, clinicId: IDS.C_A2, dentistUserId: IDS.U_ADMIN_DENT, startsAt: daysFromNow(3, 11), endsAt: endOf(daysFromNow(3, 11), 60), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_07", organizationId: IDS.ORG_A, patientId: IDS.P_A_19, clinicId: IDS.C_A1, dentistUserId: IDS.U_DENT_A, startsAt: daysFromNow(4, 9), endsAt: endOf(daysFromNow(4, 9), 45), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_08", organizationId: IDS.ORG_A, patientId: IDS.P_A_20, clinicId: IDS.C_A2, dentistUserId: IDS.U_ADMIN_DENT, startsAt: daysFromNow(4, 14), endsAt: endOf(daysFromNow(4, 14), 30), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_09", organizationId: IDS.ORG_A, patientId: IDS.P_A_21, clinicId: IDS.C_A1, dentistUserId: IDS.U_DENT_A, startsAt: daysFromNow(5, 10), endsAt: endOf(daysFromNow(5, 10), 60), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_10", organizationId: IDS.ORG_A, patientId: IDS.P_A_22, clinicId: IDS.C_A1, dentistUserId: IDS.U_DENT_A, startsAt: daysFromNow(6, 9), endsAt: endOf(daysFromNow(6, 9), 30), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_11", organizationId: IDS.ORG_A, patientId: IDS.P_A_23, clinicId: IDS.C_A2, dentistUserId: IDS.U_ADMIN_DENT, startsAt: daysFromNow(6, 14), endsAt: endOf(daysFromNow(6, 14), 45), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_12", organizationId: IDS.ORG_A, patientId: IDS.P_A_24, clinicId: IDS.C_A1, dentistUserId: IDS.U_DENT_A, startsAt: daysFromNow(7, 8), endsAt: endOf(daysFromNow(7, 8), 60), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_13", organizationId: IDS.ORG_A, patientId: IDS.P_A_13, clinicId: IDS.C_A2, dentistUserId: IDS.U_ADMIN_DENT, startsAt: daysFromNow(8, 9), endsAt: endOf(daysFromNow(8, 9), 30), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_14", organizationId: IDS.ORG_A, patientId: IDS.P_A_14, clinicId: IDS.C_A1, dentistUserId: IDS.U_DENT_A, startsAt: daysFromNow(8, 14), endsAt: endOf(daysFromNow(8, 14), 60), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_15", organizationId: IDS.ORG_A, patientId: IDS.P_A_15, clinicId: IDS.C_A1, dentistUserId: IDS.U_DENT_A, startsAt: daysFromNow(9, 10), endsAt: endOf(daysFromNow(9, 10), 45), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_16", organizationId: IDS.ORG_A, patientId: IDS.P_A_16, clinicId: IDS.C_A2, dentistUserId: IDS.U_ADMIN_DENT, startsAt: daysFromNow(9, 15), endsAt: endOf(daysFromNow(9, 15), 30), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_17", organizationId: IDS.ORG_A, patientId: IDS.P_A_17, clinicId: IDS.C_A1, dentistUserId: IDS.U_DENT_A, startsAt: daysFromNow(11, 9), endsAt: endOf(daysFromNow(11, 9), 60), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_18", organizationId: IDS.ORG_A, patientId: IDS.P_A_18, clinicId: IDS.C_A2, dentistUserId: IDS.U_ADMIN_DENT, startsAt: daysFromNow(11, 14), endsAt: endOf(daysFromNow(11, 14), 45), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_19", organizationId: IDS.ORG_A, patientId: IDS.P_A_19, clinicId: IDS.C_A1, dentistUserId: IDS.U_DENT_A, startsAt: daysFromNow(13, 8), endsAt: endOf(daysFromNow(13, 8), 30), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_a_20", organizationId: IDS.ORG_A, patientId: IDS.P_A_20, clinicId: IDS.C_A2, dentistUserId: IDS.U_ADMIN_DENT, startsAt: daysFromNow(13, 11), endsAt: endOf(daysFromNow(13, 11), 60), status: "SCHEDULED" },
+    ],
+  });
+
+  // ── Agendamentos Org F (10) dias +1..+14 ───────────────────────────────────
+  await prisma.appointment.createMany({
+    data: [
+      { id: "shhml_apt_ae_f_01", organizationId: IDS.ORG_F, patientId: IDS.P_F_05, clinicId: IDS.C_BRAGANCA, dentistUserId: IDS.U_FREEL, startsAt: daysFromNow(1, 9), endsAt: endOf(daysFromNow(1, 9), 45), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_f_02", organizationId: IDS.ORG_F, patientId: IDS.P_F_06, clinicId: IDS.C_ATIBAIA, dentistUserId: IDS.U_FREEL, startsAt: daysFromNow(2, 10), endsAt: endOf(daysFromNow(2, 10), 30), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_f_03", organizationId: IDS.ORG_F, patientId: IDS.P_F_07, clinicId: IDS.C_BRAGANCA, dentistUserId: IDS.U_FREEL, startsAt: daysFromNow(3, 9), endsAt: endOf(daysFromNow(3, 9), 60), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_f_04", organizationId: IDS.ORG_F, patientId: IDS.P_F_08, clinicId: IDS.C_ATIBAIA, dentistUserId: IDS.U_FREEL, startsAt: daysFromNow(5, 10), endsAt: endOf(daysFromNow(5, 10), 45), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_f_05", organizationId: IDS.ORG_F, patientId: IDS.P_F_09, clinicId: IDS.C_BRAGANCA, dentistUserId: IDS.U_FREEL, startsAt: daysFromNow(6, 9), endsAt: endOf(daysFromNow(6, 9), 30), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_f_06", organizationId: IDS.ORG_F, patientId: IDS.P_F_10, clinicId: IDS.C_ATIBAIA, dentistUserId: IDS.U_FREEL, startsAt: daysFromNow(7, 11), endsAt: endOf(daysFromNow(7, 11), 60), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_f_07", organizationId: IDS.ORG_F, patientId: IDS.P_F_11, clinicId: IDS.C_BRAGANCA, dentistUserId: IDS.U_FREEL, startsAt: daysFromNow(9, 9), endsAt: endOf(daysFromNow(9, 9), 45), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_f_08", organizationId: IDS.ORG_F, patientId: IDS.P_F_12, clinicId: IDS.C_ATIBAIA, dentistUserId: IDS.U_FREEL, startsAt: daysFromNow(10, 10), endsAt: endOf(daysFromNow(10, 10), 30), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_f_09", organizationId: IDS.ORG_F, patientId: IDS.P_F_05, clinicId: IDS.C_BRAGANCA, dentistUserId: IDS.U_FREEL, startsAt: daysFromNow(12, 9), endsAt: endOf(daysFromNow(12, 9), 60), status: "SCHEDULED" },
+      { id: "shhml_apt_ae_f_10", organizationId: IDS.ORG_F, patientId: IDS.P_F_06, clinicId: IDS.C_ATIBAIA, dentistUserId: IDS.U_FREEL, startsAt: daysFromNow(14, 10), endsAt: endOf(daysFromNow(14, 10), 45), status: "SCHEDULED" },
+    ],
+  });
+
+  // ── Atendimentos Org A (10) com repasse e material ─────────────────────────
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_A_01, organizationId: IDS.ORG_A, patientId: IDS.P_A_01,
+      clinicId: IDS.C_A1, procedureId: IDS.PROC_A_05, dentistUserId: IDS.U_DENT_A,
+      date: daysFromNow(-1, 10), grossValue: 120, repassePercentage: 30, materialCost: 12,
+      createdByUserId: IDS.U_ADMIN_A,
+      materialUsages: { create: [{ materialId: IDS.MAT_A_03, quantity: 0.5, organizationId: IDS.ORG_A }] },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_A_02, organizationId: IDS.ORG_A, patientId: IDS.P_A_02,
+      clinicId: IDS.C_A1, procedureId: IDS.PROC_A_02, dentistUserId: IDS.U_DENT_A,
+      date: daysFromNow(-2, 9), grossValue: 180, repassePercentage: 40, materialCost: 22,
+      createdByUserId: IDS.U_ADMIN_A,
+      materialUsages: {
+        create: [
+          { materialId: IDS.MAT_A_01, quantity: 1, organizationId: IDS.ORG_A },
+          { materialId: IDS.MAT_A_02, quantity: 1, organizationId: IDS.ORG_A },
+        ],
+      },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_A_03, organizationId: IDS.ORG_A, patientId: IDS.P_A_03,
+      clinicId: IDS.C_A1, procedureId: IDS.PROC_A_06, dentistUserId: IDS.U_DENT_A,
+      date: daysFromNow(-3, 14), grossValue: 600, repassePercentage: 50, materialCost: 38,
+      createdByUserId: IDS.U_ADMIN_A,
+      materialUsages: {
+        create: [
+          { materialId: IDS.MAT_A_02, quantity: 2, organizationId: IDS.ORG_A },
+          { materialId: IDS.MAT_A_07, quantity: 5, organizationId: IDS.ORG_A },
+        ],
+      },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_A_04, organizationId: IDS.ORG_A, patientId: IDS.P_A_05,
+      clinicId: IDS.C_A2, procedureId: IDS.PROC_A_01, dentistUserId: IDS.U_ADMIN_DENT,
+      date: daysFromNow(-4, 10), grossValue: 150, repassePercentage: 30, materialCost: 10,
+      createdByUserId: IDS.U_ADMIN_A,
+      materialUsages: { create: [{ materialId: IDS.MAT_A_03, quantity: 0.5, organizationId: IDS.ORG_A }] },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_A_05, organizationId: IDS.ORG_A, patientId: IDS.P_A_06,
+      clinicId: IDS.C_A2, procedureId: IDS.PROC_A_03, dentistUserId: IDS.U_ADMIN_DENT,
+      date: daysFromNow(-4, 14), grossValue: 250, repassePercentage: 40, materialCost: 28,
+      createdByUserId: IDS.U_ADMIN_A,
+      materialUsages: {
+        create: [
+          { materialId: IDS.MAT_A_01, quantity: 2, organizationId: IDS.ORG_A },
+          { materialId: IDS.MAT_A_06, quantity: 2, organizationId: IDS.ORG_A },
+        ],
+      },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_A_06, organizationId: IDS.ORG_A, patientId: IDS.P_A_07,
+      clinicId: IDS.C_A1, procedureId: IDS.PROC_A_04, dentistUserId: IDS.U_DENT_A,
+      date: daysFromNow(-5, 9), grossValue: 200, repassePercentage: 35, materialCost: 15,
+      createdByUserId: IDS.U_ADMIN_A,
+      materialUsages: { create: [{ materialId: IDS.MAT_A_02, quantity: 2, organizationId: IDS.ORG_A }] },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_A_07, organizationId: IDS.ORG_A, patientId: IDS.P_A_08,
+      clinicId: IDS.C_A2, procedureId: IDS.PROC_A_08, dentistUserId: IDS.U_ADMIN_DENT,
+      date: daysFromNow(-6, 10), grossValue: 300, repassePercentage: 40, materialCost: 20,
+      createdByUserId: IDS.U_ADMIN_A,
+      materialUsages: { create: [{ materialId: IDS.MAT_A_09, quantity: 2, organizationId: IDS.ORG_A }] },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_A_08, organizationId: IDS.ORG_A, patientId: IDS.P_A_09,
+      clinicId: IDS.C_A1, procedureId: IDS.PROC_A_02, dentistUserId: IDS.U_DENT_A,
+      date: daysFromNow(-7, 9), grossValue: 180, repassePercentage: 30, materialCost: 18,
+      createdByUserId: IDS.U_ADMIN_A,
+      materialUsages: { create: [{ materialId: IDS.MAT_A_01, quantity: 1, organizationId: IDS.ORG_A }] },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_A_09, organizationId: IDS.ORG_A, patientId: IDS.P_A_01,
+      clinicId: IDS.C_A1, procedureId: IDS.PROC_A_05, dentistUserId: IDS.U_DENT_A,
+      date: daysFromNow(-8, 10), grossValue: 120, repassePercentage: 30, materialCost: 14,
+      createdByUserId: IDS.U_ADMIN_A,
+      materialUsages: { create: [{ materialId: IDS.MAT_A_08, quantity: 1, organizationId: IDS.ORG_A }] },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_A_10, organizationId: IDS.ORG_A, patientId: IDS.P_A_13,
+      clinicId: IDS.C_A1, procedureId: IDS.PROC_A_01, dentistUserId: IDS.U_DENT_A,
+      date: daysFromNow(-10, 9), grossValue: 150, repassePercentage: 30, materialCost: 10,
+      createdByUserId: IDS.U_ADMIN_A,
+      materialUsages: { create: [{ materialId: IDS.MAT_A_03, quantity: 0.5, organizationId: IDS.ORG_A }] },
+    },
+  });
+
+  // ── Atendimentos Org F (5) com repasse e material ─────────────────────────
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_F_01, organizationId: IDS.ORG_F, patientId: IDS.P_F_01,
+      clinicId: IDS.C_BRAGANCA, procedureId: IDS.PROC_F_01, dentistUserId: IDS.U_FREEL,
+      date: daysFromNow(-1, 9), grossValue: 100, repassePercentage: 30, materialCost: 10,
+      createdByUserId: IDS.U_FREEL,
+      materialUsages: { create: [{ materialId: IDS.MAT_F_03, quantity: 0.5, organizationId: IDS.ORG_F }] },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_F_02, organizationId: IDS.ORG_F, patientId: IDS.P_F_02,
+      clinicId: IDS.C_BRAGANCA, procedureId: IDS.PROC_F_02, dentistUserId: IDS.U_FREEL,
+      date: daysFromNow(-3, 10), grossValue: 200, repassePercentage: 30, materialCost: 22,
+      createdByUserId: IDS.U_FREEL,
+      materialUsages: {
+        create: [
+          { materialId: IDS.MAT_F_01, quantity: 1, organizationId: IDS.ORG_F },
+          { materialId: IDS.MAT_F_02, quantity: 1, organizationId: IDS.ORG_F },
+        ],
+      },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_F_03, organizationId: IDS.ORG_F, patientId: IDS.P_F_01,
+      clinicId: IDS.C_ATIBAIA, procedureId: IDS.PROC_F_05, dentistUserId: IDS.U_FREEL,
+      date: daysFromNow(-5, 11), grossValue: 130, repassePercentage: 30, materialCost: 12,
+      createdByUserId: IDS.U_FREEL,
+      materialUsages: { create: [{ materialId: IDS.MAT_F_05, quantity: 1, organizationId: IDS.ORG_F }] },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_F_04, organizationId: IDS.ORG_F, patientId: IDS.P_F_05,
+      clinicId: IDS.C_BRAGANCA, procedureId: IDS.PROC_F_06, dentistUserId: IDS.U_FREEL,
+      date: daysFromNow(-8, 9), grossValue: 700, repassePercentage: 30, materialCost: 32,
+      createdByUserId: IDS.U_FREEL,
+      materialUsages: {
+        create: [
+          { materialId: IDS.MAT_F_02, quantity: 2, organizationId: IDS.ORG_F },
+          { materialId: IDS.MAT_F_04, quantity: 5, organizationId: IDS.ORG_F },
+        ],
+      },
+    },
+  });
+  await prisma.attendance.create({
+    data: {
+      id: IDS.ATT_F_05, organizationId: IDS.ORG_F, patientId: IDS.P_F_06,
+      clinicId: IDS.C_ATIBAIA, procedureId: IDS.PROC_F_01, dentistUserId: IDS.U_FREEL,
+      date: daysFromNow(-12, 10), grossValue: 100, repassePercentage: 30, materialCost: 8,
+      createdByUserId: IDS.U_FREEL,
+      materialUsages: { create: [{ materialId: IDS.MAT_F_03, quantity: 0.5, organizationId: IDS.ORG_F }] },
+    },
+  });
 }
 
 // Permite rodar diretamente: tsx seed-hml-personas.ts
