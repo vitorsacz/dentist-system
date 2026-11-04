@@ -120,10 +120,10 @@ describe("Audit module", () => {
     // Seed audit logs for each org
     await rawPrisma.auditLog.createMany({
       data: [
-        { organizationId: clinic.organizationId, userId: clinic.adminUserId, action: "LOGIN", ip: "1.1.1.1" },
-        { organizationId: clinic.organizationId, userId: clinic.dentistUserId, action: "CLINICAL_RECORD_READ", entity: "ClinicalRecord" },
-        { organizationId: clinic2.organizationId, userId: clinic2.adminUserId, action: "LOGIN", ip: "2.2.2.2" },
-        { organizationId: freelancer.organizationId, userId: freelancer.founderUserId, action: "ATTENDANCE_CREATE", entity: "Attendance" },
+        { organizationId: clinic.organizationId, actorId: clinic.adminUserId, actorType: "USER", action: "LOGIN", meta: { ip: "1.1.1.1" } },
+        { organizationId: clinic.organizationId, actorId: clinic.dentistUserId, actorType: "USER", action: "CLINICAL_RECORD_READ", targetType: "ClinicalRecord" },
+        { organizationId: clinic2.organizationId, actorId: clinic2.adminUserId, actorType: "USER", action: "LOGIN", meta: { ip: "2.2.2.2" } },
+        { organizationId: freelancer.organizationId, actorId: freelancer.founderUserId, actorType: "USER", action: "ATTENDANCE_CREATE", targetType: "Attendance" },
       ],
     });
   });
@@ -218,8 +218,8 @@ describe("Audit module", () => {
     it("filtra por userId", async () => {
       const res = await as(clinic.adminToken).get(`/audit?userId=${clinic.dentistUserId}`);
       expect(res.status).toBe(200);
-      res.body.items.forEach((item: { userId: string }) => {
-        expect(item.userId).toBe(clinic.dentistUserId);
+      res.body.items.forEach((item: { actorId: string }) => {
+        expect(item.actorId).toBe(clinic.dentistUserId);
       });
     });
 

@@ -10,10 +10,11 @@ import { AuditService } from "./audit.service";
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
+  // ?userId é alias público para actorId (nomenclatura do schema é interna).
   @Get()
   list(
     @CurrentUser() user: AuthenticatedUser,
-    @Query("userId") userId?: string,
+    @Query("userId") actorId?: string,
     @Query("action") action?: string,
     @Query("from") from?: string,
     @Query("to") to?: string,
@@ -21,7 +22,7 @@ export class AuditController {
     @Query("pageSize") pageSize?: string,
   ) {
     const params = {
-      userId,
+      actorId,
       action,
       from: from ? new Date(from) : undefined,
       to: to ? new Date(to) : undefined,
