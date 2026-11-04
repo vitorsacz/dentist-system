@@ -149,4 +149,44 @@ export class ReportsService {
       clinicsWithoutTerms,
     };
   }
+
+  async financialReportCsv(query: FinancialReportQuery, actor: AuthenticatedUser): Promise<string> {
+    const report = await this.financialReport(query, actor);
+    const hasAdminView = report.clinics.some((r) => r.dentistUserId !== undefined);
+
+    const q = (s: string) => `"${s.replace(/"/g, '""')}"`;
+    const n = (v: number) => v.toFixed(2).replace(".", ",");
+
+    const colHeaders = [
+      ...(hasAdminView ? ["Dentista", "Consultório"] : ["Consultório"]),
+      "Faturamento Bruto",
+      "Repasse Dentista",
+      "Custo Material",
+      "Custo Aluguel",
+      "Resultado Líquido",
+    ];
+
+    const dataRows = report.clinics.map((r) =>
+      [
+        ...(hasAdminView ? [q(r.dentistName ?? ""), q(r.clinicName)] : [q(r.clinicName)]),
+        n(r.grossRevenue),
+        n(r.dentistRepasse),
+        n(r.materialCost),
+        n(r.rentCost),
+        n(r.netResult),
+      ].join(";"),
+    );
+
+    const totalRow = [
+      ...(hasAdminView ? [q("Total"), ""] : [q("Total")]),
+      n(report.totals.grossRevenue),
+      n(report.totals.dentistRepasse),
+      n(report.totals.materialCost),
+      n(report.totals.rentCost),
+      n(report.totals.netResult),
+    ].join(";");
+
+    // BOM prefix for Excel UTF-8 compatibility
+    return "﻿" + [colHeaders.join(";"), ...dataRows, totalRow].join("\r\n");
+  }
 }
