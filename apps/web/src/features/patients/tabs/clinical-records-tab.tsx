@@ -7,9 +7,11 @@ import {
 } from "@dentist-system/shared-types";
 import { QueryStateWrapper } from "@/lib/use-query-state";
 import { patientsApi } from "../api";
+import { HealthAlertsBar } from "../health-alerts-bar";
 
 export function ClinicalRecordsTab({ patientId, readOnly }: { patientId: string; readOnly?: boolean }) {
   const queryClient = useQueryClient();
+
   const recordsQuery = useQuery({
     queryKey: ["patients", patientId, "clinical-records"],
     queryFn: () => patientsApi.listClinicalRecords(patientId),
@@ -35,6 +37,7 @@ export function ClinicalRecordsTab({ patientId, readOnly }: { patientId: string;
 
   return (
     <div className="space-y-6">
+      <HealthAlertsBar patientId={patientId} />
       {!readOnly && (
       <form
         onSubmit={handleSubmit((data) => mutation.mutate(data))}

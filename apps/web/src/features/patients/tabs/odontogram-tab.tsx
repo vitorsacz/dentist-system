@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { upsertToothRecordSchema, type UpsertToothRecordInput } from "@dentist-system/shared-types";
 import { ApiError } from "@/lib/api-client";
 import { patientsApi, type ToothRecord } from "../api";
+import { HealthAlertsBar } from "../health-alerts-bar";
 
 const UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
 const UPPER_LEFT = [21, 22, 23, 24, 25, 26, 27, 28];
@@ -153,6 +154,7 @@ export function OdontogramTab({ patientId, readOnly }: { patientId: string; read
 
   return (
     <div className="space-y-6">
+      <HealthAlertsBar patientId={patientId} />
       <div className="space-y-4 rounded-lg border border-line bg-surface p-6">
         <div className="flex justify-center gap-6 overflow-x-auto py-2">
           <ToothRow

@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { isPatientComplete, updatePatientSchema, type UpdatePatientInput } from "@dentist-system/shared-types";
 import { myClinicApi } from "@/features/my-clinic/api";
 import { patientsApi } from "./api";
+import { HealthAlertsBar } from "./health-alerts-bar";
 
 type TabKey = "anamnesis" | "clinical-records" | "odontogram" | "budgets" | "revisions";
 
@@ -323,6 +324,8 @@ export function PatientDetailPage() {
           )}
         </>
       )}
+
+      {canSeeClinical && patientId && <HealthAlertsBar patientId={patientId} />}
 
       {access?.canShare && (
         <div className="rounded-lg border border-line bg-surface p-4 text-sm">
