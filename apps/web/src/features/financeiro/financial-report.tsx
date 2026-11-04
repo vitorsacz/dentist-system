@@ -18,11 +18,29 @@ function money(value: number) {
 export function FinancialReport() {
   const [from, setFrom] = useState(firstDayOfMonth());
   const [to, setTo] = useState(today());
+  const [downloading, setDownloading] = useState(false);
 
   const reportQuery = useQuery({
     queryKey: ["reports", "financial", from, to],
     queryFn: () => reportsApi.financial(`${from}T00:00:00`, `${to}T23:59:59`),
   });
+
+  async function handleCsvDownload() {
+    setDownloading(true);
+    try {
+      const blob = await reportsApi.csvDownload(`${from}T00:00:00`, `${to}T23:59:59`);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `relatorio-financeiro-${from}-${to}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -45,6 +63,13 @@ export function FinancialReport() {
             className="rounded-md border border-line px-3 py-2 text-sm"
           />
         </div>
+        <button
+          onClick={handleCsvDownload}
+          disabled={downloading}
+          className="rounded-md border border-line px-4 py-2 text-sm hover:bg-surface disabled:opacity-50"
+        >
+          {downloading ? "Exportando…" : "Exportar CSV"}
+        </button>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-line bg-surface">
