@@ -154,7 +154,13 @@ export class ReportsService {
     const report = await this.financialReport(query, actor);
     const hasAdminView = report.clinics.some((r) => r.dentistUserId !== undefined);
 
-    const q = (s: string) => `"${s.replace(/"/g, '""')}"`;
+    const q = (s: string) => {
+      const escaped = s.replace(/"/g, '""');
+      // CSV formula injection prevention (OWASP): prefix trigger chars with tab so
+      // spreadsheets don't evaluate the cell as a formula.
+      const safe = /^[=+\-@\t\r]/.test(escaped) ? `\t${escaped}` : escaped;
+      return `"${safe}"`;
+    };
     const n = (v: number) => v.toFixed(2).replace(".", ",");
 
     const colHeaders = [
