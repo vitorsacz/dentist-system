@@ -74,13 +74,17 @@ describe("Dashboard (e2e)", () => {
     });
     await rawPrisma.organization.update({ where: { id: orgB.id }, data: { foundingAdminUserId: admin2User.id } });
 
-    // ── Seed: patient + clinic + appointment + attendance in Org A ────────────
+    // ── Seed: patient + clinic + procedure + appointment + attendance in Org A ─
     const patient = await rawPrisma.patient.create({
-      data: { organizationId: orgA.id, name: "Paciente Teste", active: true },
+      data: { organizationId: orgA.id, name: "Paciente Teste", phone: "", createdByUserId: adminUser.id },
     });
 
     const clinic = await rawPrisma.clinic.create({
-      data: { organizationId: orgA.id, name: "Clínica Teste" },
+      data: { organizationId: orgA.id, name: "Clínica Teste", type: "OWN" },
+    });
+
+    const procedure = await rawPrisma.procedureCatalog.create({
+      data: { organizationId: orgA.id, name: "Consulta Dashboard", defaultValue: 200 },
     });
 
     const today = new Date();
@@ -105,9 +109,12 @@ describe("Dashboard (e2e)", () => {
         organizationId: orgA.id,
         patientId: patient.id,
         clinicId: clinic.id,
+        procedureId: procedure.id,
         dentistUserId: dentistUser.id,
         date: monthStart,
         grossValue: 500,
+        repassePercentage: 0,
+        createdByUserId: adminUser.id,
       },
     });
 
