@@ -366,6 +366,24 @@ export class PatientsService {
     }
   }
 
+  async getAppointmentsSummary(patientId: string, actor: AuthenticatedUser) {
+    await this.patientAccess.assertPatientAccess(patientId, actor, "registry");
+    const now = new Date();
+    const [last, next] = await Promise.all([
+      this.prisma.appointment.findFirst({
+        where: { patientId, startsAt: { lte: now } },
+        orderBy: { startsAt: "desc" },
+        select: { id: true, startsAt: true, endsAt: true, status: true },
+      }),
+      this.prisma.appointment.findFirst({
+        where: { patientId, startsAt: { gt: now }, status: { not: "CANCELED" } },
+        orderBy: { startsAt: "asc" },
+        select: { id: true, startsAt: true, endsAt: true, status: true },
+      }),
+    ]);
+    return { last: last ?? null, next: next ?? null };
+  }
+
   private mapCpfConflict(error: unknown): void {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&

@@ -53,6 +53,11 @@ export class PatientsController {
     return this.patientsService.getAccess(id, user);
   }
 
+  @Get(":id/appointments/summary")
+  getAppointmentsSummary(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.patientsService.getAppointmentsSummary(id, user);
+  }
+
   @Roles(...ACCESS["patients.write"])
   @Post()
   create(

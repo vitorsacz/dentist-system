@@ -84,6 +84,18 @@ export interface Anamnesis {
   updatedByUserId: string | null;
 }
 
+export interface AppointmentSummaryItem {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+}
+
+export interface AppointmentSummary {
+  last: AppointmentSummaryItem | null;
+  next: AppointmentSummaryItem | null;
+}
+
 export interface ClinicalRecord {
   id: string;
   date: string;
@@ -132,6 +144,9 @@ export const patientsApi = {
   revoke: (id: string, dentistId: string) => apiClient.delete(`/patients/${id}/shares/${dentistId}`),
   claim: (id: string) => apiClient.post<Patient>(`/patients/${id}/claim`, {}),
   toggleActive: (id: string, active: boolean) => apiClient.patch<Patient>(`/patients/${id}/active`, { active }),
+
+  getAppointmentsSummary: (patientId: string) =>
+    apiClient.get<AppointmentSummary>(`/patients/${patientId}/appointments/summary`),
 
   getAnamnesis: (patientId: string) => apiClient.get<Anamnesis | null>(`/patients/${patientId}/anamnesis`),
   upsertAnamnesis: (patientId: string, input: UpsertAnamnesisInput) =>
