@@ -58,7 +58,8 @@ export const ACCESS = {
   "clinicFinancialTerms.manage": ["ADMIN"],
   "materials.manage": ["DENTIST", "RECEPTIONIST"],
   "recalls.manage": ["DENTIST", "RECEPTIONIST"],
-  "reports.financial": ["DENTIST"],
+  // F3: ADMIN vê consolidado por dentista+consultório; RECEPTIONIST vê estrutura sem valores monetários.
+  "reports.financial": ["ADMIN", "DENTIST", "RECEPTIONIST"],
 
   // "Minha Clínica". Na API, GET organization é @AllowAuthenticated (o Super
   // Admin recebe 400 lá dentro); esta capacidade controla a tela no front.

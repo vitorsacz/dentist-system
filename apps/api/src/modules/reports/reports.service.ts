@@ -14,7 +14,10 @@ export class ReportsService {
 
   async financialReport(query: FinancialReportQuery, actor: AuthenticatedUser): Promise<FinancialReport> {
     const { organizationId } = getTenantContext();
+    // DENTIST sem ADMIN: escopo próprio. ADMIN/RECEPTIONIST: todos os dentistas.
     const dentistOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN");
+    // RECEPTIONIST sem ADMIN: vê estrutura mas valores zerados.
+    const hideValues = actor.roles.includes("RECEPTIONIST") && !actor.roles.includes("ADMIN");
 
     const [org, attendances] = await Promise.all([
       this.prisma.organization.findUniqueOrThrow({ where: { id: organizationId } }),
@@ -24,7 +27,10 @@ export class ReportsService {
           ...(query.clinicId ? { clinicId: query.clinicId } : {}),
           ...(dentistOnly ? { dentistUserId: actor.id } : {}),
         },
-        include: { clinic: { include: { financialTerms: true } } },
+        include: {
+          clinic: { include: { financialTerms: true } },
+          dentistUser: { select: { id: true, name: true } },
+        },
       }),
     ]);
 
@@ -33,6 +39,8 @@ export class ReportsService {
     type Acc = {
       clinicId: string;
       clinicName: string;
+      dentistUserId?: string;
+      dentistName?: string;
       grossRevenue: number;
       dentistRepasse: number;
       materialCost: number;
@@ -42,15 +50,18 @@ export class ReportsService {
       hasTerms: boolean;
     };
 
-    const byClinic = new Map<string, Acc>();
+    // DENTIST: chave = clinicId. ADMIN/RECEPTIONIST: chave = dentistId:clinicId.
+    const byKey = new Map<string, Acc>();
 
     for (const attendance of attendances) {
       const clinicId = attendance.clinicId;
+      const dUserId = attendance.dentistUserId ?? undefined;
+      const key = dentistOnly ? clinicId : `${dUserId ?? ""}:${clinicId}`;
       const gross = Number(attendance.grossValue);
       const repasse = gross * (Number(attendance.repassePercentage) / 100);
       const materialCost = Number(attendance.materialCost);
 
-      let acc = byClinic.get(clinicId);
+      let acc = byKey.get(key);
       if (!acc) {
         const terms = attendance.clinic.financialTerms;
         const isDailyRent =
@@ -60,6 +71,9 @@ export class ReportsService {
         acc = {
           clinicId,
           clinicName: attendance.clinic.name,
+          ...(dentistOnly
+            ? {}
+            : { dentistUserId: dUserId, dentistName: attendance.dentistUser?.name ?? undefined }),
           grossRevenue: 0,
           dentistRepasse: 0,
           materialCost: 0,
@@ -67,7 +81,7 @@ export class ReportsService {
           dailyRentValue: isDailyRent && terms?.rentValue ? Number(terms.rentValue) : 0,
           hasTerms: !isFreelancer || terms != null,
         };
-        byClinic.set(clinicId, acc);
+        byKey.set(key, acc);
       }
 
       acc.grossRevenue += gross;
@@ -79,7 +93,7 @@ export class ReportsService {
     }
 
     const clinicsWithoutTerms: string[] = [];
-    const clinics = Array.from(byClinic.values()).map((acc) => {
+    const clinics = Array.from(byKey.values()).map((acc) => {
       if (!acc.hasTerms) {
         clinicsWithoutTerms.push(acc.clinicName);
       }
@@ -88,11 +102,14 @@ export class ReportsService {
       return {
         clinicId: acc.clinicId,
         clinicName: acc.clinicName,
-        grossRevenue: acc.grossRevenue,
-        dentistRepasse: acc.dentistRepasse,
-        materialCost: acc.materialCost,
-        rentCost,
-        netResult,
+        ...(acc.dentistUserId !== undefined
+          ? { dentistUserId: acc.dentistUserId, dentistName: acc.dentistName }
+          : {}),
+        grossRevenue: hideValues ? 0 : acc.grossRevenue,
+        dentistRepasse: hideValues ? 0 : acc.dentistRepasse,
+        materialCost: hideValues ? 0 : acc.materialCost,
+        rentCost: hideValues ? 0 : rentCost,
+        netResult: hideValues ? 0 : netResult,
       };
     });
 

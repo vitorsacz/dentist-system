@@ -98,13 +98,14 @@ describe("Múltiplos papéis por usuário", () => {
       expect((await as(token).get(`/reports/financial?${MONTH}`)).status).toBe(200);
     });
 
-    it("usuário só ADMIN continua sem acessar rotas de DENTIST", async () => {
+    it("usuário só ADMIN continua sem acessar rotas de DENTIST (F3: reports ok)", async () => {
       const org = await createOrg("SoAdmin");
       const admin = await createUser(org.id, ["ADMIN"]);
       const token = await tokenOf(admin.email);
 
       expect((await as(token).get("/users")).status).toBe(200);
-      expect((await as(token).get(`/reports/financial?${MONTH}`)).status).toBe(403);
+      // F3: ADMIN agora tem acesso ao relatório financeiro (relatório consolidado)
+      expect((await as(token).get(`/reports/financial?${MONTH}`)).status).toBe(200);
     });
 
     it("Super Admin tem roles vazio e não entra em rota de papel", async () => {
