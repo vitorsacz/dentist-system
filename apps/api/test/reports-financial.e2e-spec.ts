@@ -182,7 +182,7 @@ describe("Reports — /reports/financial (e2e)", () => {
 
   describe("F1 — DENTIST vê só o próprio financeiro", () => {
     it("dA1 recebe só os seus atendimentos (não os de dA2)", async () => {
-      const res = await as(dentistA1Token).get(reportUrl("2025-01-01T00:00:00", "2025-01-31T23:59:59"));
+      const res = await as(dentistA1Token).get(reportUrl("2025-01-01T00:00:00.000Z", "2025-01-31T23:59:59.000Z"));
       expect(res.status).toBe(200);
       const { clinics, totals } = res.body;
       // dA1 tem 1 atendimento: gross=300, repasse=50%=150, material=20
@@ -196,7 +196,7 @@ describe("Reports — /reports/financial (e2e)", () => {
     });
 
     it("dA2 recebe só os seus atendimentos (não os de dA1)", async () => {
-      const res = await as(dentistA2Token).get(reportUrl("2025-01-01T00:00:00", "2025-01-31T23:59:59"));
+      const res = await as(dentistA2Token).get(reportUrl("2025-01-01T00:00:00.000Z", "2025-01-31T23:59:59.000Z"));
       expect(res.status).toBe(200);
       expect(res.body.totals.grossRevenue).toBeCloseTo(400);
     });
@@ -206,7 +206,7 @@ describe("Reports — /reports/financial (e2e)", () => {
 
   describe("F2 — aluguel por dia só em FREELANCER", () => {
     it("CLINIC: rentCost = 0 mesmo com clinic.type = RENTED e dailyRentValue preenchido", async () => {
-      const res = await as(dentistA1Token).get(reportUrl("2025-01-01T00:00:00", "2025-01-31T23:59:59"));
+      const res = await as(dentistA1Token).get(reportUrl("2025-01-01T00:00:00.000Z", "2025-01-31T23:59:59.000Z"));
       expect(res.status).toBe(200);
       for (const row of res.body.clinics) {
         expect(row.rentCost).toBe(0);
@@ -215,7 +215,7 @@ describe("Reports — /reports/financial (e2e)", () => {
     });
 
     it("FREELANCER: 2 atendimentos no mesmo dia → aluguel conta UMA vez (R$80)", async () => {
-      const res = await as(dentistFLToken).get(reportUrl("2025-02-10T00:00:00", "2025-02-10T23:59:59"));
+      const res = await as(dentistFLToken).get(reportUrl("2025-02-10T00:00:00.000Z", "2025-02-10T23:59:59.000Z"));
       expect(res.status).toBe(200);
       const fl1Row = res.body.clinics.find((r: { clinicId: string }) => r.clinicId === clinicFL1Id);
       expect(fl1Row).toBeDefined();
@@ -224,7 +224,7 @@ describe("Reports — /reports/financial (e2e)", () => {
     });
 
     it("FREELANCER: 2 dias diferentes → aluguel conta 2 vezes (R$160)", async () => {
-      const res = await as(dentistFLToken).get(reportUrl("2025-02-10T00:00:00", "2025-02-11T23:59:59"));
+      const res = await as(dentistFLToken).get(reportUrl("2025-02-10T00:00:00.000Z", "2025-02-11T23:59:59.000Z"));
       expect(res.status).toBe(200);
       const fl1Row = res.body.clinics.find((r: { clinicId: string }) => r.clinicId === clinicFL1Id);
       expect(fl1Row).toBeDefined();
@@ -236,19 +236,19 @@ describe("Reports — /reports/financial (e2e)", () => {
 
   describe("FL2 — consultório sem termos: clinicsWithoutTerms avisa", () => {
     it("FL2 sem termos aparece em clinicsWithoutTerms, não silenciosamente como 0", async () => {
-      const res = await as(dentistFLToken).get(reportUrl("2025-02-01T00:00:00", "2025-02-28T23:59:59"));
+      const res = await as(dentistFLToken).get(reportUrl("2025-02-01T00:00:00.000Z", "2025-02-28T23:59:59.000Z"));
       expect(res.status).toBe(200);
       expect(res.body.clinicsWithoutTerms).toContain("Clinic FL2 RF");
     });
 
     it("FL1 com termos não aparece em clinicsWithoutTerms", async () => {
-      const res = await as(dentistFLToken).get(reportUrl("2025-02-01T00:00:00", "2025-02-28T23:59:59"));
+      const res = await as(dentistFLToken).get(reportUrl("2025-02-01T00:00:00.000Z", "2025-02-28T23:59:59.000Z"));
       expect(res.status).toBe(200);
       expect(res.body.clinicsWithoutTerms).not.toContain("Clinic FL1 RF");
     });
 
     it("CLINIC: clinicsWithoutTerms vazio (conceito não se aplica)", async () => {
-      const res = await as(dentistA1Token).get(reportUrl("2025-01-01T00:00:00", "2025-01-31T23:59:59"));
+      const res = await as(dentistA1Token).get(reportUrl("2025-01-01T00:00:00.000Z", "2025-01-31T23:59:59.000Z"));
       expect(res.status).toBe(200);
       expect(res.body.clinicsWithoutTerms).toHaveLength(0);
     });
@@ -258,7 +258,7 @@ describe("Reports — /reports/financial (e2e)", () => {
 
   describe("Isolamento — DENTIST de Org3 não vê dados de Org1 ou OrgFL", () => {
     it("dB1 recebe relatório vazio para o período onde só Org1/OrgFL têm atendimentos", async () => {
-      const res = await as(dentistB1Token).get(reportUrl("2025-01-01T00:00:00", "2025-02-28T23:59:59"));
+      const res = await as(dentistB1Token).get(reportUrl("2025-01-01T00:00:00.000Z", "2025-02-28T23:59:59.000Z"));
       expect(res.status).toBe(200);
       expect(res.body.clinics).toHaveLength(0);
       expect(res.body.totals.grossRevenue).toBe(0);
@@ -269,7 +269,7 @@ describe("Reports — /reports/financial (e2e)", () => {
 
   describe("Controle de acesso", () => {
     it("sem token → 401", async () => {
-      const res = await request(app.getHttpServer()).get(reportUrl("2025-01-01T00:00:00", "2025-01-31T23:59:59"));
+      const res = await request(app.getHttpServer()).get(reportUrl("2025-01-01T00:00:00.000Z", "2025-01-31T23:59:59.000Z"));
       expect(res.status).toBe(401);
     });
   });
