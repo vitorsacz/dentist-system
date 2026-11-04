@@ -60,7 +60,7 @@ export class ReportsService {
       const key = dentistOnly ? clinicId : `${dUserId ?? ""}:${clinicId}`;
       const gross = Number(attendance.grossValue);
       const repasse = gross * (Number(attendance.repassePercentage) / 100);
-      const materialCost = Number(attendance.materialCost);
+      const materialCost = attendance.materialByDentist ? 0 : Number(attendance.materialCost);
 
       let acc = byKey.get(key);
       if (!acc) {
@@ -150,7 +150,7 @@ export class ReportsService {
       const month = attendance.date.toISOString().slice(0, 7);
       const gross = Number(attendance.grossValue);
       const repasse = gross * (Number(attendance.repassePercentage) / 100);
-      const materialCost = Number(attendance.materialCost);
+      const materialCost = attendance.materialByDentist ? 0 : Number(attendance.materialCost);
 
       let mAcc = byMonth.get(month);
       if (!mAcc) {

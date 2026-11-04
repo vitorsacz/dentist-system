@@ -15,17 +15,18 @@ export function AttendanceForm() {
   const proceduresQuery = useQuery({ queryKey: ["procedures"], queryFn: proceduresApi.list });
   const materialsQuery = useQuery({ queryKey: ["materials"], queryFn: materialsApi.list });
 
-  const { register, control, handleSubmit, reset, setValue, formState } = useForm<CreateAttendanceInput>({
+  const { register, control, handleSubmit, reset, setValue, watch, formState } = useForm<CreateAttendanceInput>({
     resolver: zodResolver(createAttendanceSchema),
-    defaultValues: { materialCost: 0, materialUsages: [] },
+    defaultValues: { materialCost: 0, materialByDentist: false, materialUsages: [] },
   });
+  const materialByDentist = watch("materialByDentist");
   const { fields, append, remove } = useFieldArray({ control, name: "materialUsages" });
 
   const mutation = useMutation({
     mutationFn: attendancesApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["materials"] });
-      reset({ materialCost: 0, materialUsages: [] });
+      reset({ materialCost: 0, materialByDentist: false, materialUsages: [] });
     },
   });
 
@@ -99,6 +100,19 @@ export function AttendanceForm() {
           {...register("repassePercentage", { valueAsNumber: true })}
         />
       </div>
+      <div className="flex items-center gap-2 sm:col-span-2">
+        <input
+          id="materialByDentist"
+          type="checkbox"
+          className="h-4 w-4 rounded border border-line"
+          {...register("materialByDentist")}
+        />
+        <label htmlFor="materialByDentist" className="text-sm text-ink">
+          Material fornecido pelo dentista (sem baixa de estoque)
+        </label>
+      </div>
+
+      {!materialByDentist && (
       <div>
         <label className="mb-1 block text-sm text-muted">Custo de material (R$)</label>
         <input
@@ -108,7 +122,9 @@ export function AttendanceForm() {
           {...register("materialCost", { valueAsNumber: true })}
         />
       </div>
+      )}
 
+      {!materialByDentist && (
       <div className="space-y-2 sm:col-span-2">
         <label className="block text-sm text-muted">Materiais utilizados (baixa de estoque)</label>
         {fields.map((field, index) => (
@@ -144,6 +160,7 @@ export function AttendanceForm() {
           + adicionar material
         </button>
       </div>
+      )}
 
       <button
         type="submit"

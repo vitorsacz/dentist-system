@@ -468,6 +468,7 @@ model Attendance {
   grossValue        Decimal          @db.Decimal(10, 2)
   repassePercentage Decimal          @db.Decimal(5, 2)
   materialCost      Decimal          @default(0) @db.Decimal(10, 2)
+  materialByDentist Boolean          @default(false)
 
   createdByUserId String
   createdBy       User     @relation("AttendanceCreatedBy", fields: [createdByUserId], references: [id])
