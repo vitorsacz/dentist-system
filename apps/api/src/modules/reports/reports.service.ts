@@ -141,11 +141,67 @@ export class ReportsService {
     totals.rentCost = rentCostTotal;
     totals.netResult = totals.dentistRepasse - totals.materialCost - rentCostTotal;
 
+    // Monthly breakdown — groups attendances by month with deduplicated daily rent per clinic-day.
+    type MonthAcc = { grossRevenue: number; dentistRepasse: number; materialCost: number };
+    const byMonth = new Map<string, MonthAcc>();
+    const monthlyClinicRentDays = new Map<string, Map<string, number>>();
+
+    for (const attendance of attendances) {
+      const month = attendance.date.toISOString().slice(0, 7);
+      const gross = Number(attendance.grossValue);
+      const repasse = gross * (Number(attendance.repassePercentage) / 100);
+      const materialCost = Number(attendance.materialCost);
+
+      let mAcc = byMonth.get(month);
+      if (!mAcc) {
+        mAcc = { grossRevenue: 0, dentistRepasse: 0, materialCost: 0 };
+        byMonth.set(month, mAcc);
+      }
+      mAcc.grossRevenue += gross;
+      mAcc.dentistRepasse += repasse;
+      mAcc.materialCost += materialCost;
+
+      const terms = attendance.clinic.financialTerms;
+      const isDailyRent =
+        isFreelancer &&
+        terms?.relationshipType === "RENTED_FIXED" &&
+        terms?.rentPeriodicity === "DAILY";
+      if (isDailyRent && terms?.rentValue) {
+        const rk = `${attendance.clinicId}:${dayKey(attendance.date)}`;
+        let monthRent = monthlyClinicRentDays.get(month);
+        if (!monthRent) {
+          monthRent = new Map();
+          monthlyClinicRentDays.set(month, monthRent);
+        }
+        if (!monthRent.has(rk)) {
+          monthRent.set(rk, Number(terms.rentValue));
+        }
+      }
+    }
+
+    const monthly = Array.from(byMonth.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, acc]) => {
+        const rentCost = Array.from(monthlyClinicRentDays.get(month)?.values() ?? []).reduce(
+          (s, v) => s + v,
+          0,
+        );
+        return {
+          month,
+          grossRevenue: acc.grossRevenue,
+          dentistRepasse: acc.dentistRepasse,
+          materialCost: acc.materialCost,
+          rentCost,
+          netResult: acc.dentistRepasse - acc.materialCost - rentCost,
+        };
+      });
+
     return {
       from: query.from.toISOString(),
       to: query.to.toISOString(),
       clinics,
       totals,
+      monthly,
       clinicsWithoutTerms,
     };
   }
