@@ -22,7 +22,6 @@ describe("Attendances (e2e)", () => {
   let orgId: string;
   let dentistAToken: string;
   let dentistAId: string;
-  let dentistBToken: string;
   let dentistBId: string;
   let patientId: string;
   let clinicId: string;
@@ -126,7 +125,6 @@ describe("Attendances (e2e)", () => {
 
     // ── Tokens ────────────────────────────────────────────────────────────────
     dentistAToken = await loginAs(dentistA.email);
-    dentistBToken = await loginAs(dentistB.email);
     dentistCToken = await loginAs(dentistC.email);
   }, 60000);
 
