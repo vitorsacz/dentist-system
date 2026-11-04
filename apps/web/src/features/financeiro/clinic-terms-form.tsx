@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,9 +9,17 @@ import {
 import { clinicTermsApi } from "./api";
 import { clinicsApi } from "@/features/clinics/api";
 
+// FieldErrors de union discriminada não expõe os campos de cada ramo
+// diretamente — cast via unknown para acessar campos condicionais.
+type AnyErrors = Record<string, { message?: string } | undefined>;
+
 export function ClinicTermsForm() {
   const queryClient = useQueryClient();
   const clinicsQuery = useQuery({ queryKey: ["clinics"], queryFn: () => clinicsApi.list() });
+
+  // clinicId não faz parte do schema UpsertClinicFinancialTermsInput;
+  // fica em estado local separado.
+  const [clinicId, setClinicId] = useState<string>("");
 
   const {
     register,
@@ -24,12 +32,12 @@ export function ClinicTermsForm() {
     defaultValues: { relationshipType: "RENTED_FIXED" },
   });
 
-  const clinicId = watch("clinicId" as never) as string | undefined;
   const relationshipType = watch("relationshipType");
+  const anyErrors = errors as unknown as AnyErrors;
 
   const termsQuery = useQuery({
     queryKey: ["clinic-terms", clinicId],
-    queryFn: () => clinicTermsApi.get(clinicId!),
+    queryFn: () => clinicTermsApi.get(clinicId),
     enabled: Boolean(clinicId),
   });
 
@@ -53,7 +61,7 @@ export function ClinicTermsForm() {
   }, [termsQuery.data, reset]);
 
   const mutation = useMutation({
-    mutationFn: (data: UpsertClinicFinancialTermsInput) => clinicTermsApi.upsert(clinicId!, data),
+    mutationFn: (data: UpsertClinicFinancialTermsInput) => clinicTermsApi.upsert(clinicId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clinic-terms", clinicId] });
     },
@@ -66,7 +74,8 @@ export function ClinicTermsForm() {
         <label className="mb-1 block text-sm text-muted">Consultório</label>
         <select
           className="w-full rounded-md border border-line px-3 py-2 text-sm"
-          {...(register as (name: string) => object)("clinicId")}
+          value={clinicId}
+          onChange={(e) => setClinicId(e.target.value)}
         >
           <option value="">Selecione um consultório</option>
           {clinicsQuery.data?.map((c) => (
@@ -102,8 +111,8 @@ export function ClinicTermsForm() {
             <select
               className="w-full rounded-md border border-line px-3 py-2 text-sm"
               {...register("relationshipType")}
-              onChange={() => {
-                const type = watch("relationshipType");
+              onChange={(e) => {
+                const type = e.target.value as UpsertClinicFinancialTermsInput["relationshipType"];
                 if (type === "RENTED_FIXED") reset({ relationshipType: "RENTED_FIXED", rentValue: 0, rentPeriodicity: "DAILY" });
                 else if (type === "COMMISSION") reset({ relationshipType: "COMMISSION", commissionPercentage: 0 });
                 else reset({ relationshipType: "PER_SERVICE", defaultServiceRate: 0 });
@@ -126,8 +135,8 @@ export function ClinicTermsForm() {
                   className="w-full rounded-md border border-line px-3 py-2 text-sm"
                   {...register("rentValue", { valueAsNumber: true })}
                 />
-                {errors.rentValue && (
-                  <p className="mt-1 text-xs text-danger">{errors.rentValue.message}</p>
+                {anyErrors.rentValue && (
+                  <p className="mt-1 text-xs text-danger">{anyErrors.rentValue.message}</p>
                 )}
               </div>
               <div>
@@ -155,8 +164,8 @@ export function ClinicTermsForm() {
                 className="w-full rounded-md border border-line px-3 py-2 text-sm"
                 {...register("commissionPercentage", { valueAsNumber: true })}
               />
-              {errors.commissionPercentage && (
-                <p className="mt-1 text-xs text-danger">{errors.commissionPercentage.message}</p>
+              {anyErrors.commissionPercentage && (
+                <p className="mt-1 text-xs text-danger">{anyErrors.commissionPercentage.message}</p>
               )}
             </div>
           )}
@@ -170,8 +179,8 @@ export function ClinicTermsForm() {
                 className="w-full rounded-md border border-line px-3 py-2 text-sm"
                 {...register("defaultServiceRate", { valueAsNumber: true })}
               />
-              {errors.defaultServiceRate && (
-                <p className="mt-1 text-xs text-danger">{errors.defaultServiceRate.message}</p>
+              {anyErrors.defaultServiceRate && (
+                <p className="mt-1 text-xs text-danger">{anyErrors.defaultServiceRate.message}</p>
               )}
             </div>
           )}
