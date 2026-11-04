@@ -27,12 +27,12 @@ async function createUser(organizationId: string | null, roles: Role[], extra?: 
   return { id: user.id, email };
 }
 
-async function loginToken(server: ReturnType<typeof request>, email: string): Promise<string> {
+async function loginToken(server: Parameters<typeof request>[0], email: string): Promise<string> {
   const res = await request(server).post("/auth/login").send({ identifier: email, password: PW });
   return res.body.accessToken as string;
 }
 
-function api(server: ReturnType<typeof request>, token: string) {
+function api(server: Parameters<typeof request>[0], token: string) {
   const h = { Authorization: `Bearer ${token}` };
   return {
     get: (path: string) => request(server).get(path).set(h),
