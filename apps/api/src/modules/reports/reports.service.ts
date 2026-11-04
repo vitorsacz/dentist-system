@@ -14,10 +14,8 @@ export class ReportsService {
 
   async financialReport(query: FinancialReportQuery, actor: AuthenticatedUser): Promise<FinancialReport> {
     const { organizationId } = getTenantContext();
-    // DENTIST sem ADMIN: escopo próprio. ADMIN/RECEPTIONIST: todos os dentistas.
+    // DENTIST sem ADMIN: escopo próprio. ADMIN: todos os dentistas.
     const dentistOnly = actor.roles.includes("DENTIST") && !actor.roles.includes("ADMIN");
-    // RECEPTIONIST sem ADMIN: vê estrutura mas valores zerados.
-    const hideValues = actor.roles.includes("RECEPTIONIST") && !actor.roles.includes("ADMIN");
 
     const [org, attendances] = await Promise.all([
       this.prisma.organization.findUniqueOrThrow({ where: { id: organizationId } }),
@@ -50,8 +48,11 @@ export class ReportsService {
       hasTerms: boolean;
     };
 
-    // DENTIST: chave = clinicId. ADMIN/RECEPTIONIST: chave = dentistId:clinicId.
+    // DENTIST: key = clinicId. ADMIN: key = dentistId:clinicId.
     const byKey = new Map<string, Acc>();
+    // Admin view: (clinicId:dayKey) → dailyRentValue; avoids double-counting when multiple
+    // dentists share the same clinic-day (rent belongs to the clinic, not to each dentist).
+    const globalClinicRentDays = new Map<string, number>();
 
     for (const attendance of attendances) {
       const clinicId = attendance.clinicId;
@@ -87,8 +88,17 @@ export class ReportsService {
       acc.grossRevenue += gross;
       acc.dentistRepasse += repasse;
       acc.materialCost += materialCost;
+
       if (acc.dailyRentValue > 0) {
-        acc.rentDays.add(dayKey(attendance.date));
+        const dk = dayKey(attendance.date);
+        if (dentistOnly) {
+          acc.rentDays.add(dk);
+        } else {
+          const rk = `${clinicId}:${dk}`;
+          if (!globalClinicRentDays.has(rk)) {
+            globalClinicRentDays.set(rk, acc.dailyRentValue);
+          }
+        }
       }
     }
 
@@ -97,7 +107,8 @@ export class ReportsService {
       if (!acc.hasTerms) {
         clinicsWithoutTerms.push(acc.clinicName);
       }
-      const rentCost = acc.rentDays.size * acc.dailyRentValue;
+      // In dentistOnly view rent is per-row; in admin view it is a clinic-level cost (see totals).
+      const rentCost = dentistOnly ? acc.rentDays.size * acc.dailyRentValue : 0;
       const netResult = acc.dentistRepasse - acc.materialCost - rentCost;
       return {
         clinicId: acc.clinicId,
@@ -105,24 +116,30 @@ export class ReportsService {
         ...(acc.dentistUserId !== undefined
           ? { dentistUserId: acc.dentistUserId, dentistName: acc.dentistName }
           : {}),
-        grossRevenue: hideValues ? 0 : acc.grossRevenue,
-        dentistRepasse: hideValues ? 0 : acc.dentistRepasse,
-        materialCost: hideValues ? 0 : acc.materialCost,
-        rentCost: hideValues ? 0 : rentCost,
-        netResult: hideValues ? 0 : netResult,
+        grossRevenue: acc.grossRevenue,
+        dentistRepasse: acc.dentistRepasse,
+        materialCost: acc.materialCost,
+        rentCost,
+        netResult,
       };
     });
+
+    const rentCostTotal = dentistOnly
+      ? clinics.reduce((s, r) => s + r.rentCost, 0)
+      : Array.from(globalClinicRentDays.values()).reduce((s, v) => s + v, 0);
 
     const totals = clinics.reduce(
       (acc, row) => ({
         grossRevenue: acc.grossRevenue + row.grossRevenue,
         dentistRepasse: acc.dentistRepasse + row.dentistRepasse,
         materialCost: acc.materialCost + row.materialCost,
-        rentCost: acc.rentCost + row.rentCost,
+        rentCost: 0,
         netResult: acc.netResult + row.netResult,
       }),
       { grossRevenue: 0, dentistRepasse: 0, materialCost: 0, rentCost: 0, netResult: 0 },
     );
+    totals.rentCost = rentCostTotal;
+    totals.netResult = totals.dentistRepasse - totals.materialCost - rentCostTotal;
 
     return {
       from: query.from.toISOString(),

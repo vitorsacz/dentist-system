@@ -10,7 +10,7 @@ export type FinancialReportQuery = z.infer<typeof financialReportQuerySchema>;
 export const financialReportClinicRowSchema = z.object({
   clinicId: z.string(),
   clinicName: z.string(),
-  // F3: populado em respostas de ADMIN/RECEPTIONIST; ausente para DENTIST.
+  // F3: populado em respostas de ADMIN; ausente para DENTIST.
   dentistUserId: z.string().optional(),
   dentistName: z.string().optional(),
   grossRevenue: z.number(),
