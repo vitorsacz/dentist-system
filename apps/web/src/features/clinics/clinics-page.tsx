@@ -24,6 +24,9 @@ export function ClinicsPage() {
   // adicionar novos. Enquanto o tipo da organização não carrega, assume
   // restrito (não pisca o botão pra depois sumir).
   const canCreateClinic = myClinicQuery.data ? myClinicQuery.data.type !== "CLINIC" : false;
+  // Uma org CLINIC nunca pode ficar sem consultório ativo — o backend rejeita (409).
+  // Conta a partir da lista atual (exclui inativos quando filtro está desligado).
+  const activeClinicCount = clinicsQuery.data?.filter((c) => c.active).length ?? 0;
 
   const {
     register,
@@ -46,6 +49,10 @@ export function ClinicsPage() {
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) => clinicsApi.toggleActive(id, active),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["clinics"] }),
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Erro ao alterar status do consultório";
+      alert(msg);
+    },
   });
 
   function handleToggleClinic(id: string, currentActive: boolean) {
@@ -156,9 +163,17 @@ export function ClinicsPage() {
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"
-                      disabled={toggleActiveMutation.isPending}
+                      disabled={
+                        toggleActiveMutation.isPending ||
+                        (clinic.active && activeClinicCount <= 1)
+                      }
+                      title={
+                        clinic.active && activeClinicCount <= 1
+                          ? "Não é possível desativar o único consultório ativo"
+                          : undefined
+                      }
                       onClick={() => handleToggleClinic(clinic.id, clinic.active)}
-                      className="text-xs text-muted hover:text-ink disabled:opacity-60"
+                      className="text-xs text-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {clinic.active ? "Desativar" : "Reativar"}
                     </button>
