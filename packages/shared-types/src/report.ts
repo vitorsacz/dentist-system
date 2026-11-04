@@ -21,6 +21,16 @@ export const financialReportClinicRowSchema = z.object({
 });
 export type FinancialReportClinicRow = z.infer<typeof financialReportClinicRowSchema>;
 
+export const financialReportMonthRowSchema = z.object({
+  month: z.string(),
+  grossRevenue: z.number(),
+  dentistRepasse: z.number(),
+  materialCost: z.number(),
+  rentCost: z.number(),
+  netResult: z.number(),
+});
+export type FinancialReportMonthRow = z.infer<typeof financialReportMonthRowSchema>;
+
 export const financialReportSchema = z.object({
   from: z.string(),
   to: z.string(),
@@ -32,6 +42,7 @@ export const financialReportSchema = z.object({
     rentCost: z.number(),
     netResult: z.number(),
   }),
+  monthly: z.array(financialReportMonthRowSchema),
   // Nomes dos consultórios sem termos definidos (só relevante pra FREELANCER).
   clinicsWithoutTerms: z.array(z.string()),
 });

@@ -160,6 +160,13 @@ describe("Reports — /reports/financial F3 ADMIN (e2e)", () => {
       expect(res.body.totals.grossRevenue).toBeCloseTo(700);
       expect(res.body.totals.dentistRepasse).toBeCloseTo(390);
     });
+
+    it("monthly: 1 entrada para Março (ambos no mesmo mês) com gross=700", async () => {
+      const res = await as(adminToken).get(reportUrl(RANGE.from, RANGE.to));
+      expect(res.body.monthly).toHaveLength(1);
+      expect(res.body.monthly[0].month).toBe("2025-03");
+      expect(res.body.monthly[0].grossRevenue).toBeCloseTo(700);
+    });
   });
 
   // ── DENTIST ainda vê só o próprio ─────────────────────────────────────────
@@ -336,5 +343,16 @@ describe("Reports — FREELANCER rent dedup: 2 dentistas mesmo dia (e2e)", () =>
       .get(reportUrl(RANGE.from, RANGE.to))
       .set("Authorization", `Bearer ${adminToken}`);
     expect(res.body.totals.netResult).toBeCloseTo(100);
+  });
+
+  it("monthly: 1 entrada para Abril com gross=400, rentCost=80", async () => {
+    const res = await request(app.getHttpServer())
+      .get(reportUrl(RANGE.from, RANGE.to))
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(res.body.monthly).toHaveLength(1);
+    expect(res.body.monthly[0].month).toBe("2025-04");
+    expect(res.body.monthly[0].grossRevenue).toBeCloseTo(400);
+    expect(res.body.monthly[0].rentCost).toBeCloseTo(80);
+    expect(res.body.monthly[0].netResult).toBeCloseTo(100);
   });
 });

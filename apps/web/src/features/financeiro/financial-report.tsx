@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import ReactApexChart from "react-apexcharts";
 import { reportsApi } from "./api";
 
 function firstDayOfMonth() {
@@ -13,6 +14,10 @@ function today() {
 
 function money(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function shortMoney(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 }
 
 export function FinancialReport() {
@@ -42,8 +47,12 @@ export function FinancialReport() {
     }
   }
 
+  const data = reportQuery.data;
+  const hasMultipleMonths = (data?.monthly.length ?? 0) > 1;
+  const hasAnyClinics = (data?.clinics.length ?? 0) > 0;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label className="mb-1 block text-sm text-muted">De</label>
@@ -72,6 +81,77 @@ export function FinancialReport() {
         </button>
       </div>
 
+      {data && hasAnyClinics && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {hasMultipleMonths && (
+            <div className="rounded-lg border border-line bg-surface p-4 md:col-span-2">
+              <p className="mb-2 text-sm font-medium text-muted">Receita por mês</p>
+              <ReactApexChart
+                type="bar"
+                height={220}
+                series={[
+                  { name: "Faturamento bruto", data: data.monthly.map((m) => m.grossRevenue) },
+                  { name: "Repasse dentista", data: data.monthly.map((m) => m.dentistRepasse) },
+                ]}
+                options={{
+                  chart: { toolbar: { show: false }, fontFamily: "inherit" },
+                  xaxis: { categories: data.monthly.map((m) => m.month) },
+                  yaxis: { labels: { formatter: (v) => shortMoney(v) } },
+                  dataLabels: { enabled: false },
+                  colors: ["#6366f1", "#22c55e"],
+                  plotOptions: { bar: { borderRadius: 3, columnWidth: "55%" } },
+                  tooltip: { y: { formatter: (v) => money(v) } },
+                  legend: { position: "top" },
+                }}
+              />
+            </div>
+          )}
+
+          <div className="rounded-lg border border-line bg-surface p-4">
+            <p className="mb-2 text-sm font-medium text-muted">Faturamento por consultório</p>
+            <ReactApexChart
+              type="bar"
+              height={Math.max(180, data.clinics.length * 40)}
+              series={[{ name: "Faturamento bruto", data: data.clinics.map((c) => c.grossRevenue) }]}
+              options={{
+                chart: { toolbar: { show: false }, fontFamily: "inherit" },
+                plotOptions: { bar: { horizontal: true, borderRadius: 3, barHeight: "55%" } },
+                xaxis: {
+                  categories: data.clinics.map((c) => c.clinicName),
+                  labels: { formatter: (v) => shortMoney(Number(v)) },
+                },
+                yaxis: { labels: { maxWidth: 160 } },
+                dataLabels: { enabled: false },
+                colors: ["#6366f1"],
+                tooltip: { y: { formatter: (v) => money(v) } },
+              }}
+            />
+          </div>
+
+          <div className="rounded-lg border border-line bg-surface p-4">
+            <p className="mb-2 text-sm font-medium text-muted">Composição do resultado</p>
+            <ReactApexChart
+              type="donut"
+              height={220}
+              series={[
+                data.totals.dentistRepasse,
+                data.totals.materialCost,
+                data.totals.rentCost,
+              ]}
+              options={{
+                chart: { fontFamily: "inherit" },
+                labels: ["Repasse dentista", "Custo material", "Custo aluguel"],
+                colors: ["#22c55e", "#f59e0b", "#ef4444"],
+                dataLabels: { enabled: false },
+                legend: { position: "bottom" },
+                tooltip: { y: { formatter: (v) => money(v) } },
+                plotOptions: { pie: { donut: { size: "65%" } } },
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-lg border border-line bg-surface">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-line text-muted">
@@ -85,9 +165,9 @@ export function FinancialReport() {
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {reportQuery.data?.clinics.map((row) => (
-              <tr key={row.clinicId}>
-                <td className="px-4 py-3">{row.clinicName}</td>
+            {data?.clinics.map((row) => (
+              <tr key={`${row.dentistUserId ?? ""}:${row.clinicId}`}>
+                <td className="px-4 py-3">{row.clinicName}{row.dentistName ? ` — ${row.dentistName}` : ""}</td>
                 <td className="px-4 py-3 tabular">{money(row.grossRevenue)}</td>
                 <td className="px-4 py-3 tabular">{money(row.dentistRepasse)}</td>
                 <td className="px-4 py-3 tabular">{money(row.materialCost)}</td>
@@ -96,28 +176,28 @@ export function FinancialReport() {
               </tr>
             ))}
           </tbody>
-          {reportQuery.data && (
+          {data && (
             <tfoot className="border-t border-line font-medium">
               <tr>
                 <td className="px-4 py-3">Total</td>
-                <td className="px-4 py-3 tabular">{money(reportQuery.data.totals.grossRevenue)}</td>
-                <td className="px-4 py-3 tabular">{money(reportQuery.data.totals.dentistRepasse)}</td>
-                <td className="px-4 py-3 tabular">{money(reportQuery.data.totals.materialCost)}</td>
-                <td className="px-4 py-3 tabular">{money(reportQuery.data.totals.rentCost)}</td>
-                <td className="px-4 py-3 tabular">{money(reportQuery.data.totals.netResult)}</td>
+                <td className="px-4 py-3 tabular">{money(data.totals.grossRevenue)}</td>
+                <td className="px-4 py-3 tabular">{money(data.totals.dentistRepasse)}</td>
+                <td className="px-4 py-3 tabular">{money(data.totals.materialCost)}</td>
+                <td className="px-4 py-3 tabular">{money(data.totals.rentCost)}</td>
+                <td className="px-4 py-3 tabular">{money(data.totals.netResult)}</td>
               </tr>
             </tfoot>
           )}
         </table>
-        {reportQuery.data?.clinics.length === 0 && (
+        {data?.clinics.length === 0 && (
           <p className="p-4 text-sm text-muted">Nenhum atendimento no período selecionado.</p>
         )}
       </div>
 
-      {reportQuery.data && reportQuery.data.clinicsWithoutTerms.length > 0 && (
+      {data && data.clinicsWithoutTerms.length > 0 && (
         <div className="rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
           <strong>Atenção:</strong> os seguintes consultórios não têm termos financeiros cadastrados — valores de aluguel podem estar incorretos:{" "}
-          {reportQuery.data.clinicsWithoutTerms.join(", ")}. Acesse{" "}
+          {data.clinicsWithoutTerms.join(", ")}. Acesse{" "}
           <strong>Termos por consultório</strong> para configurar.
         </div>
       )}
