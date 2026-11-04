@@ -28,4 +28,9 @@ export class ProceduresService {
     await this.findOne(id);
     return this.prisma.procedureCatalog.update({ where: { id }, data: input });
   }
+
+  async softDelete(id: string) {
+    await this.findOne(id);
+    return this.prisma.procedureCatalog.update({ where: { id }, data: { active: false } });
+  }
 }

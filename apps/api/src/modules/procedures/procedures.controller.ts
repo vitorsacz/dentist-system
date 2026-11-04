@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post } from "@nestjs/common";
 import {
   ACCESS,
   createProcedureSchema,
@@ -33,5 +33,12 @@ export class ProceduresController {
     @Body(new ZodValidationPipe(updateProcedureSchema)) body: UpdateProcedureInput,
   ) {
     return this.proceduresService.update(id, body);
+  }
+
+  @Roles(...ACCESS["procedures.write"])
+  @Delete(":id")
+  @HttpCode(HttpStatus.OK)
+  softDelete(@Param("id") id: string) {
+    return this.proceduresService.softDelete(id);
   }
 }
