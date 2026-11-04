@@ -19,6 +19,10 @@ const INTENTIONALLY_UNSCOPED_MODELS: Record<string, string> = {
   // Admin tem organizationId null. users.service.ts, auth.service.ts e
   // organization.service.ts filtram organizationId manualmente.
   User: "resolução de tenant no login + Super Admin sem organização",
+  // AuditLog é insert-only e cross-tenant: organizationId é opcional (ações
+  // de plataforma não têm org), leitura restrita ao Super Admin / VISION com
+  // filtro manual. Nunca acessada pela extension de tenant comum.
+  AuditLog: "insert-only cross-tenant; organizationId opcional; leitura pelo Super Admin / VISION com filtro manual",
 };
 
 const TENANT_FIELD = "organizationId";
