@@ -104,8 +104,7 @@ describe("P1-P4 — role matrix e2e", () => {
 
   describe("P1: ADMIN — procedures.write e clinics.write", () => {
     it("ADMIN pode criar e editar procedimento do catálogo", async () => {
-      const { procedure } = await seedClinicOrg("P1-proc");
-      const { founder } = await seedClinicOrg("P1-proc-token");
+      const { procedure, founder } = await seedClinicOrg("P1-proc");
       const token = await loginToken(server, founder.email);
       const a = api(server, token);
 
@@ -120,12 +119,10 @@ describe("P1-P4 — role matrix e2e", () => {
     });
 
     it("ADMIN pode ativar/desativar consultório (clinics.manage)", async () => {
-      const { org, founder } = await seedClinicOrg("P1-manage");
-      await rawPrisma.clinic.create({ data: { organizationId: org.id, name: "Clínica Extra", type: "OWN" } });
-      const { clinic } = await seedClinicOrg("P1-manage-clinic");
-      const token = await loginToken(server, founder.email);
+      const { org, founder, clinic } = await seedClinicOrg("P1-manage");
       // Need a second active clinic so we can deactivate one.
-      await rawPrisma.clinic.create({ data: { organizationId: (await rawPrisma.clinic.findUnique({ where: { id: clinic.id } }))!.organizationId, name: "Guard Clinic", type: "OWN" } });
+      await rawPrisma.clinic.create({ data: { organizationId: org.id, name: "Clínica Extra", type: "OWN" } });
+      const token = await loginToken(server, founder.email);
       await api(server, token).patch(`/clinics/${clinic.id}/active`, { active: false }).expect(200);
     });
 
@@ -219,9 +216,9 @@ describe("P1-P4 — role matrix e2e", () => {
     });
 
     it("RECEPTIONIST pode ler e escrever orçamentos", async () => {
-      const { receptionist } = await seedClinicOrg("P4-budget");
+      const { receptionist, patient } = await seedClinicOrg("P4-budget");
       const token = await loginToken(server, receptionist.email);
-      await api(server, token).get("/budgets").expect(200);
+      await api(server, token).get(`/budgets?patientId=${patient.id}`).expect(200);
     });
 
     it("RECEPTIONIST pode ler procedimentos (procedures.read)", async () => {
@@ -252,7 +249,7 @@ describe("P1-P4 — role matrix e2e", () => {
     it("RECEPTIONIST pode ver agendamentos (appointments.read)", async () => {
       const { receptionist } = await seedClinicOrg("P4-appt");
       const token = await loginToken(server, receptionist.email);
-      await api(server, token).get("/appointments?from=2026-01-01&to=2026-12-31").expect(200);
+      await api(server, token).get("/appointments?from=2026-11-01&to=2026-11-30").expect(200);
     });
   });
 
