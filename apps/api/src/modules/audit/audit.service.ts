@@ -1,22 +1,23 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
+export type AuditActorType = "USER" | "SUPER_ADMIN" | "SYSTEM";
+
 export interface AuditParams {
   organizationId?: string | null;
-  userId?: string | null;
+  actorId?: string | null;
+  actorType: AuditActorType;
   action: string;
-  entity?: string;
-  entityId?: string;
-  // Instantâneos sanitizados: nunca gravar senha, token ou conteúdo clínico completo.
-  before?: Record<string, unknown>;
-  after?: Record<string, unknown>;
-  ip?: string;
-  userAgent?: string;
+  targetType?: string;
+  targetId?: string;
+  // Payload livre: IP, userAgent, campos alterados, motivo, etc.
+  // Nunca incluir senha, token ou conteúdo clínico completo.
+  meta?: Record<string, unknown>;
 }
 
 export interface AuditListParams {
   organizationId: string;
-  userId?: string;
+  actorId?: string;
   action?: string;
   from?: Date;
   to?: Date;
@@ -29,20 +30,17 @@ export class AuditService {
   constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
 
   // Falha silenciosa intencional: auditoria nunca deve quebrar a requisição
-  // principal. Chame via fire-and-forget quando não precisar de garantia de
-  // entrega (use await quando precisar — ex. testes).
+  // principal. Use await quando precisar de garantia de entrega (ex. testes).
   async log(params: AuditParams): Promise<void> {
     await this.prisma.auditLog.create({
       data: {
         organizationId: params.organizationId ?? null,
-        userId: params.userId ?? null,
+        actorId: params.actorId ?? null,
+        actorType: params.actorType,
         action: params.action,
-        entity: params.entity ?? null,
-        entityId: params.entityId ?? null,
-        before: params.before ?? undefined,
-        after: params.after ?? undefined,
-        ip: params.ip ?? null,
-        userAgent: params.userAgent ?? null,
+        targetType: params.targetType ?? null,
+        targetId: params.targetId ?? null,
+        meta: params.meta ?? undefined,
       },
     });
   }
@@ -54,7 +52,7 @@ export class AuditService {
 
     const where = {
       organizationId: params.organizationId,
-      ...(params.userId ? { userId: params.userId } : {}),
+      ...(params.actorId ? { actorId: params.actorId } : {}),
       ...(params.action ? { action: params.action } : {}),
       ...(params.from || params.to
         ? {
@@ -67,19 +65,13 @@ export class AuditService {
     };
 
     const [items, total] = await Promise.all([
-      this.prisma.auditLog.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: pageSize,
-      }),
+      this.prisma.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: pageSize }),
       this.prisma.auditLog.count({ where }),
     ]);
 
     return { items, total, page, pageSize };
   }
 
-  // Super Admin vê todos os tenants — sem filtro de organizationId.
   async listAll(params: Omit<AuditListParams, "organizationId"> & { organizationId?: string }) {
     const page = Math.max(1, params.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 50));
@@ -87,7 +79,7 @@ export class AuditService {
 
     const where = {
       ...(params.organizationId ? { organizationId: params.organizationId } : {}),
-      ...(params.userId ? { userId: params.userId } : {}),
+      ...(params.actorId ? { actorId: params.actorId } : {}),
       ...(params.action ? { action: params.action } : {}),
       ...(params.from || params.to
         ? {
@@ -100,12 +92,7 @@ export class AuditService {
     };
 
     const [items, total] = await Promise.all([
-      this.prisma.auditLog.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: pageSize,
-      }),
+      this.prisma.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: pageSize }),
       this.prisma.auditLog.count({ where }),
     ]);
 
