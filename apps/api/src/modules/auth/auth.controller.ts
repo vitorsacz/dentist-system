@@ -2,7 +2,13 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, Unauthoriz
 import type { Request, Response } from "express";
 import { Throttle } from "@nestjs/throttler";
 import { ConfigService } from "@nestjs/config";
-import { loginSchema, type LoginInput, type LoginResult } from "@dentist-system/shared-types";
+import {
+  loginSchema,
+  setInitialPasswordSchema,
+  type LoginInput,
+  type LoginResult,
+  type SetInitialPasswordInput,
+} from "@dentist-system/shared-types";
 import {
   LOGIN_RATE_LIMIT,
   RATE_LIMIT_WINDOW_MS,
@@ -43,8 +49,31 @@ export class AuthController {
     if (outcome.kind === "organization-selection") {
       return { requiresOrganizationSelection: true, accounts: outcome.accounts };
     }
+    if (outcome.kind === "must-change-password") {
+      return { requiresPasswordChange: true, changeToken: outcome.changeToken };
+    }
     this.setRefreshCookie(res, outcome.refreshToken);
     return { accessToken: outcome.accessToken };
+  }
+
+  // R3/R5: troca obrigatória de senha no primeiro login ou após reset pelo
+  // Super Admin. Aceita o changeToken do login e emite tokens completos.
+  @Public()
+  @Throttle({ default: { limit: LOGIN_RATE_LIMIT, ttl: RATE_LIMIT_WINDOW_MS } })
+  @Post("set-initial-password")
+  @HttpCode(HttpStatus.OK)
+  async setInitialPassword(
+    @Body(new ZodValidationPipe(setInitialPasswordSchema)) body: SetInitialPasswordInput,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken } = await this.authService.setInitialPassword(
+      body.changeToken,
+      body.newPassword,
+      clientInfo(req),
+    );
+    this.setRefreshCookie(res, refreshToken);
+    return { accessToken };
   }
 
   @Public()

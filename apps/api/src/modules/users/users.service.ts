@@ -59,6 +59,7 @@ export class UsersService {
     }
 
     const passwordHash = await bcrypt.hash(input.password, 10);
+    // mustChangePassword é false por padrão; só o Super Admin (R3/R5) seta true.
     const user = await this.prisma.user.create({
       data: {
         organizationId,

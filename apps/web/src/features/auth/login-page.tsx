@@ -41,6 +41,11 @@ export function LoginPage() {
         setOrganizationId(result.accounts[0]?.organizationId ?? "");
         return;
       }
+      if ("requiresPasswordChange" in result) {
+        sessionStorage.setItem("changeToken", result.changeToken);
+        navigate("/auth/set-initial-password", { replace: true });
+        return;
+      }
       await login(result.accessToken);
       navigate("/", { replace: true });
     } catch (err) {

@@ -11,6 +11,8 @@ interface JwtPayload {
   organizationId: string | null;
   roles: Role[];
   isSuperAdmin: boolean;
+  // change-password tokens carry kind; real access tokens never do.
+  kind?: string;
 }
 
 @Injectable()
@@ -25,10 +27,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  // Relê o usuário do banco a cada request: papéis, ativo e organização valem
-  // sempre o estado atual, não o que estava no token (um access token antigo,
-  // de antes do R1, com `role` no payload, continua funcionando).
+  // Relê o usuário do banco a cada request: papéis, ativo, organização e
+  // mustChangePassword valem sempre o estado atual, não o que estava no token.
+  // changeTokens (kind="must-change-password") são JWT válidos mas não são
+  // access tokens: rejeitados aqui para que só sirvam ao endpoint dedicado.
   async validate(payload: JwtPayload) {
+    if (payload.kind === "must-change-password") {
+      throw new UnauthorizedException("Token de troca de senha não é válido para autenticação");
+    }
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       include: { organization: { select: { status: true } } },
@@ -48,6 +54,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       organizationId: user.organizationId,
       roles: user.roles,
       isSuperAdmin: user.isSuperAdmin,
+      mustChangePassword: user.mustChangePassword,
     };
   }
 }
