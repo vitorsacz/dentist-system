@@ -2,8 +2,10 @@ import { Link } from "react-router-dom";
 import { CalendarCheck, CalendarDays, DollarSign, Users } from "lucide-react";
 import type { AppointmentStatus } from "@dentist-system/shared-types";
 import { useAuth } from "@/lib/auth-context";
+import { can } from "@/lib/access";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
+import { AlertBanner } from "@/components/ui/alert-banner";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
@@ -37,6 +39,15 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader breadcrumb="Início" title={`Olá, ${user?.name ?? ""}`} />
+
+      {can(user, "users.manage") && (
+        <AlertBanner>
+          Alguns dados da sua clínica ainda estão incompletos.{" "}
+          <Link to="/my-clinic" className="font-medium underline">
+            Completar cadastro
+          </Link>
+        </AlertBanner>
+      )}
 
       <div className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-${statCount}`}>
         {isLoading ? (
