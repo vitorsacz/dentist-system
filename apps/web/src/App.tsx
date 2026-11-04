@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "@/features/auth/login-page";
+import { SetInitialPasswordPage } from "@/features/auth/set-initial-password-page";
 import { PatientsPage } from "@/features/patients/patients-page";
 import { PatientDetailPage } from "@/features/patients/patient-detail-page";
 import { AgendaPage } from "@/features/agenda/agenda-page";
@@ -20,6 +21,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/auth/set-initial-password" element={<SetInitialPasswordPage />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>
             <Route path="/" element={<HomeRoute />} />
