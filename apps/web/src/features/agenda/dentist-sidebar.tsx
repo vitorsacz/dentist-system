@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { LOCATION_COLOR_HEX, LOCATION_COLOR_TOKENS, type LocationColorToken } from "./location-colors";
-import type { MockDentist } from "./mock-data";
+import type { AgendaDentist } from "./mock-data";
 
 interface DentistSidebarProps {
-  dentists: MockDentist[];
+  dentists: AgendaDentist[];
   hiddenDentistIds: Set<string>;
   onToggle: (dentistId: string) => void;
   onChangeColor: (dentistId: string, colorToken: LocationColorToken) => void;
