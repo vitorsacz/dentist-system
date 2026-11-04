@@ -213,6 +213,40 @@ describe("R3/R5 — mustChangePassword first-login flow", () => {
         .expect(401);
     });
 
+    it("changeToken é de uso único: segunda chamada retorna 401", async () => {
+      const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);
+      const org = await rawPrisma.organization.create({ data: { name: "Org Single Use" } });
+      const user = await rawPrisma.user.create({
+        data: {
+          organizationId: org.id,
+          email: `single-use-${Date.now()}@test.com`,
+          passwordHash,
+          name: "Single Use User",
+          roles: ["ADMIN"],
+          mustChangePassword: true,
+        },
+      });
+      await rawPrisma.organization.update({ where: { id: org.id }, data: { foundingAdminUserId: user.id } });
+
+      const loginRes = await request(app.getHttpServer())
+        .post("/auth/login")
+        .send({ identifier: user.email, password: TEST_PASSWORD })
+        .expect(200);
+      const { changeToken } = loginRes.body as { changeToken: string };
+
+      // Primeira chamada: sucesso.
+      await request(app.getHttpServer())
+        .post("/auth/set-initial-password")
+        .send({ changeToken, newPassword: NEW_PASSWORD })
+        .expect(200);
+
+      // Segunda chamada com mesmo token: 401 (mustChangePassword já é false).
+      await request(app.getHttpServer())
+        .post("/auth/set-initial-password")
+        .send({ changeToken, newPassword: NEW_PASSWORD })
+        .expect(401);
+    });
+
     it("changeToken expirado é rejeitado por set-initial-password", async () => {
       // Usa o JwtService do app para assinar um token já expirado.
       const jwtService = app.get(JwtService);

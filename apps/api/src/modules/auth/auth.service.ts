@@ -165,8 +165,17 @@ export class AuthService {
     if (!user || !user.active) {
       throw new UnauthorizedException("Usuário não encontrado ou inativo");
     }
+    // changeToken é de uso único: se mustChangePassword já é false, o token
+    // foi consumido (ou nunca foi emitido para este usuário).
+    if (!user.mustChangePassword) {
+      throw new UnauthorizedException("Troca de senha já realizada ou não solicitada");
+    }
 
     const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    // Revoga sessões anteriores ao trocar a senha — se o Super Admin resetou
+    // a senha (R5) enquanto o usuário tinha sessões ativas, essas sessões
+    // ficam inválidas após a troca obrigatória.
+    await this.refreshSessions.revokeAllForUser(user.id);
     const updated = await this.prisma.user.update({
       where: { id: payload.sub },
       data: { passwordHash, mustChangePassword: false },
