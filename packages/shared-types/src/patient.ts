@@ -193,3 +193,8 @@ export const createClinicalRecordSchema = z.object({
   observations: z.string().optional(),
 });
 export type CreateClinicalRecordInput = z.infer<typeof createClinicalRecordSchema>;
+
+export const createAddendumSchema = z.object({
+  text: z.string().min(1),
+});
+export type CreateAddendumInput = z.infer<typeof createAddendumSchema>;

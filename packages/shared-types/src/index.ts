@@ -113,6 +113,8 @@ export {
   type UpsertAnamnesisInput,
   type StructuredAnamnesis,
   type CreateClinicalRecordInput,
+  createAddendumSchema,
+  type CreateAddendumInput,
 } from "./patient";
 
 export {
