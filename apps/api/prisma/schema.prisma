@@ -121,6 +121,7 @@ model User {
   ownedPatients           Patient[]        @relation("PatientOwner")
   patientRevisions        PatientRevision[] @relation("PatientRevisionChangedBy")
   createdClinicalRecords  ClinicalRecord[] @relation("ClinicalRecordCreatedBy")
+  updatedAnamneses        Anamnesis[]      @relation("AnamnesisUpdatedBy")
   createdBudgets          Budget[]         @relation("BudgetCreatedBy")
   createdAttendances      Attendance[]     @relation("AttendanceCreatedBy")
   refreshSessions         RefreshSession[]
@@ -327,6 +328,9 @@ model Anamnesis {
   healthConditions String?
   dentalHistory    String?
   chiefComplaint   String?
+  structured       Json?
+  updatedByUserId  String?
+  updatedBy        User?    @relation("AnamnesisUpdatedBy", fields: [updatedByUserId], references: [id])
   updatedAt        DateTime @updatedAt
 
   organizationId String

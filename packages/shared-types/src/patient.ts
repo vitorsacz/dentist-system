@@ -141,12 +141,49 @@ export const bulkReassignPatientsSchema = z.object({
 });
 export type BulkReassignPatientsInput = z.infer<typeof bulkReassignPatientsSchema>;
 
+const detailRequiredWhenTrue = (detail: z.ZodOptional<z.ZodNullable<z.ZodString>>) =>
+  z.object({ value: z.boolean().nullable().optional(), detail: detail });
+
+const optionalAnswer = detailRequiredWhenTrue(z.string().nullable().optional());
+const requiredDetailAnswer = z
+  .object({ value: z.boolean().nullable().optional(), detail: z.string().nullable().optional() })
+  .superRefine((v, ctx) => {
+    if (v.value === true && !v.detail?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Detalhe obrigatório quando sim", path: ["detail"] });
+    }
+  });
+
+export const structuredAnamnesisSchema = z.object({
+  version: z.literal(1).default(1),
+  answers: z.object({
+    hypertension: optionalAnswer,
+    diabetes: optionalAnswer,
+    heartDisease: requiredDetailAnswer,
+    anticoagulant: requiredDetailAnswer,
+    pregnantOrBreastfeeding: optionalAnswer,
+    smoker: optionalAnswer,
+    allergyAnesthetic: requiredDetailAnswer,
+    allergyPenicillin: requiredDetailAnswer,
+    allergyLatex: requiredDetailAnswer,
+    previousSurgeries: optionalAnswer,
+    bleedingProblems: requiredDetailAnswer,
+    bisphosphonate: requiredDetailAnswer,
+    otherConditions: optionalAnswer,
+    asthma: optionalAnswer,
+    epilepsy: optionalAnswer,
+    kidneyLiverDisease: optionalAnswer,
+    underMedicalTreatment: optionalAnswer,
+  }).partial().optional(),
+});
+export type StructuredAnamnesis = z.infer<typeof structuredAnamnesisSchema>;
+
 export const upsertAnamnesisSchema = z.object({
   allergies: z.string().optional(),
   medications: z.string().optional(),
   healthConditions: z.string().optional(),
   dentalHistory: z.string().optional(),
   chiefComplaint: z.string().optional(),
+  structured: structuredAnamnesisSchema.optional(),
 });
 export type UpsertAnamnesisInput = z.infer<typeof upsertAnamnesisSchema>;
 
