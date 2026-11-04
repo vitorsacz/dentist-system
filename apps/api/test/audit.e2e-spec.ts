@@ -231,6 +231,16 @@ describe("Audit module", () => {
       expect(res.body.pageSize).toBe(1);
       expect(res.body.items.length).toBeLessThanOrEqual(1);
     });
+
+    it("retorna 400 para from inválido", async () => {
+      const res = await as(clinic.adminToken).get("/audit?from=not-a-date");
+      expect(res.status).toBe(400);
+    });
+
+    it("retorna 400 para to inválido", async () => {
+      const res = await as(clinic.adminToken).get("/audit?to=not-a-date");
+      expect(res.status).toBe(400);
+    });
   });
 
   describe("Registro automático via interceptor", () => {
