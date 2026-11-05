@@ -58,9 +58,11 @@ export {
   clinicMemberSchema,
   myClinicSchema,
   organizationDentistSchema,
+  updateOrganizationProfileSchema,
   type ClinicMember,
   type MyClinic,
   type OrganizationDentist,
+  type UpdateOrganizationProfileInput,
 } from "./organization";
 
 export {

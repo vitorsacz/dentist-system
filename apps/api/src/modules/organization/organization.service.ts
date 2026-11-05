@@ -1,5 +1,5 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { MyClinic, OrganizationDentist } from "@dentist-system/shared-types";
+import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
+import type { MyClinic, OrganizationDentist, UpdateOrganizationProfileInput } from "@dentist-system/shared-types";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
@@ -26,6 +26,21 @@ export class OrganizationService {
         active: user.active,
       })),
     };
+  }
+
+  async update(organizationId: string, input: UpdateOrganizationProfileInput): Promise<void> {
+    const { logoDataUrl, ...rest } = input;
+    if (logoDataUrl != null) {
+      const base64Part = logoDataUrl.split(",")[1] ?? "";
+      // Buffer.byteLength of base64 string ≈ decoded size (precise check)
+      if (Buffer.byteLength(base64Part, "base64") > 300 * 1024) {
+        throw new UnprocessableEntityException("Logo excede 300 KB");
+      }
+    }
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { ...rest, ...(logoDataUrl !== undefined ? { logoDataUrl } : {}) },
+    });
   }
 
   // Roster pra sidebar de dentistas da Agenda — deliberadamente um método

@@ -166,6 +166,10 @@ model Organization {
   status              OrganizationStatus @default(ACTIVE)
   foundingAdminUserId String?            @unique
   foundingAdmin       User?              @relation("OrganizationFoundingAdmin", fields: [foundingAdminUserId], references: [id])
+  phone               String?
+  email               String?
+  address             String?
+  logoDataUrl         String?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 

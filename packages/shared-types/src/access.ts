@@ -66,9 +66,14 @@ export const ACCESS = {
   "organization.read": ["ADMIN", "DENTIST", "RECEPTIONIST"],
   // Lista de dentistas da organização (sidebar "por dentista" da Agenda).
   "organization.dentists": ["ADMIN", "RECEPTIONIST"],
+  // PATCH /organization: nome, telefone, email, endereço, logo.
+  "organization.write": ["ADMIN"],
 
   "users.manage": ["ADMIN"],
   "clinics.manage": ["ADMIN"],
+
+  // Configuração de formulário de anamnese (HAWK módulo). Avisar HAWK ao mergear.
+  "anamnesis.configure": ["ADMIN"],
 
   // Só telas do front (sem rota de API equivalente).
   "agenda.view": ["ADMIN", "DENTIST", "RECEPTIONIST"],
