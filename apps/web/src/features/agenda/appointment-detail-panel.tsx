@@ -1,4 +1,6 @@
-import { X } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { ExternalLink, MessageCircle, X } from "lucide-react";
 import type { AppointmentStatus } from "@dentist-system/shared-types";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { LOCATION_COLOR_HEX } from "./location-colors";
@@ -33,6 +35,19 @@ function formatRange(start: Date, end: Date) {
   return `${dateLabel} · ${timeLabel(start)} – ${timeLabel(end)}`;
 }
 
+function formatDateLong(d: Date) {
+  return d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+}
+
+function formatTime(d: Date) {
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function buildWaUrl(phone: string, message: string) {
+  const digits = phone.replace(/\D/g, "");
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+
 export function AppointmentDetailPanel({
   appointment,
   location,
@@ -42,82 +57,147 @@ export function AppointmentDetailPanel({
   onChangeStatus,
 }: AppointmentDetailPanelProps) {
   const color = location ? LOCATION_COLOR_HEX[location.colorToken] : undefined;
+  const [showWa, setShowWa] = useState(false);
+  const defaultMessage = `Olá ${appointment.patientName}, confirmamos seu atendimento para ${formatDateLong(appointment.start)} às ${formatTime(appointment.start)}. Aguardamos você!`;
+  const [waMessage, setWaMessage] = useState(defaultMessage);
+
+  function handleConfirmClick() {
+    setWaMessage(defaultMessage);
+    setShowWa(true);
+  }
+
+  function handleConfirmWithoutWa() {
+    onChangeStatus("SCHEDULED");
+    setShowWa(false);
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-gray-900/20">
-      <div className="h-full w-full max-w-sm overflow-y-auto border-l border-line bg-surface p-6">
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            <p className="text-sm text-muted">Agendamento</p>
-            <h2 className="text-xl font-semibold text-ink">{appointment.patientName}</h2>
-            {appointment.patientActive === false && (
-              <Badge tone="warning">Paciente inativo</Badge>
-            )}
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-gray-100 hover:text-ink">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4 text-sm">
-          <div>
-            <p className="text-muted">Telefone</p>
-            <p className="text-ink">{appointment.patientPhone}</p>
-          </div>
-          <div>
-            <p className="text-muted">Procedimento</p>
-            <p className="text-ink">{appointment.procedureName}</p>
-          </div>
-          <div>
-            <p className="text-muted">Horário</p>
-            <p className="text-ink">{formatRange(appointment.start, appointment.end)}</p>
-          </div>
-          <div>
-            <p className="text-muted">Consultório</p>
-            <p className="flex items-center gap-2 text-ink">
-              {color && <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color.solid }} />}
-              {location?.name ?? "—"}
-            </p>
-          </div>
-          {dentist && (
+    <>
+      <div className="fixed inset-0 z-50 flex justify-end bg-gray-900/20">
+        <div className="h-full w-full max-w-sm overflow-y-auto border-l border-line bg-surface p-6">
+          <div className="mb-6 flex items-start justify-between">
             <div>
-              <p className="text-muted">Dentista</p>
+              <p className="text-sm text-muted">Agendamento</p>
+              <h2 className="text-xl font-semibold text-ink">{appointment.patientName}</h2>
+              {appointment.patientActive === false && (
+                <Badge tone="warning">Paciente inativo</Badge>
+              )}
+            </div>
+            <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-gray-100 hover:text-ink">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="space-y-4 text-sm">
+            <div>
+              <p className="text-muted">Telefone</p>
+              <p className="text-ink">{appointment.patientPhone}</p>
+            </div>
+            <div>
+              <p className="text-muted">Procedimento</p>
+              <p className="text-ink">{appointment.procedureName}</p>
+            </div>
+            <div>
+              <p className="text-muted">Horário</p>
+              <p className="text-ink">{formatRange(appointment.start, appointment.end)}</p>
+            </div>
+            <div>
+              <p className="text-muted">Consultório</p>
               <p className="flex items-center gap-2 text-ink">
-                <span
-                  className="h-2.5 w-2.5 rounded-sm"
-                  style={{ backgroundColor: LOCATION_COLOR_HEX[dentist.colorToken].solid }}
-                />
-                {dentist.name}
+                {color && <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color.solid }} />}
+                {location?.name ?? "—"}
               </p>
             </div>
-          )}
-          <div>
-            <p className="mb-1 text-muted">Status</p>
-            <Badge tone={STATUS_TONE[appointment.status]}>{STATUS_LABEL[appointment.status]}</Badge>
+            {dentist && (
+              <div>
+                <p className="text-muted">Dentista</p>
+                <p className="flex items-center gap-2 text-ink">
+                  <span
+                    className="h-2.5 w-2.5 rounded-sm"
+                    style={{ backgroundColor: LOCATION_COLOR_HEX[dentist.colorToken].solid }}
+                  />
+                  {dentist.name}
+                </p>
+              </div>
+            )}
+            <div>
+              <p className="mb-1 text-muted">Status</p>
+              <Badge tone={STATUS_TONE[appointment.status]}>{STATUS_LABEL[appointment.status]}</Badge>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-col gap-2">
+            <button
+              onClick={handleConfirmClick}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white"
+            >
+              Confirmar
+            </button>
+            <button
+              onClick={onReschedule}
+              className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink"
+            >
+              Remarcar
+            </button>
+            <button
+              onClick={() => onChangeStatus("CANCELED")}
+              className="rounded-lg border border-error-solid/30 px-4 py-2 text-sm font-medium text-bad"
+            >
+              Cancelar
+            </button>
+            <Link
+              to={`/patients/${appointment.patientId}`}
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-gray-50"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Ver paciente
+            </Link>
           </div>
         </div>
-
-        <div className="mt-8 flex flex-col gap-2">
-          <button
-            onClick={() => onChangeStatus("SCHEDULED")}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white"
-          >
-            Confirmar
-          </button>
-          <button
-            onClick={onReschedule}
-            className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink"
-          >
-            Remarcar
-          </button>
-          <button
-            onClick={() => onChangeStatus("CANCELED")}
-            className="rounded-lg border border-error-solid/30 px-4 py-2 text-sm font-medium text-bad"
-          >
-            Cancelar
-          </button>
-        </div>
       </div>
-    </div>
+
+      {showWa && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 font-semibold text-ink">
+                <MessageCircle className="h-5 w-5 text-green-600" />
+                Confirmar via WhatsApp
+              </h3>
+              <button onClick={() => setShowWa(false)} className="rounded-lg p-1.5 text-muted hover:bg-gray-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <label className="mb-1.5 block text-sm font-medium text-ink">Mensagem</label>
+            <textarea
+              value={waMessage}
+              onChange={(e) => setWaMessage(e.target.value)}
+              rows={4}
+              className="mb-4 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink"
+            />
+
+            <div className="flex flex-col gap-2">
+              <a
+                href={buildWaUrl(appointment.patientPhone, waMessage)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => { onChangeStatus("SCHEDULED"); setShowWa(false); }}
+                className="flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Enviar no WhatsApp
+              </a>
+              <button
+                onClick={handleConfirmWithoutWa}
+                className="rounded-lg border border-line px-4 py-2 text-sm text-ink"
+              >
+                Confirmar sem enviar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

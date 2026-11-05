@@ -61,27 +61,35 @@ export function DashboardPage() {
           Array.from({ length: statCount }).map((_, i) => <Skeleton key={i} className="h-32" />)
         ) : (
           <>
-            <StatCard
-              label="Atendimentos no mês"
-              value={data?.attendancesThisMonth}
-              icon={<CalendarCheck className="h-5 w-5" />}
-            />
-            <StatCard
-              label="Consultas esta semana"
-              value={data?.appointmentsThisWeek}
-              icon={<CalendarDays className="h-5 w-5" />}
-            />
-            <StatCard
-              label="Pacientes ativos"
-              value={data?.activePatients}
-              icon={<Users className="h-5 w-5" />}
-            />
-            {showRevenue && (
+            <Link to="/agenda">
               <StatCard
-                label="Faturamento do mês"
-                value={formatCurrency(data?.revenueThisMonth ?? 0)}
-                icon={<DollarSign className="h-5 w-5" />}
+                label="Atendimentos no mês"
+                value={data?.attendancesThisMonth}
+                icon={<CalendarCheck className="h-5 w-5" />}
               />
+            </Link>
+            <Link to="/agenda">
+              <StatCard
+                label="Consultas esta semana"
+                value={data?.appointmentsThisWeek}
+                icon={<CalendarDays className="h-5 w-5" />}
+              />
+            </Link>
+            <Link to="/patients">
+              <StatCard
+                label="Pacientes ativos"
+                value={data?.activePatients}
+                icon={<Users className="h-5 w-5" />}
+              />
+            </Link>
+            {showRevenue && (
+              <Link to="/financeiro">
+                <StatCard
+                  label="Faturamento do mês"
+                  value={formatCurrency(data?.revenueThisMonth ?? 0)}
+                  icon={<DollarSign className="h-5 w-5" />}
+                />
+              </Link>
             )}
           </>
         )}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { UserPlus } from "lucide-react";
 import { patientsApi } from "@/features/patients/api";
 import { proceduresApi } from "@/features/procedures/api";
 import { ApiError } from "@/lib/api-client";
@@ -14,6 +15,7 @@ interface AppointmentCreateModalProps {
   initialDate: Date;
   initialStart?: Date;
   initialEnd?: Date;
+  initialClinicId?: string;
   editingAppointment?: AppointmentListItem | null;
   actorRoles: string[];
   onClose: () => void;
@@ -39,6 +41,7 @@ export function AppointmentCreateModal({
   initialDate,
   initialStart,
   initialEnd,
+  initialClinicId,
   editingAppointment,
   actorRoles,
   onClose,
@@ -66,8 +69,11 @@ export function AppointmentCreateModal({
     editingAppointment?.patientId ?? null,
   );
   const [locationId, setLocationId] = useState(
-    editingAppointment?.clinicId ?? locations[0]?.id ?? "",
+    editingAppointment?.clinicId ?? initialClinicId ?? locations[0]?.id ?? "",
   );
+  const [showNewPatient, setShowNewPatient] = useState(false);
+  const [newPatientName, setNewPatientName] = useState("");
+  const [newPatientPhone, setNewPatientPhone] = useState("");
   const [dentistId, setDentistId] = useState(
     editingAppointment?.dentistUserId ?? dentists[0]?.id ?? "",
   );
@@ -126,6 +132,21 @@ export function AppointmentCreateModal({
     },
   });
 
+  const createPatientMutation = useMutation({
+    mutationFn: () => patientsApi.create({ name: newPatientName.trim(), phone: newPatientPhone.trim() }),
+    onSuccess: (patient) => {
+      setSelectedPatientId(patient.id);
+      setPatientSearch(patient.name);
+      setShowNewPatient(false);
+      setNewPatientName("");
+      setNewPatientPhone("");
+      void queryClient.invalidateQueries({ queryKey: ["patients"] });
+    },
+    onError: (err: unknown) => {
+      setSubmitError(err instanceof Error ? err.message : "Erro ao criar paciente");
+    },
+  });
+
   function buildBody(allowOverlap?: boolean) {
     const baseDate = editStart ?? initialDate;
     const startsAt = buildDateTime(baseDate, startTime).toISOString();
@@ -155,7 +176,7 @@ export function AppointmentCreateModal({
     saveMutation.mutate(buildBody(true));
   }
 
-  const isLoading = saveMutation.isPending || cancelMutation.isPending;
+  const isLoading = saveMutation.isPending || cancelMutation.isPending || createPatientMutation.isPending;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4">
@@ -165,36 +186,87 @@ export function AppointmentCreateModal({
         </h2>
 
         <div className="space-y-4">
-          {/* Patient search */}
+          {/* Patient search / quick create */}
           <div className="relative">
-            <label className="mb-1.5 block text-sm font-medium text-ink">Paciente</label>
-            <input
-              type="text"
-              value={patientSearch}
-              onChange={(e) => {
-                setPatientSearch(e.target.value);
-                setSelectedPatientId(null);
-              }}
-              placeholder="Buscar paciente..."
-              className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink placeholder:text-muted"
-            />
-            {filteredPatients.length > 0 && (
-              <ul className="absolute z-10 mt-1 w-full rounded-lg border border-line bg-surface shadow-lg">
-                {filteredPatients.map((patient) => (
-                  <li key={patient.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedPatientId(patient.id);
-                        setPatientSearch(patient.name);
-                      }}
-                      className="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-gray-100"
-                    >
-                      {patient.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-sm font-medium text-ink">Paciente</label>
+              {!isEditing && (
+                <button
+                  type="button"
+                  onClick={() => setShowNewPatient((v) => !v)}
+                  className="flex items-center gap-1 text-xs text-accent hover:underline"
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Novo paciente
+                </button>
+              )}
+            </div>
+
+            {showNewPatient ? (
+              <div className="space-y-2 rounded-lg border border-line p-3">
+                <input
+                  type="text"
+                  value={newPatientName}
+                  onChange={(e) => setNewPatientName(e.target.value)}
+                  placeholder="Nome completo"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink placeholder:text-muted"
+                />
+                <input
+                  type="tel"
+                  value={newPatientPhone}
+                  onChange={(e) => setNewPatientPhone(e.target.value)}
+                  placeholder="Telefone"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink placeholder:text-muted"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => createPatientMutation.mutate()}
+                    disabled={!newPatientName.trim() || !newPatientPhone.trim() || createPatientMutation.isPending}
+                    className="flex-1 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    {createPatientMutation.isPending ? "Criando…" : "Criar paciente"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNewPatient(false); setNewPatientName(""); setNewPatientPhone(""); }}
+                    className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={patientSearch}
+                  onChange={(e) => {
+                    setPatientSearch(e.target.value);
+                    setSelectedPatientId(null);
+                  }}
+                  placeholder="Buscar paciente..."
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink placeholder:text-muted"
+                />
+                {filteredPatients.length > 0 && (
+                  <ul className="absolute z-10 mt-1 w-full rounded-lg border border-line bg-surface shadow-lg">
+                    {filteredPatients.map((patient) => (
+                      <li key={patient.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedPatientId(patient.id);
+                            setPatientSearch(patient.name);
+                          }}
+                          className="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-gray-100"
+                        >
+                          {patient.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </div>
 

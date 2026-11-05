@@ -31,6 +31,7 @@ export interface AgendaAppointment {
   calendarId: string;
   locationId: string;
   dentistUserId: string;
+  patientId: string;
   patientName: string;
   patientPhone: string;
   procedureName: string;
@@ -106,6 +107,7 @@ export function useAgendaData(currentUser: CurrentUser | null, from: Date, to: D
         calendarId: appt.id,
         locationId: appt.clinicId,
         dentistUserId: appt.dentistUserId,
+        patientId: appt.patientId,
         patientName: appt.patient.name,
         patientPhone: appt.patient.phone ?? "",
         procedureName: appt.notes ?? "",
