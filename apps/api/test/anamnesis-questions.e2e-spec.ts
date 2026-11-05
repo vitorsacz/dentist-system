@@ -114,6 +114,27 @@ describe("AnamnesisQuestions (e2e)", () => {
       expect(res.status).toBe(200);
       expect(res.body.length).toBe(43);
     });
+
+    it("re-seed after soft-delete reactivates question (no unique violation)", async () => {
+      // soft-delete a library question
+      const list = await as(adminToken).get("/anamnesis-questions");
+      const hypertension = (list.body as Array<{ id: string; key: string }>).find((q) => q.key === "hypertension")!;
+      await as(adminToken).delete(`/anamnesis-questions/${hypertension.id}`);
+
+      // confirm removed from list
+      const afterDelete = await as(adminToken).get("/anamnesis-questions");
+      expect((afterDelete.body as Array<{ key: string }>).some((q) => q.key === "hypertension")).toBe(false);
+
+      // re-seed — must NOT fail with unique constraint
+      const res = await as(adminToken).post("/anamnesis-questions/seed-library");
+      expect(res.status).toBe(201);
+      expect(res.body.reactivated).toBe(1);
+      expect(res.body.created).toBe(0);
+
+      // confirm back in list
+      const afterReseed = await as(adminToken).get("/anamnesis-questions");
+      expect((afterReseed.body as Array<{ key: string }>).some((q) => q.key === "hypertension")).toBe(true);
+    });
   });
 
   describe("POST /anamnesis-questions", () => {
