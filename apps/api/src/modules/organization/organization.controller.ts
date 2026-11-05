@@ -3,6 +3,7 @@ import { AllowAuthenticated } from "../../common/decorators/allow-authenticated.
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { ACCESS, updateOrganizationProfileSchema, type UpdateOrganizationProfileInput } from "@dentist-system/shared-types";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { AuditAction } from "../../common/decorators/audit-action.decorator";
 import { OrganizationService } from "./organization.service";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 
@@ -21,6 +22,7 @@ export class OrganizationController {
   }
 
   @Roles(...ACCESS["organization.write"])
+  @AuditAction("ORGANIZATION_UPDATE", "Organization")
   @Patch()
   @HttpCode(204)
   updateProfile(
