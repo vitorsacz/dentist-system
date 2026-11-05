@@ -19,6 +19,10 @@ export class OrganizationService {
       id: organization.id,
       name: organization.name,
       type: organization.type as MyClinic["type"],
+      phone: organization.phone ?? null,
+      email: organization.email ?? null,
+      address: organization.address ?? null,
+      logoDataUrl: organization.logoDataUrl ?? null,
       members: organization.users.map((user) => ({
         userId: user.id,
         name: user.name,

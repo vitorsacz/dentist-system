@@ -13,6 +13,10 @@ export const myClinicSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(TENANT_TYPES),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+  address: z.string().nullable(),
+  logoDataUrl: z.string().nullable(),
   members: z.array(clinicMemberSchema),
 });
 export type MyClinic = z.infer<typeof myClinicSchema>;
