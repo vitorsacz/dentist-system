@@ -4,6 +4,7 @@ export const financialReportQuerySchema = z.object({
   from: z.coerce.date(),
   to: z.coerce.date(),
   clinicId: z.string().optional(),
+  dentistUserId: z.string().optional(),
 });
 export type FinancialReportQuery = z.infer<typeof financialReportQuerySchema>;
 

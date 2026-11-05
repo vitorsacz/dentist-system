@@ -23,7 +23,11 @@ export class ReportsService {
         where: {
           date: { gte: query.from, lte: query.to },
           ...(query.clinicId ? { clinicId: query.clinicId } : {}),
-          ...(dentistOnly ? { dentistUserId: actor.id } : {}),
+          ...(dentistOnly
+            ? { dentistUserId: actor.id }
+            : query.dentistUserId
+              ? { dentistUserId: query.dentistUserId }
+              : {}),
         },
         include: {
           clinic: { include: { financialTerms: true } },

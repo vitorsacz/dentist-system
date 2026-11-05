@@ -13,9 +13,9 @@ export const attendancesApi = {
 };
 
 export const reportsApi = {
-  financial: (from: string, to: string, clinicId?: string) =>
+  financial: (from: string, to: string, clinicId?: string, dentistUserId?: string) =>
     apiClient.get<FinancialReport>(
-      `/reports/financial?from=${from}&to=${to}${clinicId ? `&clinicId=${clinicId}` : ""}`,
+      `/reports/financial?from=${from}&to=${to}${clinicId ? `&clinicId=${clinicId}` : ""}${dentistUserId ? `&dentistUserId=${dentistUserId}` : ""}`,
     ),
 
   csvDownload: async (from: string, to: string): Promise<Blob> => {
