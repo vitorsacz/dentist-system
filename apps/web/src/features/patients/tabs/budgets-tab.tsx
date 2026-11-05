@@ -32,15 +32,7 @@ function formatCurrency(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-// Form row state includes qty and unitValue for UI; `value` sent to API = qty * unitValue
-interface ItemRow {
-  procedureId: string;
-  toothNumber?: number;
-  notes?: string;
-  value: number;
-  _qty: number;
-  _unitValue: number;
-}
+
 
 interface PrintBudgetProps {
   orgName: string;
@@ -127,13 +119,11 @@ export function BudgetsTab({ patientId }: { patientId: string }) {
   // Local qty/unitValue per row — not in RHF because they don't go to API directly
   const [rowMeta, setRowMeta] = useState<{ qty: number; unitValue: number }[]>([{ qty: 1, unitValue: 0 }]);
 
-  const { register, control, handleSubmit, reset, setValue, watch, formState } = useForm<CreateBudgetInput>({
+  const { register, control, handleSubmit, reset, setValue, formState } = useForm<CreateBudgetInput>({
     resolver: zodResolver(createBudgetSchema),
     defaultValues: { patientId, items: [{ procedureId: "", value: 0 }] },
   });
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
-  const watchedItems = watch("items");
-
   const formTotal = rowMeta.reduce((sum, row) => sum + row.qty * row.unitValue, 0);
 
   function updateRowValue(index: number, qty: number, unitValue: number) {
