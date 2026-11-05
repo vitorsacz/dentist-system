@@ -29,3 +29,18 @@ export const organizationDentistSchema = z.object({
   active: z.boolean(),
 });
 export type OrganizationDentist = z.infer<typeof organizationDentistSchema>;
+
+// Decoded base64 of 300 KB = 307200 bytes → ceil(307200/3)*4 = 409600 base64 chars + ~23 prefix
+const LOGO_MAX_BASE64_CHARS = 409623;
+export const updateOrganizationProfileSchema = z.object({
+  phone: z.string().max(30).optional(),
+  email: z.string().email().optional(),
+  address: z.string().max(255).optional(),
+  logoDataUrl: z
+    .string()
+    .regex(/^data:image\/(png|jpeg);base64,/, "Logo deve ser PNG ou JPEG em base64")
+    .max(LOGO_MAX_BASE64_CHARS, "Logo deve ter no máximo 300 KB")
+    .nullable()
+    .optional(),
+});
+export type UpdateOrganizationProfileInput = z.infer<typeof updateOrganizationProfileSchema>;
