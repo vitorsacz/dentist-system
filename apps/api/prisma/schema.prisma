@@ -122,6 +122,7 @@ model User {
   patientRevisions        PatientRevision[] @relation("PatientRevisionChangedBy")
   createdClinicalRecords  ClinicalRecord[] @relation("ClinicalRecordCreatedBy")
   updatedAnamneses        Anamnesis[]      @relation("AnamnesisUpdatedBy")
+  createdAddenda          ClinicalRecordAddendum[] @relation("AddendumCreatedBy")
   createdBudgets          Budget[]         @relation("BudgetCreatedBy")
   createdAttendances      Attendance[]     @relation("AttendanceCreatedBy")
   refreshSessions         RefreshSession[]
@@ -176,6 +177,7 @@ model Organization {
   patientShares        PatientShare[]
   anamneses            Anamnesis[]
   clinicalRecords      ClinicalRecord[]
+  clinicalRecordAddenda ClinicalRecordAddendum[]
   toothRecords         ToothRecord[]
   procedures           ProcedureCatalog[]
   budgets              Budget[]
@@ -351,10 +353,28 @@ model ClinicalRecord {
   createdBy       User     @relation("ClinicalRecordCreatedBy", fields: [createdByUserId], references: [id])
   createdAt       DateTime @default(now())
 
+  addenda        ClinicalRecordAddendum[]
+
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([patientId, date])
+  @@index([organizationId])
+}
+
+model ClinicalRecordAddendum {
+  id               String        @id @default(cuid())
+  clinicalRecordId String
+  clinicalRecord   ClinicalRecord @relation(fields: [clinicalRecordId], references: [id], onDelete: Restrict)
+  text             String
+  createdByUserId  String
+  createdBy        User          @relation("AddendumCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt        DateTime      @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([clinicalRecordId])
   @@index([organizationId])
 }
 

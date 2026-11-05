@@ -84,11 +84,19 @@ export interface Anamnesis {
   updatedByUserId: string | null;
 }
 
+export interface ClinicalRecordAddendum {
+  id: string;
+  text: string;
+  createdAt: string;
+  createdBy: { id: string; name: string };
+}
+
 export interface ClinicalRecord {
   id: string;
   date: string;
   procedureNote: string;
   observations: string | null;
+  addenda: ClinicalRecordAddendum[];
 }
 
 export interface ToothRecord {
@@ -141,6 +149,8 @@ export const patientsApi = {
     apiClient.get<ClinicalRecord[]>(`/patients/${patientId}/clinical-records`),
   createClinicalRecord: (patientId: string, input: CreateClinicalRecordInput) =>
     apiClient.post<ClinicalRecord>(`/patients/${patientId}/clinical-records`, input),
+  createAddendum: (patientId: string, recordId: string, text: string) =>
+    apiClient.post<ClinicalRecordAddendum>(`/patients/${patientId}/clinical-records/${recordId}/addenda`, { text }),
 
   listToothRecords: (patientId: string) =>
     apiClient.get<ToothRecord[]>(`/patients/${patientId}/tooth-records`),

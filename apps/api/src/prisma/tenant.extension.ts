@@ -12,6 +12,7 @@ export const TENANT_SCOPED_MODELS = [
   "Patient",
   "Anamnesis",
   "ClinicalRecord",
+  "ClinicalRecordAddendum",
   "ToothRecord",
   "ProcedureCatalog",
   "Budget",
