@@ -9,6 +9,7 @@ import { MaterialsPage } from "@/features/materials/materials-page";
 import { ProceduresPage } from "@/features/procedures/procedures-page";
 import { ClinicsPage } from "@/features/clinics/clinics-page";
 import { AdminUsersPage } from "@/features/admin/admin-users-page";
+import { AnamnesisQuestionsPage } from "@/features/anamnesis-questions/anamnesis-questions-page";
 import { MyClinicPage } from "@/features/my-clinic/my-clinic-page";
 import { PlatformPage } from "@/features/platform/platform-page";
 import { OrganizationDetailPage } from "@/features/platform/organization-detail-page";
@@ -37,6 +38,10 @@ export function App() {
 
             <Route element={<ProtectedRoute capability="users.manage" />}>
               <Route path="/admin/users" element={<AdminUsersPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute capability="anamnesis.configure" />}>
+              <Route path="/admin/anamnese" element={<AnamnesisQuestionsPage />} />
             </Route>
 
             <Route element={<ProtectedRoute capability="agenda.view" />}>
