@@ -9,6 +9,7 @@ import {
   Landmark,
   LogOut,
   Package,
+  Settings,
   Stethoscope,
   UserCog,
   Users,
@@ -51,6 +52,7 @@ const NAV_GROUPS: NavGroupDef[] = [
     items: [
       { to: "/clinics", label: "Consultórios", icon: Building2, capability: "clinics.write" },
       { to: "/my-clinic", label: "Equipe", icon: Landmark, capability: "organization.read" },
+      { to: "/clinic-profile", label: "Perfil da clínica", icon: Settings, capability: "organization.write" },
       { to: "/admin/users", label: "Usuários", icon: UserCog, capability: "users.manage" },
     ],
   },

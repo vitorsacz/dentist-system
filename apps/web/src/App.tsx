@@ -10,6 +10,7 @@ import { ProceduresPage } from "@/features/procedures/procedures-page";
 import { ClinicsPage } from "@/features/clinics/clinics-page";
 import { AdminUsersPage } from "@/features/admin/admin-users-page";
 import { MyClinicPage } from "@/features/my-clinic/my-clinic-page";
+import { ClinicProfilePage } from "@/features/my-clinic/clinic-profile-page";
 import { PlatformPage } from "@/features/platform/platform-page";
 import { OrganizationDetailPage } from "@/features/platform/organization-detail-page";
 import { ProtectedRoute } from "@/routes/protected-route";
@@ -28,6 +29,10 @@ export function App() {
 
             <Route element={<ProtectedRoute capability="organization.read" />}>
               <Route path="/my-clinic" element={<MyClinicPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute capability="organization.write" />}>
+              <Route path="/clinic-profile" element={<ClinicProfilePage />} />
             </Route>
 
             <Route element={<ProtectedRoute superAdminOnly />}>
