@@ -203,4 +203,15 @@ export {
   type FinancialReport,
 } from "./report";
 
+export {
+  ANAMNESIS_QUESTION_KINDS,
+  createAnamnesisQuestionSchema,
+  updateAnamnesisQuestionSchema,
+  reorderAnamnesisQuestionsSchema,
+  type AnamnesisQuestionKind,
+  type CreateAnamnesisQuestionInput,
+  type UpdateAnamnesisQuestionInput,
+  type ReorderAnamnesisQuestionsInput,
+} from "./anamnesis-question";
+
 export { ACCESS, rolesHaveAccess, type Capability } from "./access";

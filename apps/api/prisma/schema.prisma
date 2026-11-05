@@ -192,6 +192,7 @@ model Organization {
   materialBatches      MaterialBatch[]
   materialUsages       MaterialUsage[]
   recalls              Recall[]
+  anamnesisQuestions   AnamnesisQuestion[]
 }
 
 model Clinic {
@@ -571,6 +572,11 @@ model Recall {
   @@index([organizationId])
 }
 
+enum AnamnesisQuestionKind {
+  YES_NO
+  TEXT
+}
+
 // Trilha de auditoria imutável — INSERT only, sem UPDATE nem DELETE.
 // actorType: "USER" | "SUPER_ADMIN" | "SYSTEM".
 // targetType: nome do modelo Prisma (ex.: "User", "Organization").
@@ -590,4 +596,24 @@ model AuditLog {
   @@index([organizationId])
   @@index([actorId])
   @@index([targetType, targetId])
+}
+
+model AnamnesisQuestion {
+  id                    String                @id @default(cuid())
+  organizationId        String
+  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  key                   String
+  label                 String
+  kind                  AnamnesisQuestionKind @default(YES_NO)
+  detailRequiredWhenYes Boolean               @default(false)
+  alertWhenYes          Boolean               @default(false)
+  sensitive             Boolean               @default(false)
+  active                Boolean               @default(true)
+  order                 Int                   @default(0)
+  deletedAt             DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
 }
