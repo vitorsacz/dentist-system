@@ -169,6 +169,30 @@ describe("Reports — /reports/financial F3 ADMIN (e2e)", () => {
     });
   });
 
+  // ── Filtro por dentistUserId (ADMIN) ─────────────────────────────────────
+
+  describe("ADMIN filtra relatório por dentistUserId", () => {
+    it("?dentistUserId=dA → só linha de dA (gross=300)", async () => {
+      const res = await as(adminToken).get(
+        `/reports/financial?from=${RANGE.from}&to=${RANGE.to}&dentistUserId=${dentistAId}`,
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.clinics).toHaveLength(1);
+      expect(res.body.clinics[0].dentistUserId).toBe(dentistAId);
+      expect(res.body.totals.grossRevenue).toBeCloseTo(300);
+    });
+
+    it("?dentistUserId=dB → só linha de dB (gross=400)", async () => {
+      const res = await as(adminToken).get(
+        `/reports/financial?from=${RANGE.from}&to=${RANGE.to}&dentistUserId=${dentistBId}`,
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.clinics).toHaveLength(1);
+      expect(res.body.clinics[0].dentistUserId).toBe(dentistBId);
+      expect(res.body.totals.grossRevenue).toBeCloseTo(400);
+    });
+  });
+
   // ── DENTIST ainda vê só o próprio ─────────────────────────────────────────
 
   describe("DENTIST ainda vê só o próprio (F1 regressão)", () => {

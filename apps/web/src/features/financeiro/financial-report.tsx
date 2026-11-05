@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import ReactApexChart from "react-apexcharts";
+import { can } from "@/lib/access";
+import { useAuth } from "@/lib/auth-context";
+import { myClinicApi } from "@/features/my-clinic/api";
 import { reportsApi } from "./api";
 
 function firstDayOfMonth() {
@@ -21,13 +24,28 @@ function shortMoney(value: number) {
 }
 
 export function FinancialReport() {
+  const { user } = useAuth();
+  const isAdmin = can(user, "organization.dentists");
   const [from, setFrom] = useState(firstDayOfMonth());
   const [to, setTo] = useState(today());
+  const [dentistUserId, setDentistUserId] = useState<string>("");
   const [downloading, setDownloading] = useState(false);
 
+  const dentistsQuery = useQuery({
+    queryKey: ["organization", "dentists"],
+    queryFn: () => myClinicApi.dentists(),
+    enabled: isAdmin,
+  });
+
   const reportQuery = useQuery({
-    queryKey: ["reports", "financial", from, to],
-    queryFn: () => reportsApi.financial(`${from}T00:00:00`, `${to}T23:59:59`),
+    queryKey: ["reports", "financial", from, to, dentistUserId],
+    queryFn: () =>
+      reportsApi.financial(
+        `${from}T00:00:00`,
+        `${to}T23:59:59`,
+        undefined,
+        dentistUserId || undefined,
+      ),
   });
 
   async function handleCsvDownload() {
@@ -72,6 +90,23 @@ export function FinancialReport() {
             className="rounded-md border border-line px-3 py-2 text-sm"
           />
         </div>
+        {isAdmin && (
+          <div>
+            <label className="mb-1 block text-sm text-muted">Dentista</label>
+            <select
+              value={dentistUserId}
+              onChange={(e) => setDentistUserId(e.target.value)}
+              className="rounded-md border border-line px-3 py-2 text-sm"
+            >
+              <option value="">Todos</option>
+              {dentistsQuery.data?.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <button
           onClick={handleCsvDownload}
           disabled={downloading}
