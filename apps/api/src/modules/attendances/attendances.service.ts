@@ -65,14 +65,17 @@ export class AttendancesService {
           grossValue: input.grossValue,
           repassePercentage: input.repassePercentage,
           materialCost: input.materialCost,
+          materialByDentist: input.materialByDentist,
           createdByUserId: actor.id,
           dentistUserId: actor.id,
           organizationId,
         },
       });
 
-      for (const usage of input.materialUsages) {
-        await this.deductStock(tx, attendance.id, usage.materialId, usage.quantity, organizationId);
+      if (!input.materialByDentist) {
+        for (const usage of input.materialUsages) {
+          await this.deductStock(tx, attendance.id, usage.materialId, usage.quantity, organizationId);
+        }
       }
 
       if (input.appointmentId) {

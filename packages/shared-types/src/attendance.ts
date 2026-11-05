@@ -15,6 +15,7 @@ export const createAttendanceSchema = z.object({
   grossValue: z.coerce.number().positive(),
   repassePercentage: z.coerce.number().min(0).max(100),
   materialCost: z.coerce.number().min(0).default(0),
+  materialByDentist: z.boolean().default(false),
   materialUsages: z.array(materialUsageInputSchema).default([]),
 });
 export type CreateAttendanceInput = z.infer<typeof createAttendanceSchema>;
