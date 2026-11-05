@@ -37,8 +37,8 @@ export class ClinicalRecordsController {
     return this.clinicalRecordsService.create(patientId, body, user);
   }
 
-  // VISION: adicionar @AuditAction("CLINICAL_RECORD_ADDENDUM_CREATE") aqui quando PRs #47/#50 mergearem
   @Roles(...ACCESS["clinical.write"])
+  @AuditAction("CLINICAL_RECORD_ADDENDUM_CREATE", "ClinicalRecord")
   @Post(":recordId/addenda")
   createAddendum(
     @Param("patientId") patientId: string,

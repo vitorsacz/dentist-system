@@ -1,6 +1,11 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 
+// LOGIN_FAILURE sem usuário identificado (actorType SYSTEM) pode ser gerado em
+// massa por scanners de credenciais. Esta janela deduplicado por IP evita
+// inchar o banco: no máximo um registro por IP a cada 5 minutos.
+const SYSTEM_THROTTLE_MS = 5 * 60 * 1000;
+
 export type AuditActorType = "USER" | "SUPER_ADMIN" | "SYSTEM";
 
 export interface AuditParams {
@@ -27,11 +32,23 @@ export interface AuditListParams {
 
 @Injectable()
 export class AuditService {
+  // Mapa em memória: `${ip}:${action}` → timestamp do último registro.
+  // Singleton do NestJS — funciona dentro de um processo; em multi-réplica
+  // cada instância tem sua janela própria, o que ainda reduz >90% do volume.
+  private readonly systemThrottle = new Map<string, number>();
+
   constructor(@Inject(PRISMA_SERVICE) private readonly prisma: PrismaService) {}
 
   // Falha silenciosa intencional: auditoria nunca deve quebrar a requisição
   // principal. Use await quando precisar de garantia de entrega (ex. testes).
   async log(params: AuditParams): Promise<void> {
+    if (params.actorType === "SYSTEM" && typeof params.meta?.ip === "string") {
+      const key = `${params.meta.ip}:${params.action}`;
+      const last = this.systemThrottle.get(key) ?? 0;
+      if (Date.now() - last < SYSTEM_THROTTLE_MS) return;
+      this.systemThrottle.set(key, Date.now());
+    }
+
     await this.prisma.auditLog.create({
       data: {
         organizationId: params.organizationId ?? null,

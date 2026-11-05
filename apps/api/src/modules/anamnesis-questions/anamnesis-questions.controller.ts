@@ -10,6 +10,7 @@ import {
 } from "@dentist-system/shared-types";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { AuditAction } from "../../common/decorators/audit-action.decorator";
 import { AnamnesisQuestionsService } from "./anamnesis-questions.service";
 
 @Controller("anamnesis-questions")
@@ -35,18 +36,21 @@ export class AnamnesisQuestionsController {
   }
 
   @Roles(...ACCESS["anamnesis.configure"])
+  @AuditAction("ANAMNESIS_QUESTION_CREATE", "AnamnesisQuestion")
   @Post()
   create(@Body(new ZodValidationPipe(createAnamnesisQuestionSchema)) body: CreateAnamnesisQuestionInput) {
     return this.service.create(body);
   }
 
   @Roles(...ACCESS["anamnesis.configure"])
+  @AuditAction("ANAMNESIS_QUESTION_REORDER", "AnamnesisQuestion")
   @Post("reorder")
   reorder(@Body(new ZodValidationPipe(reorderAnamnesisQuestionsSchema)) body: ReorderAnamnesisQuestionsInput) {
     return this.service.reorder(body);
   }
 
   @Roles(...ACCESS["anamnesis.configure"])
+  @AuditAction("ANAMNESIS_QUESTION_UPDATE", "AnamnesisQuestion")
   @Patch(":id")
   update(
     @Param("id") id: string,
@@ -56,12 +60,14 @@ export class AnamnesisQuestionsController {
   }
 
   @Roles(...ACCESS["anamnesis.configure"])
+  @AuditAction("ANAMNESIS_QUESTION_TOGGLE", "AnamnesisQuestion")
   @Patch(":id/active")
   toggleActive(@Param("id") id: string) {
     return this.service.toggleActive(id);
   }
 
   @Roles(...ACCESS["anamnesis.configure"])
+  @AuditAction("ANAMNESIS_QUESTION_DELETE", "AnamnesisQuestion")
   @Delete(":id")
   softDelete(@Param("id") id: string) {
     return this.service.softDelete(id);
