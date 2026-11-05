@@ -15,6 +15,7 @@ import {
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { AuditAction } from "../../common/decorators/audit-action.decorator";
 import { PatientsService } from "./patients.service";
 
 @Controller("patients")
@@ -54,6 +55,7 @@ export class PatientsController {
   }
 
   @Roles(...ACCESS["patients.write"])
+  @AuditAction("PATIENT_CREATE", "Patient")
   @Post()
   create(
     @Body(new ZodValidationPipe(createPatientSchema)) body: CreatePatientInput,
@@ -63,6 +65,7 @@ export class PatientsController {
   }
 
   @Roles(...ACCESS["patients.write"])
+  @AuditAction("PATIENT_UPDATE", "Patient")
   @Patch(":id")
   update(
     @Param("id") id: string,

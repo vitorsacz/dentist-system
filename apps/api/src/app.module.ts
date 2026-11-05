@@ -14,6 +14,7 @@ import {
 import { RolesGuard } from "./common/guards/roles.guard";
 import { DecimalInterceptor } from "./common/interceptors/decimal.interceptor";
 import { TenantContextInterceptor } from "./common/interceptors/tenant-context.interceptor";
+import { AuditInterceptor } from "./common/interceptors/audit.interceptor";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
 import { OrganizationModule } from "./modules/organization/organization.module";
@@ -33,6 +34,7 @@ import { OdontogramModule } from "./modules/odontogram/odontogram.module";
 import { RecallsModule } from "./modules/recalls/recalls.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
 import { AnamnesisQuestionsModule } from "./modules/anamnesis-questions/anamnesis-questions.module";
+import { AuditModule } from "./modules/audit/audit.module";
 import { HealthController } from "./modules/health/health.controller";
 
 @Module({
@@ -66,6 +68,7 @@ import { HealthController } from "./modules/health/health.controller";
     RecallsModule,
     DashboardModule,
     AnamnesisQuestionsModule,
+    AuditModule,
   ],
   controllers: [HealthController],
   providers: [
@@ -90,6 +93,10 @@ import { HealthController } from "./modules/health/health.controller";
     {
       provide: APP_INTERCEPTOR,
       useClass: DecimalInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
     },
   ],
 })

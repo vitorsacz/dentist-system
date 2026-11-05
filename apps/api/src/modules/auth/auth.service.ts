@@ -5,6 +5,7 @@ import type { AccountOption, LoginInput, Role } from "@dentist-system/shared-typ
 import * as bcrypt from "bcrypt";
 import { PRISMA_SERVICE, type PrismaService } from "../../prisma/prisma.service";
 import { RefreshSessionsService, type SessionClientInfo } from "../sessions/refresh-sessions.service";
+import { AuditService } from "../audit/audit.service";
 
 const ACCESS_TOKEN_TTL = "15m";
 const BCRYPT_ROUNDS = 10;
@@ -57,6 +58,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly refreshSessions: RefreshSessionsService,
+    private readonly auditService: AuditService,
   ) {}
 
   // Identidade é isolada por organização — o mesmo e-mail pode ter conta em
@@ -79,6 +81,9 @@ export class AuthService {
 
     if (candidates.length === 0) {
       await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+      this.auditService
+        .log({ actorType: "SYSTEM", action: "LOGIN_FAILURE", meta: { ip: client.ip, userAgent: client.userAgent } })
+        .catch(() => {});
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
 
@@ -91,10 +96,31 @@ export class AuthService {
 
     const [onlyAccount] = validAccounts;
     if (!onlyAccount) {
+      this.auditService
+        .log({
+          organizationId: candidates[0]?.organizationId,
+          actorId: candidates[0]?.id,
+          actorType: "USER",
+          action: "LOGIN_FAILURE",
+          meta: { ip: client.ip, userAgent: client.userAgent },
+        })
+        .catch(() => {});
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
     if (validAccounts.length === 1) {
-      return this.issueTokens(onlyAccount, client);
+      const outcome = await this.issueTokens(onlyAccount, client);
+      if (outcome.kind === "tokens") {
+        this.auditService
+          .log({
+            organizationId: onlyAccount.organizationId,
+            actorId: onlyAccount.id,
+            actorType: onlyAccount.isSuperAdmin ? "SUPER_ADMIN" : "USER",
+            action: "LOGIN",
+            meta: { ip: client.ip, userAgent: client.userAgent },
+          })
+          .catch(() => {});
+      }
+      return outcome;
     }
 
     // Senha confere em mais de uma conta: o usuário escolhe a organização e

@@ -9,6 +9,7 @@ import {
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator";
+import { AuditAction } from "../../common/decorators/audit-action.decorator";
 import { OdontogramService } from "./odontogram.service";
 
 @Controller("patients/:patientId/tooth-records")
@@ -16,6 +17,7 @@ export class OdontogramController {
   constructor(private readonly odontogramService: OdontogramService) {}
 
   @Roles(...ACCESS["clinical.read"])
+  @AuditAction("ODONTOGRAM_READ", "ToothRecord")
   @Get()
   listByPatient(
     @Param("patientId") patientId: string,
