@@ -324,6 +324,7 @@ export function AgendaPage() {
           initialDate={modalState.initialDate}
           initialStart={modalState.initialStart}
           initialEnd={modalState.initialEnd}
+          initialClinicId={selectedClinicId}
           editingAppointment={modalState.editingAppointment}
           actorRoles={user?.roles ?? []}
           onClose={() => setModalState(null)}
