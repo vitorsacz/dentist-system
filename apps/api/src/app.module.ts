@@ -32,6 +32,7 @@ import { MaterialsModule } from "./modules/materials/materials.module";
 import { OdontogramModule } from "./modules/odontogram/odontogram.module";
 import { RecallsModule } from "./modules/recalls/recalls.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
+import { AnamnesisQuestionsModule } from "./modules/anamnesis-questions/anamnesis-questions.module";
 import { HealthController } from "./modules/health/health.controller";
 
 @Module({
@@ -64,6 +65,7 @@ import { HealthController } from "./modules/health/health.controller";
     OdontogramModule,
     RecallsModule,
     DashboardModule,
+    AnamnesisQuestionsModule,
   ],
   controllers: [HealthController],
   providers: [
