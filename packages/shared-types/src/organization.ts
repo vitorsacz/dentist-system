@@ -37,6 +37,7 @@ export type OrganizationDentist = z.infer<typeof organizationDentistSchema>;
 // Decoded base64 of 300 KB = 307200 bytes → ceil(307200/3)*4 = 409600 base64 chars + ~23 prefix
 const LOGO_MAX_BASE64_CHARS = 409623;
 export const updateOrganizationProfileSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
   phone: z.string().max(30).optional(),
   email: z.string().email().optional(),
   address: z.string().max(255).optional(),
