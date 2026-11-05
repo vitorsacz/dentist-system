@@ -215,6 +215,21 @@ describe("Attendance materialByDentist (e2e)", () => {
       expect(res.status).toBe(404);
     });
 
+    it("Org2 DENTIST cria atendimento próprio (isolamento positivo) → 201", async () => {
+      const res = await as(dentistBToken).post("/attendances", {
+        patientId: patientOrg2Id,
+        clinicId: clinicOrg2Id,
+        procedureId: procedureOrg2Id,
+        date: "2026-07-10T12:00:00.000Z",
+        grossValue: 200,
+        repassePercentage: 50,
+        materialCost: 0,
+        materialByDentist: true,
+        materialUsages: [],
+      });
+      expect(res.status).toBe(201);
+    });
+
     it("Org2 DENTIST não vê relatório de Org1", async () => {
       const res = await as(dentistBToken).get(reportUrl("2026-01-01T00:00:00.000Z", "2026-12-31T23:59:59.000Z"));
       expect(res.status).toBe(200);
