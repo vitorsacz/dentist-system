@@ -25,13 +25,23 @@ export class AnamnesisQuestionsService {
 
   async seedLibrary() {
     const { organizationId } = getTenantContext();
+    // Include soft-deleted rows so we don't hit the unique constraint on re-seed.
     const existing = await this.prisma.anamnesisQuestion.findMany({
-      where: { deletedAt: null },
-      select: { key: true },
+      select: { key: true, deletedAt: true },
     });
-    const existingKeys = new Set(existing.map((q) => q.key));
+    const liveKeys = new Set(existing.filter((q) => q.deletedAt === null).map((q) => q.key));
+    const deletedKeys = new Set(existing.filter((q) => q.deletedAt !== null).map((q) => q.key));
 
-    const toCreate = QUESTION_LIBRARY.filter((q) => !existingKeys.has(q.key)).map((q) => ({
+    // Reactivate previously soft-deleted library questions.
+    const toReactivate = QUESTION_LIBRARY.filter((q) => deletedKeys.has(q.key)).map((q) => q.key);
+    if (toReactivate.length > 0) {
+      await this.prisma.anamnesisQuestion.updateMany({
+        where: { key: { in: toReactivate }, organizationId, deletedAt: { not: null } },
+        data: { deletedAt: null, active: true },
+      });
+    }
+
+    const toCreate = QUESTION_LIBRARY.filter((q) => !liveKeys.has(q.key) && !deletedKeys.has(q.key)).map((q) => ({
       organizationId,
       key: q.key,
       label: q.label,
@@ -43,10 +53,11 @@ export class AnamnesisQuestionsService {
       order: q.order,
     }));
 
-    if (toCreate.length === 0) return { created: 0 };
+    if (toCreate.length > 0) {
+      await this.prisma.anamnesisQuestion.createMany({ data: toCreate });
+    }
 
-    await this.prisma.anamnesisQuestion.createMany({ data: toCreate });
-    return { created: toCreate.length };
+    return { created: toCreate.length, reactivated: toReactivate.length };
   }
 
   async create(input: CreateAnamnesisQuestionInput) {
