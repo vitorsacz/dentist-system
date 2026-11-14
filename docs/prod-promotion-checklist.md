@@ -53,28 +53,7 @@ A query da seção 1.2 lista quais constraints precisam de VALIDATE.
 | Migration | Tabela | Constraint | VALIDATE incluído? |
 |---|---|---|---|
 | `20261104000000_hawk_h1_anamnesis_structured` | `Anamnesis` | `Anamnesis_updatedByUserId_fkey` | Sim — `20261105000001_cap_validate_anamnesis_fk` |
-| `20261104020000_hawk_anamnesis_questions` | `AnamnesisQuestion` | `AnamnesisQuestion_organizationId_fkey` | **Não** — validar manualmente |
-
-Para a FK `AnamnesisQuestion_organizationId_fkey`, execute em prod após o deploy:
-
-```sql
-ALTER TABLE "AnamnesisQuestion"
-  VALIDATE CONSTRAINT "AnamnesisQuestion_organizationId_fkey";
-```
-
-Acesso: Supabase dashboard → SQL Editor, ou via `psql $DIRECT_URL`.
-
-Após validar, adicione uma migration de VALIDATE para registrar no histórico:
-
-```bash
-# No repo, crie a migration:
-pnpm --filter @dentist-system/api prisma migrate dev \
-  --name cap_validate_anamnesis_question_fk \
-  --create-only
-# Adicione ao arquivo gerado:
-#   ALTER TABLE "AnamnesisQuestion" VALIDATE CONSTRAINT "AnamnesisQuestion_organizationId_fkey";
-# Aplique em prod no próximo deploy.
-```
+| `20261104020000_hawk_anamnesis_questions` | `AnamnesisQuestion` | `AnamnesisQuestion_organizationId_fkey` | Sim — `20261106000000_cap_validate_anamnesis_question_fk` |
 
 ### 3.2 Smoke post-deploy
 
